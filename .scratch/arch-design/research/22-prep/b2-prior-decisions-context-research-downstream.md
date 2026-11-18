@@ -1,14 +1,20 @@
 # Research 22 Prep: Prior Decisions, Context, Research, and Downstream Constraints (B2)
 
-- **Deliverable Path**: `.scratch/arch-design/research/22-prep/b2-prior-decisions-context-research-downstream.md`
+- **Deliverable Path**:
+  `.scratch/arch-design/research/22-prep/b2-prior-decisions-context-research-downstream.md`
 - **Baseline Git HEAD**: `8064cf76` (incorporating `main @ 207cc3fb`)
-- **Focus**: Synthesize constraints, obligations, precedents, tactical findings, contradictions, and downstream handoffs for Ticket 22 (`issues/22-config-ownership-and-lifecycle.md`).
+- **Focus**: Synthesize constraints, obligations, precedents, tactical findings,
+  contradictions, and downstream handoffs for Ticket 22
+  (`issues/22-config-ownership-and-lifecycle.md`).
 
 ---
 
 ## 1. Per-Sub-Question (a to g) Constraints Table
 
-Sources audited: Issue 21 Answer & Prep (`issues/21`, `brief-r3.md`, `decisions-ledger.md`), Research (`01`, `04`, `05`, `09`, `11`), ADRs (`0002`, `0009`, `0004`, `0006`), Surveys (`root-primitives.md`, `note.md`, `cross-cutting.md`, `cli.md`), and `reverification.md`.
+Sources audited: Issue 21 Answer & Prep (`issues/21`, `brief-r3.md`,
+`decisions-ledger.md`), Research (`01`, `04`, `05`, `09`, `11`), ADRs (`0002`,
+`0009`, `0004`, `0006`), Surveys (`root-primitives.md`, `note.md`,
+`cross-cutting.md`, `cli.md`), and `reverification.md`.
 
 | Sub-Q | Core Topic | Concrete Constraint & Rule | Exact Source Citation | Provenance Class |
 |---|---|---|---|---|
@@ -26,7 +32,9 @@ Sources audited: Issue 21 Answer & Prep (`issues/21`, `brief-r3.md`, `decisions-
 
 ## 2. Ticket 21 Interface Obligations on Config
 
-Ticket 21 (`issues/21-ambient-environment-and-execution-context.md#answer`) establishes strict architectural contracts on how configuration is discovered, acquired, validated, and bound.
+Ticket 21 (`issues/21-ambient-environment-and-execution-context.md#answer`)
+establishes strict architectural contracts on how configuration is discovered,
+acquired, validated, and bound.
 
 ### Detailed Obligations Matrix: Ticket 22 vs Downstream Ownership
 
@@ -45,7 +53,9 @@ Ticket 21 (`issues/21-ambient-environment-and-execution-context.md#answer`) esta
 
 ## 3. Downstream Dependency Table (Open Tickets 23–36)
 
-To enable proper sequencing of sub-questions (a) through (g) during Ticket 22's specification, this table details what each downstream ticket requires from 22, and what 22 requires from each ticket.
+To enable proper sequencing of sub-questions (a) through (g) during Ticket 22's
+specification, this table details what each downstream ticket requires from 22,
+and what 22 requires from each ticket.
 
 | Ticket | Title | What It Needs from Ticket 22 | What Ticket 22 Needs from It | Sequencing Constraint on Sub-Questions |
 |---|---|---|---|---|
@@ -68,54 +78,115 @@ To enable proper sequencing of sub-questions (a) through (g) during Ticket 22's 
 
 ## 4. Tactical Defects Recorded in `findings-ledger.md` (Config Area)
 
-The following entries from `.scratch/arch-design/findings-ledger.md` represent tactical defects and mechanical cleanups in the config area. Ticket 22 MUST NOT attempt to architecturally redesign or re-litigate these; they are fixed through ordinary PRs or respected as existing ground truth:
+The following entries from `.scratch/arch-design/findings-ledger.md` represent
+tactical defects and mechanical cleanups in the config area. Ticket 22 MUST NOT
+attempt to architecturally redesign or re-litigate these; they are fixed through
+ordinary PRs or respected as existing ground truth:
 
-1. **Item 19 (`findings-ledger.md:19`)**: `[templates].directory` has no default while `[schemas].directory` defaults to `"schemas"`.
-   - *Status*: Config default asymmetry in `src/config/builder.rs:76-82,141-150`. To be resolved by standardizing defaults.
-2. **Item 21 (`findings-ledger.md:21`)**: `Config::hash`, `ConfigDigests::compose`, and the `root`/`templates`/`schema-directory` digests have no production consumer; the 380-line `syn` scan of 6 source files remains.
-   - *Status*: Residual dead surface left after drift detection landed. Ticket 22 sub-question (c) resolves whether to retire or keep these.
-3. **Item 20 (`findings-ledger.md:20`)**: ADR-0009 (index refresh) is implemented in code (`meta` table, config drift heals on refresh) but still labeled `status: proposed`; its text states format-version mismatch is a `Drifted` state, whereas code wipes the store at `IndexStore::open`.
+1. **Item 19 (`findings-ledger.md:19`)**: `[templates].directory` has no default
+   while `[schemas].directory` defaults to `"schemas"`.
+   - *Status*: Config default asymmetry in
+     `src/config/builder.rs:76-82,141-150`. To be resolved by standardizing
+     defaults.
+2. **Item 21 (`findings-ledger.md:21`)**: `Config::hash`,
+   `ConfigDigests::compose`, and the `root`/`templates`/`schema-directory`
+   digests have no production consumer; the 380-line `syn` scan of 6 source
+   files remains.
+   - *Status*: Residual dead surface left after drift detection landed. Ticket
+     22 sub-question (c) resolves whether to retire or keep these.
+3. **Item 20 (`findings-ledger.md:20`)**: ADR-0009 (index refresh) is
+   implemented in code (`meta` table, config drift heals on refresh) but still
+   labeled `status: proposed`; its text states format-version mismatch is a
+   `Drifted` state, whereas code wipes the store at `IndexStore::open`.
    - *Status*: Documentation/ADR maintenance item.
-4. **Item 23 (`findings-ledger.md:23`)**: `RefreshReport` is only logged in production; its count accessors are test-only (`expect(dead_code)`), so config drift healing is invisible to CLI users except at `RUST_LOG=info`.
+4. **Item 23 (`findings-ledger.md:23`)**: `RefreshReport` is only logged in
+   production; its count accessors are test-only (`expect(dead_code)`), so
+   config drift healing is invisible to CLI users except at `RUST_LOG=info`.
    - *Status*: Observability defect owned by tickets 25 and 31.
 
 ---
 
 ## 5. Architectural Contradictions & Tensions Identified
 
-1. **Dead Hashing vs. Compile-Time Completeness (`findings-ledger:21` vs. `ADR-0009:56-58` vs. `research/05:70`)**:
-   - *Tension*: ADR-0009 and the landed drift implementation intended fail-closed compile-time safety by exhaustively destructuring `ConfigDigests`. However, 5 of the 15 digests are unconsumed by `IndexFingerprint`, and `Config::hash` / `compose` are completely dead. Furthermore, a complex 380-line `syn` AST test was introduced to enforce digest presence, which `research/05` criticized as high-maintenance when a plain struct destructure in `IndexFingerprint` already achieves Rust type-level fail-closed guarantees.
-2. **Path Encoding in redb vs. Portable Config (`src/path.rs:340-437` vs. `survey/root-primitives.md:51` vs. `issues/21:78`)**:
-   - *Tension*: `src/path.rs::codec` serializes `PathBuf` as raw OS bytes (`&[u8]`) on Unix and wide chars (`&[u16]`) on Windows. Storing machine-dependent path encodings in redb makes the index database non-portable across OSes. Meanwhile, Ticket 21 mandates preserving platform path encodings at the edge while avoiding Unicode-only loss for production paths.
-3. **`SafeRelativePath` TOCTOU Window vs. Strict Trust Security (`docs/adr/0002` vs. `src/path.rs:181-190` vs. `survey/root-primitives.md:34`)**:
-   - *Tension*: ADR-0002 relies on symlinks in XDG state dirs for security gating. However, `SafeRelativePath::parse` checks `strict_path` boundary confinement and then immediately executes a plain `root.join()`, leaving an acknowledged TOCTOU window where an intervening symlink swap can escape the boundary.
-4. **Phantom Typestate Over-Engineering (`src/config/` vs. Jujutsu/Cargo Precedent)**:
-   - *Tension*: `LocalConfigFile<Unchecked>` and `LocalConfigFile<Trusted>` enforce compile-time state transitions, but in practice, real workflows need dynamic request-admission revalidation and error handling. Precedent from Cargo and jj uses simple state snapshots and explicit verification methods rather than phantom types.
+1. **Dead Hashing vs. Compile-Time Completeness (`findings-ledger:21` vs.
+   `ADR-0009:56-58` vs. `research/05:70`)**:
+   - *Tension*: ADR-0009 and the landed drift implementation intended
+     fail-closed compile-time safety by exhaustively destructuring
+     `ConfigDigests`. However, 5 of the 15 digests are unconsumed by
+     `IndexFingerprint`, and `Config::hash` / `compose` are completely dead.
+     Furthermore, a complex 380-line `syn` AST test was introduced to enforce
+     digest presence, which `research/05` criticized as high-maintenance when a
+     plain struct destructure in `IndexFingerprint` already achieves Rust
+     type-level fail-closed guarantees.
+2. **Path Encoding in redb vs. Portable Config (`src/path.rs:340-437` vs.
+   `survey/root-primitives.md:51` vs. `issues/21:78`)**:
+   - *Tension*: `src/path.rs::codec` serializes `PathBuf` as raw OS bytes
+     (`&[u8]`) on Unix and wide chars (`&[u16]`) on Windows. Storing
+     machine-dependent path encodings in redb makes the index database
+     non-portable across OSes. Meanwhile, Ticket 21 mandates preserving platform
+     path encodings at the edge while avoiding Unicode-only loss for production
+     paths.
+3. **`SafeRelativePath` TOCTOU Window vs. Strict Trust Security (`docs/adr/0002`
+   vs. `src/path.rs:181-190` vs. `survey/root-primitives.md:34`)**:
+   - *Tension*: ADR-0002 relies on symlinks in XDG state dirs for security
+     gating. However, `SafeRelativePath::parse` checks `strict_path` boundary
+     confinement and then immediately executes a plain `root.join()`, leaving an
+     acknowledged TOCTOU window where an intervening symlink swap can escape the
+     boundary.
+4. **Phantom Typestate Over-Engineering (`src/config/` vs. Jujutsu/Cargo
+   Precedent)**:
+   - *Tension*: `LocalConfigFile<Unchecked>` and `LocalConfigFile<Trusted>`
+     enforce compile-time state transitions, but in practice, real workflows
+     need dynamic request-admission revalidation and error handling. Precedent
+     from Cargo and jj uses simple state snapshots and explicit verification
+     methods rather than phantom types.
 
 ---
 
 ## 6. Open Questions Left for Ticket 22
 
 1. **Sub-Q (c) Invalidation Scope & Index Fingerprint Composition**:
-   - *Explicit Mandate from Ticket 21 (`issues/21:93-95`)*: "Include the ignore policy and any persisted filename-period parse policy in index freshness. Do not automatically use the full host-policy identity as the index fingerprint."
-   - *Implication for (c)*: The index fingerprint MUST NOT hash the entire host policy or whole-config file (which would cause spurious rebuilds on benign changes like CLI verbosity, template directories, or log levels). Instead:
-     - 10 settings currently in `IndexFingerprint` (`frontmatter`, `task`, `schemas.class_field`) remain valid.
-     - Add `ignore` directory names/patterns and `DateConfig` filename-period parsing rules to `IndexFingerprint`.
-     - Retire the unused digests (`root`, `templates.directory`, `schemas.directory`), delete `Config::hash` and `ConfigDigests::compose`, and remove the 380-line `syn` AST test scanner.
+   - *Explicit Mandate from Ticket 21 (`issues/21:93-95`)*: "Include the ignore
+     policy and any persisted filename-period parse policy in index freshness.
+     Do not automatically use the full host-policy identity as the index
+     fingerprint."
+   - *Implication for (c)*: The index fingerprint MUST NOT hash the entire host
+     policy or whole-config file (which would cause spurious rebuilds on benign
+     changes like CLI verbosity, template directories, or log levels). Instead:
+     - 10 settings currently in `IndexFingerprint` (`frontmatter`, `task`,
+       `schemas.class_field`) remain valid.
+     - Add `ignore` directory names/patterns and `DateConfig` filename-period
+       parsing rules to `IndexFingerprint`.
+     - Retire the unused digests (`root`, `templates.directory`,
+       `schemas.directory`), delete `Config::hash` and `ConfigDigests::compose`,
+       and remove the 380-line `syn` AST test scanner.
 2. **Sub-Q (a) Module Re-Homing Boundary**:
-   - Should `TaskStatusMap` move to `src/config/tasks.rs` while `TaskDateSet`, `TaskPriority`, and emoji extractors move to `src/note/task.rs`? Or should a dedicated leaf module `src/task_status.rs` hold status definitions shared by config, note, and query?
+   - Should `TaskStatusMap` move to `src/config/tasks.rs` while `TaskDateSet`,
+     `TaskPriority`, and emoji extractors move to `src/note/task.rs`? Or should
+     a dedicated leaf module `src/task_status.rs` hold status definitions shared
+     by config, note, and query?
 3. **Sub-Q (b) Parser Input Decoupling**:
-   - Does `MarkdownParserInput` take a lightweight `&note::parser::ParserOptions` struct, or purely destructured primitive slices (`&TaskStatusMap`, `&[Tag]`, `&str`)?
+   - Does `MarkdownParserInput` take a lightweight
+     `&note::parser::ParserOptions` struct, or purely destructured primitive
+     slices (`&TaskStatusMap`, `&[Tag]`, `&str`)?
 4. **Sub-Q (d) & (e) Trust Revalidation Protocol**:
-   - How does the per-request revalidation in a held workspace balance syscall overhead (stat/readlink on `.local/state/traces/trusted-configs/<hash>`) against caching? Is checking the symlink mtime sufficient, or must the content hash of `.traces/config.toml` be recomputed on every request?
+   - How does the per-request revalidation in a held workspace balance syscall
+     overhead (stat/readlink on `.local/state/traces/trusted-configs/<hash>`)
+     against caching? Is checking the symlink mtime sufficient, or must the
+     content hash of `.traces/config.toml` be recomputed on every request?
 5. **Sub-Q (g) Scaffolding Seam**:
-   - What is the exact API boundary of `ConfigService::scaffold`? How does it report progress/created paths back to `cli::init` for terminal output and potential rollback?
+   - What is the exact API boundary of `ConfigService::scaffold`? How does it
+     report progress/created paths back to `cli::init` for terminal output and
+     potential rollback?
 
 ---
 
 ## Summary of Findings & Ground Truths
 
 - All 7 sub-questions (a) through (g) have clear evidence-backed boundaries.
-- Ticket 21's interface obligations require a stateless, multi-root ready `Config` architecture with request-admission trust checks.
-- Downstream tickets 23, 25, 30, 31, and 33 are tightly coupled to the sequencing of Ticket 22's answers.
-- `findings-ledger.md` records 4 tactical defects that must remain out of scope for architectural debates.
+- Ticket 21's interface obligations require a stateless, multi-root ready
+  `Config` architecture with request-admission trust checks.
+- Downstream tickets 23, 25, 30, 31, and 33 are tightly coupled to the
+  sequencing of Ticket 22's answers.
+- `findings-ledger.md` records 4 tactical defects that must remain out of scope
+  for architectural debates.

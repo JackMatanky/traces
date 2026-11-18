@@ -2,152 +2,608 @@
 
 Status: ready-for-agent
 
-> **Historical note (2026-10-05, §12.3 Q1e):** the Problem Statement below is the *as-written* record of why this effort started. Several of its items have since been fixed by tickets 01/03 — the silent panics (N1), the dead fixed-magnitude bridge (30-day `month`), and the 301-digit `DurationSeconds: Display` (N19, fixed at `duration.rs:1095`). Treat them as regression-guard context, not current state; current state is the checklist statuses in the tickets.
+> **Historical note (2026-10-05, §12.3 Q1e):** the Problem Statement below is
+> the *as-written* record of why this effort started. Several of its items have
+> since been fixed by tickets 01/03 — the silent panics (N1), the dead
+> fixed-magnitude bridge (30-day `month`), and the 301-digit
+> `DurationSeconds: Display` (N19, fixed at `duration.rs:1095`). Treat them as
+> regression-guard context, not current state; current state is the checklist
+> statuses in the tickets.
 
 ## Problem Statement
 
-Traces' date/duration layer is the least trustworthy cluster in the codebase. It silently panics on out-of-range durations, its YAML-deserialized dates behave differently from the same dates typed inline (different grammar, different round-trip), the template engine owns the one live calendar implementation while core holds a dead fixed-magnitude bridge (`month` = 30 days), so the two *meanings* of month diverge and `date_add` can visibly do nothing, and a reader can never tell whether "1 month" means 30 days or a calendar month because both meanings are in the code and neither is declared. Meanwhile two citation-backed parity reviews against Dataview and Templater show the query language missing its headline idiom (`date + duration`) and the template layer missing `durationformat` and moment-style formats — the features users copy from those plugins most.
+Traces' date/duration layer is the least trustworthy cluster in the codebase. It
+silently panics on out-of-range durations, its YAML-deserialized dates behave
+differently from the same dates typed inline (different grammar, different
+round-trip), the template engine owns the one live calendar implementation while
+core holds a dead fixed-magnitude bridge (`month` = 30 days), so the two
+*meanings* of month diverge and `date_add` can visibly do nothing, and a reader
+can never tell whether "1 month" means 30 days or a calendar month because both
+meanings are in the code and neither is declared. Meanwhile two citation-backed
+parity reviews against Dataview and Templater show the query language missing
+its headline idiom (`date + duration`) and the template layer missing
+`durationformat` and moment-style formats — the features users copy from those
+plugins most.
 
-For a vault tool, this is user-facing: a note written in New York silently compares wrong-by-hours against file timestamps and a month-duration query is wrong five days a year; behind the same surface sits a latent public-API defect (`DurationSeconds: Display` renders a 301-digit number, though it has no non-test caller yet — a test-demonstrated edge, not a user-facing one). The cluster also can't grow safely — every parity feature currently requires editing core match statements, so the open/closed property the rest of the codebase enjoys (registry entries) is absent exactly where the divergence risk is highest.
+For a vault tool, this is user-facing: a note written in New York silently
+compares wrong-by-hours against file timestamps and a month-duration query is
+wrong five days a year; behind the same surface sits a latent public-API defect
+(`DurationSeconds: Display` renders a 301-digit number, though it has no
+non-test caller yet — a test-demonstrated edge, not a user-facing one). The
+cluster also can't grow safely — every parity feature currently requires editing
+core match statements, so the open/closed property the rest of the codebase
+enjoys (registry entries) is absent exactly where the divergence risk is
+highest.
 
 ## Solution
 
-Make `date.rs`/`duration.rs` a set of deep modules with declared, single-owner seams, then land the parity gaps as registry entries on top:
+Make `date.rs`/`duration.rs` a set of deep modules with declared, single-owner
+seams, then land the parity gaps as registry entries on top:
 
-- **One calendar owner:** shift/diff/apply live in the date module; the template engine and (future) query functions become thin adapters over it. Adding a unit means editing one table, not four matches.
-- **One declared duration regime:** identity is seconds (fixed ratios, named as such); application of day/week/month/year parts to dates is calendar (local wall-clock frame), left-to-right — the Luxon-style "equal values, different shifts" behavior is declared, pinned by test, and documented instead of hidden in an engine `match`.
-- **One recognition entry per domain:** a `classify` trichotomy (`None` = cheap shape gate, `Some(Ok/Err)`) retires the guard-protocol functions that two call sites have already forgotten to honor.
-- **Precision lives at the recognition layer**, so `YYYY-MM` survives arithmetic and the engine deletes the shadow type it had to invent.
-- **Deserialization funnels through the same parser as inline input**, making the documented funnel claim true.
-- **Naive datetimes mean local time** (both plugins' behavior), stored as UTC, with a decided DST policy (ambiguous → earliest, true gap → shift forward, tz-data/OS lookup failure → error) enforced by a single gap-verified resolver.
-- **Parity arrives as registry entries:** query temporal functions in the `FilterFunction` registry, `durationformat` and a scoped moment→strftime translator as template filters, shorthands as engine adapters over the calendar owner.
+- **One calendar owner:** shift/diff/apply live in the date module; the template
+  engine and (future) query functions become thin adapters over it. Adding a
+  unit means editing one table, not four matches.
+- **One declared duration regime:** identity is seconds (fixed ratios, named as
+  such); application of day/week/month/year parts to dates is calendar (local
+  wall-clock frame), left-to-right — the Luxon-style "equal values, different
+  shifts" behavior is declared, pinned by test, and documented instead of hidden
+  in an engine `match`.
+- **One recognition entry per domain:** a `classify` trichotomy (`None` = cheap
+  shape gate, `Some(Ok/Err)`) retires the guard-protocol functions that two call
+  sites have already forgotten to honor.
+- **Precision lives at the recognition layer**, so `YYYY-MM` survives arithmetic
+  and the engine deletes the shadow type it had to invent.
+- **Deserialization funnels through the same parser as inline input**, making
+  the documented funnel claim true.
+- **Naive datetimes mean local time** (both plugins' behavior), stored as UTC,
+  with a decided DST policy (ambiguous → earliest, true gap → shift forward,
+  tz-data/OS lookup failure → error) enforced by a single gap-verified resolver.
+- **Parity arrives as registry entries:** query temporal functions in the
+  `FilterFunction` registry, `durationformat` and a scoped moment→strftime
+  translator as template filters, shorthands as engine adapters over the
+  calendar owner.
 
-Everything is verified through three existing seams — value-type interfaces (unit), the query `FilterFunction` registry (integration), and template filters (integration) — with no new seams.
+Everything is verified through three existing seams — value-type interfaces
+(unit), the query `FilterFunction` registry (integration), and template filters
+(integration) — with no new seams.
 
 ## User Stories
 
-1. As a query author, I want to write `date + duration` and `date - duration` in filter expressions (Dataview's headline idiom), so that I don't have to compute offsets by hand.
-2. As a query author, I want `date - date` to yield a duration, so that I can ask "how old is this note" in one expression.
-3. As a query author, I want duration arithmetic (`duration + duration`, `duration * number`), so that I can build derived offsets.
-4. As a query author, I want `date_component(date, "year"|"month"|"day"|...)` plus start/end-of-week/month/year helpers, so that I can bucket notes into periods (week buckets per Dataview minus the `.week` footgun).
-5. As a query author, I want `date_add`/`date_diff` to accept **any** documented unit spelling (weeks, ms, abbreviations), so that the docs never lie about what parses.
-6. As a query author, I want `file.day` available on notes, so that day-bucketed views work like Dataview's.
-7. As a template author, I want `durationformat` producing human-readable durations ("3 days, 4 hours"), so that output reads naturally.
-8. As a template author, I want common moment tokens (`YYYY MM DD HH mm ss`, `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`, bracket literals like `[Daily]`) accepted in template date formats, so that templates copied from Dataview/Templater render without rewriting.
-9. As a template author, I want an unsupported moment token to fail with an error that **names the token**, says the input was treated as moment-dialect, and points at the supported list — so that I know exactly what to fix.
-10. As a template author, I want ISO-8601 duration offsets (`P1M`, `P-1M`) accepted on date shorthands like `date.now`, so that Templater recipes work unchanged.
-11. As a template author, I want the `weekday(n)` argument form and the `sow`/`eow`/`soy`/`eoy` bucketing shorthands (the other pieces — `tomorrow`/`yesterday`, start/end-of-month, no-arg `weekday` — already exist), so that daily-note workflows are one expression.
-12. As a note author, I want a naive datetime in YAML (`2026-07-29 14:30`) interpreted in **my local zone** and stored as UTC, so that my timestamps compare correctly against file times instead of being wrong by my UTC offset.
-13. As a note author in a DST timezone, I want an ambiguous fall-back time to deterministically resolve to the **earliest** occurrence and a spring-forward gap to shift forward, so that ambiguity and DST gaps never make parsing fail (only a tz-data/OS lookup failure does) and results are reproducible.
-14. As a note author, I want date-only values (`2026-07-29`) treated as civil dates with no zone attached, so that adding days never shifts them across a timezone transition.
-15. As a note author, I want inline dates and YAML-deserialized dates to parse through the **same grammar** (four-digit year rule, `YYYY-MM` accepted), so that where I write a date never changes what it means.
-16. As a note author, I want a serialized date to read back exactly through the explicit RFC3339 `…Z` interop form while human `Display` stays local-naive text, so that round-trips are stable without changing what a note author sees.
-17. As a Dataview user, I want `dur("1 month")` to parse and shift dates by a calendar month, so that the plugin's documented examples work.
-18. As a Dataview user, I want `"1h 30m" == "90m"` and cross-spelling equality preserved, so that normalized comparisons keep working.
-19. As a careful reader of the docs, I want the month/year incoherence ("1 month" equals "30 days" as a value but shifts differently) **pinned by a test** that demonstrates it, so that the contract is executable, not just prose.
-20. As anyone comparing durations, I want `"0m"` and `"-0m"` to be equal and to satisfy `>= 0`, so that signed-zero can't fail a range filter.
-21. As an API consumer rendering extreme durations, I want display output that is readable (no 301-digit numbers, no silent `"0s"` for a nonzero value), so that the latent public-API defect — `DurationSeconds: Display` has no non-test caller today — is pinned by tests instead of waiting to surface in user output. *(Both defects fixed by tickets 01/03 — `duration.rs:1095` dialect + tests; retained as a regression guard.)*
-22. As an API consumer, I want out-of-range duration conversion to return an error instead of panicking, so that untrusted input can't crash indexing.
-23. As an API consumer, I want errors to carry their source chain (`Error::source`), so that a parse failure shows which layer and input produced it.
-24. As a maintainer, I want the guard protocol (`classify` trichotomy) to be the **only** way callers distinguish "not mine" from "mine but invalid", so that a call site can't forget a guard and misclassify.
-25. As a maintainer, I want the cheap shape-gate checks private to their module, so that the protocol can't leak and drift across callers.
-26. As a maintainer, I want `YYYY-MM` precision to survive arithmetic and re-formatting, so that a year-month input doesn't silently become a day.
-27. As a template author, I want `date_add` with sub-day units on a date-only input to behave predictably (and be documented when it can't change the visible result), so that I'm not surprised by a no-op.
-28. As a maintainer, I want the template engine's private precision/parsed-date types deleted in favor of the recognition-layer result, so that there's one answer to "what did this string recognize as".
-29. As a maintainer, I want exactly one copy of the unit-ratio table, so that adding a unit can't silently miss a consumer.
-30. As a maintainer, I want the format-cascade loop and the ISO-prefix scan each implemented once (invalid-pattern detection is chrono's `DelayedFormat` error, not ours), so that a fix lands everywhere at once.
-31. As a maintainer, I want `checked_add`/`checked_sub` either calendar-aware or gone, so that no API pretends to arithmetic it can't do.
-32. As a maintainer, I want dead methods either wired to real consumers or deleted, so that the public surface is all true surface.
-33. As a library consumer, I want `DateTimeValue`/`DateError` exported alongside `DurationValue`/`DurationError` (`DateValue` is the only public type today) and errors marked `#[non_exhaustive]`, so that the crate's public date API is coherent and evolvable.
-34. As a vault maintainer, I want `now`/`today` read from the local clock but stored UTC (Templater parity), so that templates show my day while the index stays canonical.
-35. As a cross-timezone user, I want the local-vs-UTC decision and the strictness-by-seam rule (lenient note coercion / strict template / strict serde) written in the glossary, so that the behavior is unsurprising by documentation.
-36. As a query author comparing to null, I want the null-ordering doctrine captured in an ADR — sort: null ranks below every non-null value (current behavior, pinned by existing tests); filter: null never satisfies any ordering (explicit guard, ADR supersedes the code comment) — so that the rule is a decision, not a comment.
-37. As a note author sorting notes, I want nulls equal to each other and ranked below every non-null value (current behavior, pinned by existing tests), so that sorts don't silently promote missing data.
-38. As an agent working in this repo, I want GLOSSARY.md to name the calendar-arithmetic owner, the duration regime, the four-digit-year rule, and the naive-zone rule, so that I don't re-derive them from code.
-39. As an agent, I want the config-level default format constant removed in favor of the crate's documented `DEFAULT_DATETIME_FORMAT` (the config const is named for a *date* but holds a datetime pattern — naming is misleading, and the values are identical, so consolidation is value-neutral), so that there's one source of truth.
-40. As a maintainer, I want every public date/duration item to have rustdoc-conformant comments (`# Errors` listing real variants, intra-doc links, one-sentence summaries), so that rustdoc builds clean and callers know failure modes.
-41. As a user writing dates with offsets, I want RFC3339 `…Z` reserved for explicit interop (including `Serialize`) while everyday human display uses the local-naive spelling, so that each channel has one canonical form.
-42. As a maintainer, I want the divergence register to record every intentional difference from Dataview/Templater (UTC instants, space-separated datetimes, magnitude-vs-calendar identity, explicit `NoteFieldType` rank, canonical duration Eq, null ordering, ISO Monday weeks, local-naive + DST, strictness-by-seam, strftime dialect, DST overlap resolves earlier (ecosystem consensus: Temporal/jiff/BigQuery; PostgreSQL resolves later — the outlier), first day of week pinned ISO Monday (elsewhere it is CLDR locale data — deliberately not followed), null ordering unique among engines (SQL engines themselves disagree: PG nulls-largest, Trino/DuckDB always-last, SQLite first), day/week/month/year calendar vs sub-hour exact (PG `1 day` ≠ `24 hours` parity), wasm `Local` caveat (chrono #1701) documented, out-of-scope), so that "is this a bug?" has one place to look. **Added 2026-10-05 (§13):** computed-duration Display faithfulness (an arithmetic result's `raw` is display-only and not a faithful encoding of its parts — NU-1); non-finite `Mul` Display/Serialize (`"infs"`/`"NaNs"` emitted while this spec rejects at consumption — NU-4); the space-fractional parse gap if 04 doesn't fix it (NU-2); the String↔Duration equality asymmetry if kept (`string_field == Duration("1h")` true vs `duration_field == String("1h")` false — §13 T-new-3); fractional-month nominal remainder (`0.5mo` = 15 nominal days — ND-3).
+1. As a query author, I want to write `date + duration` and `date - duration` in
+   filter expressions (Dataview's headline idiom), so that I don't have to
+   compute offsets by hand.
+2. As a query author, I want `date - date` to yield a duration, so that I can
+   ask "how old is this note" in one expression.
+3. As a query author, I want duration arithmetic (`duration + duration`,
+   `duration * number`), so that I can build derived offsets.
+4. As a query author, I want `date_component(date, "year"|"month"|"day"|...)`
+   plus start/end-of-week/month/year helpers, so that I can bucket notes into
+   periods (week buckets per Dataview minus the `.week` footgun).
+5. As a query author, I want `date_add`/`date_diff` to accept **any** documented
+   unit spelling (weeks, ms, abbreviations), so that the docs never lie about
+   what parses.
+6. As a query author, I want `file.day` available on notes, so that day-bucketed
+   views work like Dataview's.
+7. As a template author, I want `durationformat` producing human-readable
+   durations ("3 days, 4 hours"), so that output reads naturally.
+8. As a template author, I want common moment tokens (`YYYY MM DD HH mm ss`,
+   `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`, bracket literals like
+   `[Daily]`) accepted in template date formats, so that templates copied from
+   Dataview/Templater render without rewriting.
+9. As a template author, I want an unsupported moment token to fail with an
+   error that **names the token**, says the input was treated as moment-dialect,
+   and points at the supported list — so that I know exactly what to fix.
+10. As a template author, I want ISO-8601 duration offsets (`P1M`, `P-1M`)
+    accepted on date shorthands like `date.now`, so that Templater recipes work
+    unchanged.
+11. As a template author, I want the `weekday(n)` argument form and the
+    `sow`/`eow`/`soy`/`eoy` bucketing shorthands (the other pieces —
+    `tomorrow`/`yesterday`, start/end-of-month, no-arg `weekday` — already
+    exist), so that daily-note workflows are one expression.
+12. As a note author, I want a naive datetime in YAML (`2026-07-29 14:30`)
+    interpreted in **my local zone** and stored as UTC, so that my timestamps
+    compare correctly against file times instead of being wrong by my UTC
+    offset.
+13. As a note author in a DST timezone, I want an ambiguous fall-back time to
+    deterministically resolve to the **earliest** occurrence and a
+    spring-forward gap to shift forward, so that ambiguity and DST gaps never
+    make parsing fail (only a tz-data/OS lookup failure does) and results are
+    reproducible.
+14. As a note author, I want date-only values (`2026-07-29`) treated as civil
+    dates with no zone attached, so that adding days never shifts them across a
+    timezone transition.
+15. As a note author, I want inline dates and YAML-deserialized dates to parse
+    through the **same grammar** (four-digit year rule, `YYYY-MM` accepted), so
+    that where I write a date never changes what it means.
+16. As a note author, I want a serialized date to read back exactly through the
+    explicit RFC3339 `…Z` interop form while human `Display` stays local-naive
+    text, so that round-trips are stable without changing what a note author
+    sees.
+17. As a Dataview user, I want `dur("1 month")` to parse and shift dates by a
+    calendar month, so that the plugin's documented examples work.
+18. As a Dataview user, I want `"1h 30m" == "90m"` and cross-spelling equality
+    preserved, so that normalized comparisons keep working.
+19. As a careful reader of the docs, I want the month/year incoherence ("1
+    month" equals "30 days" as a value but shifts differently)
+    **pinned by a test** that demonstrates it, so that the contract is
+    executable, not just prose.
+20. As anyone comparing durations, I want `"0m"` and `"-0m"` to be equal and to
+    satisfy `>= 0`, so that signed-zero can't fail a range filter.
+21. As an API consumer rendering extreme durations, I want display output that
+    is readable (no 301-digit numbers, no silent `"0s"` for a nonzero value), so
+    that the latent public-API defect — `DurationSeconds: Display` has no
+    non-test caller today — is pinned by tests instead of waiting to surface in
+    user output. *(Both defects fixed by tickets 01/03 — `duration.rs:1095`
+    dialect + tests; retained as a regression guard.)*
+22. As an API consumer, I want out-of-range duration conversion to return an
+    error instead of panicking, so that untrusted input can't crash indexing.
+23. As an API consumer, I want errors to carry their source chain
+    (`Error::source`), so that a parse failure shows which layer and input
+    produced it.
+24. As a maintainer, I want the guard protocol (`classify` trichotomy) to be the
+    **only** way callers distinguish "not mine" from "mine but invalid", so that
+    a call site can't forget a guard and misclassify.
+25. As a maintainer, I want the cheap shape-gate checks private to their module,
+    so that the protocol can't leak and drift across callers.
+26. As a maintainer, I want `YYYY-MM` precision to survive arithmetic and
+    re-formatting, so that a year-month input doesn't silently become a day.
+27. As a template author, I want `date_add` with sub-day units on a date-only
+    input to behave predictably (and be documented when it can't change the
+    visible result), so that I'm not surprised by a no-op.
+28. As a maintainer, I want the template engine's private precision/parsed-date
+    types deleted in favor of the recognition-layer result, so that there's one
+    answer to "what did this string recognize as".
+29. As a maintainer, I want exactly one copy of the unit-ratio table, so that
+    adding a unit can't silently miss a consumer.
+30. As a maintainer, I want the format-cascade loop and the ISO-prefix scan each
+    implemented once (invalid-pattern detection is chrono's `DelayedFormat`
+    error, not ours), so that a fix lands everywhere at once.
+31. As a maintainer, I want `checked_add`/`checked_sub` either calendar-aware or
+    gone, so that no API pretends to arithmetic it can't do.
+32. As a maintainer, I want dead methods either wired to real consumers or
+    deleted, so that the public surface is all true surface.
+33. As a library consumer, I want `DateTimeValue`/`DateError` exported alongside
+    `DurationValue`/`DurationError` (`DateValue` is the only public type today)
+    and errors marked `#[non_exhaustive]`, so that the crate's public date API
+    is coherent and evolvable.
+34. As a vault maintainer, I want `now`/`today` read from the local clock but
+    stored UTC (Templater parity), so that templates show my day while the index
+    stays canonical.
+35. As a cross-timezone user, I want the local-vs-UTC decision and the
+    strictness-by-seam rule (lenient note coercion / strict template / strict
+    serde) written in the glossary, so that the behavior is unsurprising by
+    documentation.
+36. As a query author comparing to null, I want the null-ordering doctrine
+    captured in an ADR — sort: null ranks below every non-null value (current
+    behavior, pinned by existing tests); filter: null never satisfies any
+    ordering (explicit guard, ADR supersedes the code comment) — so that the
+    rule is a decision, not a comment.
+37. As a note author sorting notes, I want nulls equal to each other and ranked
+    below every non-null value (current behavior, pinned by existing tests), so
+    that sorts don't silently promote missing data.
+38. As an agent working in this repo, I want GLOSSARY.md to name the
+    calendar-arithmetic owner, the duration regime, the four-digit-year rule,
+    and the naive-zone rule, so that I don't re-derive them from code.
+39. As an agent, I want the config-level default format constant removed in
+    favor of the crate's documented `DEFAULT_DATETIME_FORMAT` (the config const
+    is named for a *date* but holds a datetime pattern — naming is misleading,
+    and the values are identical, so consolidation is value-neutral), so that
+    there's one source of truth.
+40. As a maintainer, I want every public date/duration item to have
+    rustdoc-conformant comments (`# Errors` listing real variants, intra-doc
+    links, one-sentence summaries), so that rustdoc builds clean and callers
+    know failure modes.
+41. As a user writing dates with offsets, I want RFC3339 `…Z` reserved for
+    explicit interop (including `Serialize`) while everyday human display uses
+    the local-naive spelling, so that each channel has one canonical form.
+42. As a maintainer, I want the divergence register to record every intentional
+    difference from Dataview/Templater (UTC instants, space-separated datetimes,
+    magnitude-vs-calendar identity, explicit `NoteFieldType` rank, canonical
+    duration Eq, null ordering, ISO Monday weeks, local-naive + DST,
+    strictness-by-seam, strftime dialect, DST overlap resolves earlier
+    (ecosystem consensus: Temporal/jiff/BigQuery; PostgreSQL resolves later —
+    the outlier), first day of week pinned ISO Monday (elsewhere it is CLDR
+    locale data — deliberately not followed), null ordering unique among engines
+    (SQL engines themselves disagree: PG nulls-largest, Trino/DuckDB
+    always-last, SQLite first), day/week/month/year calendar vs sub-hour exact
+    (PG `1 day` ≠ `24 hours` parity), wasm `Local` caveat (chrono #1701)
+    documented, out-of-scope), so that "is this a bug?" has one place to look.
+    **Added 2026-10-05 (§13):** computed-duration Display faithfulness (an
+    arithmetic result's `raw` is display-only and not a faithful encoding of its
+    parts — NU-1); non-finite `Mul` Display/Serialize (`"infs"`/`"NaNs"` emitted
+    while this spec rejects at consumption — NU-4); the space-fractional parse
+    gap if 04 doesn't fix it (NU-2); the String↔Duration equality asymmetry if
+    kept (`string_field == Duration("1h")` true vs
+    `duration_field == String("1h")` false — §13 T-new-3); fractional-month
+    nominal remainder (`0.5mo` = 15 nominal days — ND-3).
 
 ## Implementation Decisions
 
 **Cluster ownership & architecture**
 
-- The date module owns calendar arithmetic: `shift(base, n, unit)`, `diff(a, b, unit)`, `apply(base, &DurationValue)`. The template engine and query layer become thin adapters over it; the engine's copied shift/diff implementations are deleted. Calendar meaning for day/week/month/year exists **only** behind this owner — no unit method exposes it (one place defines it).
-- Query temporal features are `FilterFunction` registry entries for predicates, extended by a **minimal value-expression surface** — and nothing beyond it. **Decided 2026-10-05 (§11 X1, option (i)):** the grammar grows exactly this and no further: field references; literals; registry function calls returning values (their arguments are themselves value expressions — this covers the two-field-arg convention); `+`/`-` on date/duration values (including `date − date` → duration); `*` by a number; and comparison operators whose operands may be any value expression, including function results. No operator precedence beyond left-to-right, no boolean algebra beyond the existing filter combinators, no user-defined functions. Stories 1–3 and ticket 05's demo contract stand as written. Everything outside this fence returns to the lock — never new operators or grammar beyond the enumerated surface.
-- The unit registry (parse table) is the single source of unit knowledge; the duration constructor's private ms-ratio table is derived from it. Month/Year omission from magnitude-derived conversion is documented (unsynthesizable from a magnitude).
-- `DurationUnit::seconds()` is renamed `fixed_seconds()` (and `seconds_i64` → `fixed_seconds_i64`) so the fixed regime is in the name at every call site.
-- Rejected: `Clock`/`TimeZone` traits (one adapter = hypothetical seam; doctrine is data + docs), a `Dialect` trait (the moment translator is a pure function at the template seam), typestate parse builders, merging `DateError`+`DurationError`, `Cow<'a, str>` for the stored raw string (lifetime parameter = interface bloat), locale-configurable first day of week (pinned ISO Monday), a combined date-or-duration mega-classifier (coercion-layer policy stays at coercion seams), **a `DurationValue` type split** (reconfirmed 2026-10-05, §11.5: the grammar mixes calendar and fixed parts inside one value — `1d 2h` — identity is seconds-based per D13 so `1d == 24h` spans any split, `Add` crosses classes, `api-parse-dont-validate` is already satisfied because `parse` is the sole validated constructor, and the parser's complexity-78 score would move wholesale; the class-predicate version of the split is the already-rejected `DurationUnit::class()` one level down), a `Scanner<'a>` type for the duration parse machinery (stateless helpers; ticket 04 collapses the only stateful loops; adjacent no-split already settled), and a private `Frame` trait for `apply`/`shift` (one behavior-varying pair; the public `Shift` trait rejection at review §5.7 covers it — the two frame impls are the real-seam test).
+- The date module owns calendar arithmetic: `shift(base, n, unit)`,
+  `diff(a, b, unit)`, `apply(base, &DurationValue)`. The template engine and
+  query layer become thin adapters over it; the engine's copied shift/diff
+  implementations are deleted. Calendar meaning for day/week/month/year exists
+  **only** behind this owner — no unit method exposes it (one place defines it).
+- Query temporal features are `FilterFunction` registry entries for predicates,
+  extended by a **minimal value-expression surface** — and nothing beyond it.
+  **Decided 2026-10-05 (§11 X1, option (i)):** the grammar grows exactly this
+  and no further: field references; literals; registry function calls returning
+  values (their arguments are themselves value expressions — this covers the
+  two-field-arg convention); `+`/`-` on date/duration values (including
+  `date − date` → duration); `*` by a number; and comparison operators whose
+  operands may be any value expression, including function results. No operator
+  precedence beyond left-to-right, no boolean algebra beyond the existing filter
+  combinators, no user-defined functions. Stories 1–3 and ticket 05's demo
+  contract stand as written. Everything outside this fence returns to the lock —
+  never new operators or grammar beyond the enumerated surface.
+- The unit registry (parse table) is the single source of unit knowledge; the
+  duration constructor's private ms-ratio table is derived from it. Month/Year
+  omission from magnitude-derived conversion is documented (unsynthesizable from
+  a magnitude).
+- `DurationUnit::seconds()` is renamed `fixed_seconds()` (and `seconds_i64` →
+  `fixed_seconds_i64`) so the fixed regime is in the name at every call site.
+- Rejected: `Clock`/`TimeZone` traits (one adapter = hypothetical seam; doctrine
+  is data + docs), a `Dialect` trait (the moment translator is a pure function
+  at the template seam), typestate parse builders, merging
+  `DateError`+`DurationError`, `Cow<'a, str>` for the stored raw string
+  (lifetime parameter = interface bloat), locale-configurable first day of week
+  (pinned ISO Monday), a combined date-or-duration mega-classifier
+  (coercion-layer policy stays at coercion seams),
+  **a `DurationValue` type split** (reconfirmed 2026-10-05, §11.5: the grammar
+  mixes calendar and fixed parts inside one value — `1d 2h` — identity is
+  seconds-based per D13 so `1d == 24h` spans any split, `Add` crosses classes,
+  `api-parse-dont-validate` is already satisfied because `parse` is the sole
+  validated constructor, and the parser's complexity-78 score would move
+  wholesale; the class-predicate version of the split is the already-rejected
+  `DurationUnit::class()` one level down), a `Scanner<'a>` type for the duration
+  parse machinery (stateless helpers; ticket 04 collapses the only stateful
+  loops; adjacent no-split already settled), and a private `Frame` trait for
+  `apply`/`shift` (one behavior-varying pair; the public `Shift` trait rejection
+  at review §5.7 covers it — the two frame impls are the real-seam test).
 
 **Duration semantics (decision A2′)**
 
-- `DurationValue` shape: `raw: Box<str>` + `seconds: DurationSeconds` (sole Eq/Ord/Hash identity) + `parts: Option<Box<[(f64, DurationUnit)]>>`. `parts` entries carry the **written** magnitude, signed with the whole-duration sign applied (N15b: `"-1h 30m"` → `[(-1.0, Hour), (-30.0, Minute)]`), so Σ is one plain left-to-right fold. Exactly two filling *behaviors*: one shared text fold reached by `parse` **and** (until ticket 04's `classify` absorbs it) `parse_prefix`, computing `seconds` as a single left-to-right fold over the entries it just read, computed in one statement — and duration arithmetic (below), whose `Some`+`Some` results compute `seconds` as that same fold over the combined entries, so Σ holds bit-exactly by construction; no runtime validation on either.
-- `parts` doubles as the regime witness: `Some` containing `Day`/`Week`/`Month`/`Year` ⇒ calendar application; `Some` without ⇒ fixed (sub-day-only parts); `None` (synthesized values) ⇒ fixed. Matched exhaustively as data, no extra enum.
-- **Day as calendar application unit (D13):** Identity stays seconds-based (fixed ratios); day joins month/year as a **calendar** application unit, applied left-to-right in written order (chrono's `Days` type exists because `TimeDelta::days(1)` surprises; PostgreSQL documents `+ interval '1 day'` ≠ `+ interval '24 hours'` across DST). So `1d == 24h` as values but may shift differently — the A2′ incoherence extends to days and is pinned by test. Sub-day units (h/min/s/ms) apply as exact durations on the instant.
-- **Week is a calendar application unit too (≡ 7 wall-days):** it is not sub-day, and moment (*"adding years, months, weeks, or days…"* — research item 24) and Temporal (weeks require `relativeTo` — item 25) both treat it as calendar; PostgreSQL `interval '1 week'` ≡ `+ 7 days`. The engine applies week as exact seconds today — this clause **deliberately changes that**, preventing `1w` vs `7d` from becoming a new undeclared incoherence the moment day turns calendar. Pin `1w` ≡ `7d` shifting identically and `1w` vs `168h` differently across DST, beside the `1d`/`24h` test. Verify Luxon during implementation (item 23 lists only days/months/years); if Luxon differs, it earns a divergence-register entry.
-- **Calendar frame (D12):** calendar application preserves the **local wall clock**: `shift`/`apply` for day/week/month/year units round-trip through the local zone — `DateTime<Utc>` → local naive → chrono `checked_add_months(Months)`/`checked_add_days(Days)` (never fail on DST — naive has no DST) → back to UTC through the single resolver; sub-day units remain exact on the instant. Precedent: Temporal `relativeTo`, Luxon `plus`, PostgreSQL `+ interval '1 day'`/`'1 month'`.
-- The Luxon-style incoherence (equal values, different date-shifts — the incoherence now extends to `1d` vs `24h` across DST) is **accepted and declared**: glossary clause + a pinning test that demonstrates it. A1′ (reject `mo`/`y`) and A3′ (shape identity) explicitly rejected — they break pinned cross-spelling equality and the plugins' documented idioms.
-- Duration arithmetic: `Add`/`Sub` on `DurationValue` — with **both sides `Some`**, `seconds` is one left-to-right fold over the combined entries (`Sub` = concat with each rhs entry negated), which equals "seconds add" up to float rounding and makes Σ bit-exact by construction (direct `lhs.seconds ± rhs.seconds` would diverge by non-associativity: `1e16s + ("1s 1s")` folds to `1e16`, direct-adds to `1e16+2`); **with either side `None`**, `seconds` adds directly (`Sub` = add of the negated rhs); `parts` concatenate only when **both** sides are `Some`; **either side `None` ⇒ result `None`** — Σ forces it: a half-inherited witness would lie, and the regime then honestly reads `None` ⇒ fixed; `-0.0` normalized (existing `DurationSeconds::normalized`); result `raw` re-synthesized through `from_seconds` (display-only — the witness is never encoded in `raw`); `Mul<f64>` scales the entries (`Some` ⇒ `seconds` = fold of the scaled entries; `None` ⇒ `seconds` scales directly) — and, since `Mul` cannot fail, a non-finite scalar or overflow to ±∞/NaN leaves `seconds` non-finite, **declared** in `DurationValue`'s type docs (its "always finite" claim narrowed to construction paths, mirroring `DurationSeconds`) and rejected by every consuming conversion with the existing `NonFiniteSeconds` error, never panicking; equality remains seconds-only.
+- `DurationValue` shape: `raw: Box<str>` + `seconds: DurationSeconds` (sole
+  Eq/Ord/Hash identity) + `parts: Option<Box<[(f64, DurationUnit)]>>`. `parts`
+  entries carry the **written** magnitude, signed with the whole-duration sign
+  applied (N15b: `"-1h 30m"` → `[(-1.0, Hour), (-30.0, Minute)]`), so Σ is one
+  plain left-to-right fold. Exactly two filling *behaviors*: one shared text
+  fold reached by `parse` **and** (until ticket 04's `classify` absorbs it)
+  `parse_prefix`, computing `seconds` as a single left-to-right fold over the
+  entries it just read, computed in one statement — and duration arithmetic
+  (below), whose `Some`+`Some` results compute `seconds` as that same fold over
+  the combined entries, so Σ holds bit-exactly by construction; no runtime
+  validation on either.
+- `parts` doubles as the regime witness: `Some` containing
+  `Day`/`Week`/`Month`/`Year` ⇒ calendar application; `Some` without ⇒ fixed
+  (sub-day-only parts); `None` (synthesized values) ⇒ fixed. Matched
+  exhaustively as data, no extra enum.
+- **Day as calendar application unit (D13):** Identity stays seconds-based
+  (fixed ratios); day joins month/year as a **calendar** application unit,
+  applied left-to-right in written order (chrono's `Days` type exists because
+  `TimeDelta::days(1)` surprises; PostgreSQL documents `+ interval '1 day'` ≠
+  `+ interval '24 hours'` across DST). So `1d == 24h` as values but may shift
+  differently — the A2′ incoherence extends to days and is pinned by test.
+  Sub-day units (h/min/s/ms) apply as exact durations on the instant.
+- **Week is a calendar application unit too (≡ 7 wall-days):** it is not
+  sub-day, and moment (*"adding years, months, weeks, or days…"* — research item
+  24) and Temporal (weeks require `relativeTo` — item 25) both treat it as
+  calendar; PostgreSQL `interval '1 week'` ≡ `+ 7 days`. The engine applies week
+  as exact seconds today — this clause **deliberately changes that**, preventing
+  `1w` vs `7d` from becoming a new undeclared incoherence the moment day turns
+  calendar. Pin `1w` ≡ `7d` shifting identically and `1w` vs `168h` differently
+  across DST, beside the `1d`/`24h` test. Verify Luxon during implementation
+  (item 23 lists only days/months/years); if Luxon differs, it earns a
+  divergence-register entry.
+- **Calendar frame (D12):** calendar application preserves the
+  **local wall clock**: `shift`/`apply` for day/week/month/year units round-trip
+  through the local zone — `DateTime<Utc>` → local naive → chrono
+  `checked_add_months(Months)`/`checked_add_days(Days)` (never fail on DST —
+  naive has no DST) → back to UTC through the single resolver; sub-day units
+  remain exact on the instant. Precedent: Temporal `relativeTo`, Luxon `plus`,
+  PostgreSQL `+ interval '1 day'`/`'1 month'`.
+- The Luxon-style incoherence (equal values, different date-shifts — the
+  incoherence now extends to `1d` vs `24h` across DST) is
+  **accepted and declared**: glossary clause + a pinning test that demonstrates
+  it. A1′ (reject `mo`/`y`) and A3′ (shape identity) explicitly rejected — they
+  break pinned cross-spelling equality and the plugins' documented idioms.
+- Duration arithmetic: `Add`/`Sub` on `DurationValue` — with
+  **both sides `Some`**, `seconds` is one left-to-right fold over the combined
+  entries (`Sub` = concat with each rhs entry negated), which equals "seconds
+  add" up to float rounding and makes Σ bit-exact by construction (direct
+  `lhs.seconds ± rhs.seconds` would diverge by non-associativity:
+  `1e16s + ("1s 1s")` folds to `1e16`, direct-adds to `1e16+2`);
+  **with either side `None`**, `seconds` adds directly (`Sub` = add of the
+  negated rhs); `parts` concatenate only when **both** sides are `Some`;
+  **either side `None` ⇒ result `None`** — Σ forces it: a half-inherited witness
+  would lie, and the regime then honestly reads `None` ⇒ fixed; `-0.0`
+  normalized (existing `DurationSeconds::normalized`); result `raw`
+  re-synthesized through `from_seconds` (display-only — the witness is never
+  encoded in `raw`); `Mul<f64>` scales the entries (`Some` ⇒ `seconds` = fold of
+  the scaled entries; `None` ⇒ `seconds` scales directly) — and, since `Mul`
+  cannot fail, a non-finite scalar or overflow to ±∞/NaN leaves `seconds`
+  non-finite, **declared** in `DurationValue`'s type docs (its "always finite"
+  claim narrowed to construction paths, mirroring `DurationSeconds`) and
+  rejected by every consuming conversion with the existing `NonFiniteSeconds`
+  error, never panicking; equality remains seconds-only.
 
 **Recognition & precision**
 
-- Each domain gains one entry point: `classify(s) -> Option<Result<Value, Error>>` (`#[must_use]`). Trichotomy: `None` = O(1) shape gate, no allocation (lexer hot path preserved); `Some(Err)` = allocating detail; `Some(Ok)`. This replaces `can_start && parse` call sites, absorbs the coercion-cascade protocol copy, retires the public guard functions to private, merges the duplicated `parse`/`parse_prefix` loops (killing the `"1h 1x"` divergence), and reduces `TextShape` to a caller rather than a fourth recognition fragment.
-- A `Precision` enum (`YearMonth` | `Date` | `DateTime`) is hoisted to the recognition layer alongside a recognition-result struct; the engine's private precision/parsed-date/format-precise trio delegates to it and is deleted. Precision never participates in `DateValue` equality. This is also where fractional truncation in arithmetic re-serialization gets fixed — once, behind the hoisted precision. **OPEN (2026-10-05, §11 X8):** neither this spec nor ticket 04 names where the `YearMonth` strftime pattern (`%Y-%m`) lives after the hoist (presumably a method/entry on `Precision`), nor that `date_shift_unit` must recover `wall` from the value once `ParsedDate` is deleted (derivable: `DateValue` → midnight, `DateTimeValue` → `local_wall()`, `YearMonth` → day-1 midnight). Ticket 04 must settle both.
-- Format enums gain a `parse_any`-style constructor that owns the cascade loop (currently copied four ways) — adding a recognized shape becomes one variant + list + pattern entry.
+- Each domain gains one entry point:
+  `classify(s) -> Option<Result<Value, Error>>` (`#[must_use]`). Trichotomy:
+  `None` = O(1) shape gate, no allocation (lexer hot path preserved);
+  `Some(Err)` = allocating detail; `Some(Ok)`. This replaces
+  `can_start && parse` call sites, absorbs the coercion-cascade protocol copy,
+  retires the public guard functions to private, merges the duplicated
+  `parse`/`parse_prefix` loops (killing the `"1h 1x"` divergence), and reduces
+  `TextShape` to a caller rather than a fourth recognition fragment.
+- A `Precision` enum (`YearMonth` | `Date` | `DateTime`) is hoisted to the
+  recognition layer alongside a recognition-result struct; the engine's private
+  precision/parsed-date/format-precise trio delegates to it and is deleted.
+  Precision never participates in `DateValue` equality. This is also where
+  fractional truncation in arithmetic re-serialization gets fixed — once, behind
+  the hoisted precision. **OPEN (2026-10-05, §11 X8):** neither this spec nor
+  ticket 04 names where the `YearMonth` strftime pattern (`%Y-%m`) lives after
+  the hoist (presumably a method/entry on `Precision`), nor that
+  `date_shift_unit` must recover `wall` from the value once `ParsedDate` is
+  deleted (derivable: `DateValue` → midnight, `DateTimeValue` → `local_wall()`,
+  `YearMonth` → day-1 midnight). Ticket 04 must settle both.
+- Format enums gain a `parse_any`-style constructor that owns the cascade loop
+  (currently copied four ways) — adding a recognized shape becomes one variant +
+  list + pattern entry.
 
 **Parsing, formatting, serde**
 
-- **DST policy / local→UTC resolver (D14):** Naive datetime input parses as **local zone → UTC**; date-only input is zone-free; `now`/`today`/file-stat reads use the local clock, storage is always UTC. DST policy: one named resolver owns local→UTC, exhaustively matching `MappedLocalTime::{Single, Ambiguous, None}` — ambiguous → earliest (policy "earliest"; **mechanism 2026-10-05: the manual `local_minus_utc()` comparison at `src/date.rs:1064-1076`, never chrono's `.earliest()` API — chrono's `Ambiguous` pair ordering is platform-dependent and `.earliest()` returns the latest occurrence on unix; see §13 RPT-F1**), true gap → shifted forward by the gap, while `None` caused by a tz-data/OS error surfaces as an error, never a silent shift (gap verified by probing adjacent local times). **Issue (§11 X4, raised 2026-10-05):** `From<DateValue> for DateTimeValue` (`src/date.rs:741-749`) currently violates this absolute wording — on zone failure it silently falls back to UTC midnight (`unwrap_or_else(|_zone_failure| midnight.and_utc())`), and it is reachable from filter equality (`is_equal_to_date` `src/date.rs:681-683`), so `Date == DateTime` would compare at UTC midnight while every other path returns `DateError::LocalZoneLookup`. **Decided 2026-10-05 (§11 X4, option (a)):** keep `From`, with a **declared exception** to the sentence above: on zone-lookup failure this promotion degrades to the neutral UTC frame (the civil date read as UTC — deterministic and shift-free) instead of surfacing `LocalZoneLookup`, because the infallible conversion is consumed by equality, sort-key, and ordering paths that cannot propagate an error, while `TryFrom` would duplicate the same fallback at each of them. The exception is recorded as a divergence-register entry (entry number assigned when the register is written, ticket 08), and the impl's rustdoc must state this spec rationale in place of the "chrono does the same" parity argument, which does not satisfy this line. Every other path still surfaces `LocalZoneLookup`. Its rustdoc cites Temporal `'compatible'` (RFC 5545) and jiff `Disambiguation::Compatible`; `LocalResult` is chrono's old name for `MappedLocalTime`. The wasm caveat (chrono #1701: `Local` on wasm returns only `Single`) is documented as out-of-scope. Tests inject `TZ`.
-- `date_add` documentation widens to "any `DurationUnit` spelling"; the caveat that sub-day units may not change a date-only result lands with the precision fix.
-- Deserialization uses a manual `Deserialize` via the module's own parser (house precedent: the duration type's existing manual impl). `Serialize` is explicit interop and emits RFC3339 `…Z` via chrono `to_rfc3339_opts(SecondsFormat::AutoSi, use_z = true)` (closed 2026-10-05, §13 RPT-F3 option (a): `AutoSi` preserves exact decimals without truncation); human `Display` remains the everyday local-naive spelling. Thus explicit-offset input round-trips as an instant, while only naive user-authored input takes the local→UTC resolver path; `%+` is never used. Both errors get `#[non_exhaustive]`; exports made symmetric across the two domains (`DateTimeValue`/`DateError` exported alongside `DurationValue`/`DurationError`).
-- Display rules: duration seconds render through a chosen dialect (exponent above a threshold), never raw `f64`; extreme/small synthesized values must not render as a lie (`"0s"` for nonzero).
-- Invalid-pattern rendering lives at exactly one site: `DatePoint::format_in` (`src/temporal/point.rs`); we own no validator. **(Amended 2026-10-25, temporal-offload Task 16:** the chrono-era `format_with`/`DelayedFormat` wording predates the jiff offload; Task 14 deleted the engine's `format_strtime`, the guard now sits in `DatePoint::format_in`, and failures surface as `DateError::InvalidFormat`. `grep -rn "format_with" src/` finds no match.**)**
-- Moment→strftime translator lives in `temporal::token` (`src/temporal/token.rs`), scope 1: bracket literals, `YYYY MM DD HH mm ss` family, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`; everything else errors naming the token and dialect via `TemporalTokenError`. The engine keeps a thin `pattern_to_strftime` wrapper that delegates the `%`-contains dispatch to the translator and maps `TemporalTokenError` to a template render error. **(Amended by temporal-offload Task 6:** the translator moved from the template seam to `temporal::token`; the "template-seam only" claim is retired.**)**
-- `parse_with(text, fmt)` returns `Result` (one implementation serving the query `reference` case and future LSP needs).
-- ISO-8601 duration strings (`P1M`, `P-1M`) are translated at the shorthand adapter, not added as a second grammar.
-- **Format bindings:** core formatting is a thin jiff wrapper; jiff's `strtime` syntax is the documented grammar (intra-doc link in touched rustdoc); invalid-pattern detection is jiff's own pattern error surfaced with the pattern; no parallel specifier validator; `%+` is not a jiff directive and fails hard; RFC3339 interop emits the `…Z` channel (RPT-F3 closed); format docs note `%Z` prints only an offset, `%S` never renders `60`, and week numbers use `%V`/`%G` (ISO), not `%U`/`%W`.
-- **Week mandate:** week bucketing/numbering delegates to chrono `NaiveDate::iso_week()` / `from_isoywd_opt` and weekday accessors; epoch-day division for weeks is forbidden (Dataview `.week` footgun).
+- **DST policy / local→UTC resolver (D14):** Naive datetime input parses as
+  **local zone → UTC**; date-only input is zone-free; `now`/`today`/file-stat
+  reads use the local clock, storage is always UTC. DST policy: one named
+  resolver owns local→UTC, exhaustively matching
+  `MappedLocalTime::{Single, Ambiguous, None}` — ambiguous → earliest (policy
+  "earliest"; **mechanism 2026-10-05: the manual `local_minus_utc()` comparison
+  at `src/date.rs:1064-1076`, never chrono's `.earliest()` API — chrono's
+  `Ambiguous` pair ordering is platform-dependent and `.earliest()` returns the
+  latest occurrence on unix; see §13 RPT-F1**), true gap → shifted forward by
+  the gap, while `None` caused by a tz-data/OS error surfaces as an error, never
+  a silent shift (gap verified by probing adjacent local times).
+  **Issue (§11 X4, raised 2026-10-05):** `From<DateValue> for DateTimeValue`
+  (`src/date.rs:741-749`) currently violates this absolute wording — on zone
+  failure it silently falls back to UTC midnight
+  (`unwrap_or_else(|_zone_failure| midnight.and_utc())`), and it is reachable
+  from filter equality (`is_equal_to_date` `src/date.rs:681-683`), so
+  `Date == DateTime` would compare at UTC midnight while every other path
+  returns `DateError::LocalZoneLookup`.
+  **Decided 2026-10-05 (§11 X4, option (a)):** keep `From`, with a
+  **declared exception** to the sentence above: on zone-lookup failure this
+  promotion degrades to the neutral UTC frame (the civil date read as UTC —
+  deterministic and shift-free) instead of surfacing `LocalZoneLookup`, because
+  the infallible conversion is consumed by equality, sort-key, and ordering
+  paths that cannot propagate an error, while `TryFrom` would duplicate the same
+  fallback at each of them. The exception is recorded as a divergence-register
+  entry (entry number assigned when the register is written, ticket 08), and the
+  impl's rustdoc must state this spec rationale in place of the "chrono does the
+  same" parity argument, which does not satisfy this line. Every other path
+  still surfaces `LocalZoneLookup`. Its rustdoc cites Temporal `'compatible'`
+  (RFC 5545) and jiff `Disambiguation::Compatible`; `LocalResult` is chrono's
+  old name for `MappedLocalTime`. The wasm caveat (chrono #1701: `Local` on wasm
+  returns only `Single`) is documented as out-of-scope. Tests inject `TZ`.
+- `date_add` documentation widens to "any `DurationUnit` spelling"; the caveat
+  that sub-day units may not change a date-only result lands with the precision
+  fix.
+- Deserialization uses a manual `Deserialize` via the module's own parser (house
+  precedent: the duration type's existing manual impl). `Serialize` is explicit
+  interop and emits RFC3339 `…Z` via chrono
+  `to_rfc3339_opts(SecondsFormat::AutoSi, use_z = true)` (closed 2026-10-05, §13
+  RPT-F3 option (a): `AutoSi` preserves exact decimals without truncation);
+  human `Display` remains the everyday local-naive spelling. Thus
+  explicit-offset input round-trips as an instant, while only naive
+  user-authored input takes the local→UTC resolver path; `%+` is never used.
+  Both errors get `#[non_exhaustive]`; exports made symmetric across the two
+  domains (`DateTimeValue`/`DateError` exported alongside
+  `DurationValue`/`DurationError`).
+- Display rules: duration seconds render through a chosen dialect (exponent
+  above a threshold), never raw `f64`; extreme/small synthesized values must not
+  render as a lie (`"0s"` for nonzero).
+- Invalid-pattern rendering lives at exactly one site: `DatePoint::format_in`
+  (`src/temporal/point.rs`); we own no validator.
+  **(Amended 2026-10-25, temporal-offload Task 16:** the chrono-era
+  `format_with`/`DelayedFormat` wording predates the jiff offload; Task 14
+  deleted the engine's `format_strtime`, the guard now sits in
+  `DatePoint::format_in`, and failures surface as `DateError::InvalidFormat`.
+  `grep -rn "format_with" src/` finds no match.**)**
+- Moment→strftime translator lives in `temporal::token`
+  (`src/temporal/token.rs`), scope 1: bracket literals, `YYYY MM DD HH mm ss`
+  family, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`; everything else errors naming the
+  token and dialect via `TemporalTokenError`. The engine keeps a thin
+  `pattern_to_strftime` wrapper that delegates the `%`-contains dispatch to the
+  translator and maps `TemporalTokenError` to a template render error.
+  **(Amended by temporal-offload Task 6:** the translator moved from the
+  template seam to `temporal::token`; the "template-seam only" claim is
+  retired.**)**
+- `parse_with(text, fmt)` returns `Result` (one implementation serving the query
+  `reference` case and future LSP needs).
+- ISO-8601 duration strings (`P1M`, `P-1M`) are translated at the shorthand
+  adapter, not added as a second grammar.
+- **Format bindings:** core formatting is a thin jiff wrapper; jiff's `strtime`
+  syntax is the documented grammar (intra-doc link in touched rustdoc);
+  invalid-pattern detection is jiff's own pattern error surfaced with the
+  pattern; no parallel specifier validator; `%+` is not a jiff directive and
+  fails hard; RFC3339 interop emits the `…Z` channel (RPT-F3 closed); format
+  docs note `%Z` prints only an offset, `%S` never renders `60`, and week
+  numbers use `%V`/`%G` (ISO), not `%U`/`%W`.
+- **Week mandate:** week bucketing/numbering delegates to chrono
+  `NaiveDate::iso_week()` / `from_isoywd_opt` and weekday accessors; epoch-day
+  division for weeks is forbidden (Dataview `.week` footgun).
 
 **Dead surface & config (Decision C)**
 
-- Wire or delete — **executed by ticket 03's remediation except the live `expect(dead_code)` census** (amended 2026-10-05, §11 X-B): `checked_add`/`checked_sub` superseded by the calendar owner's `apply` and **deleted**; `to_time_string`/`start_of_day`/`cmp_date` **deleted**; `to_offset_string` **deleted** — its `…Z` mandate is satisfied instead by `Serialize` (`to_rfc3339_opts(SecondsFormat::AutoSi, true)` at `src/date.rs`); core `format_with` **deleted** (template copy survives). The live `expect(dead_code)` set is six items: `DateValue::{shift, apply}`, `DateTimeValue::apply`, `DurationValue::{from_seconds, parts, is_calendar}` — all declared spec-mandated surface with declared consumers (04's `classify`, ticket 05). Deletion test re-run on `into_inner`/`From` chrono surface after the calendar owner landed confirms the need shrank (D7 honored).
-- The config-module default-format constant is removed; callers substitute the crate's `DEFAULT_DATETIME_FORMAT` (value-neutral — the config const already holds that same datetime pattern despite its date-ish name; the misleading naming is noted in the commit/docs).
+- Wire or delete — **executed by ticket 03's remediation except the live
+  `expect(dead_code)` census** (amended 2026-10-05, §11 X-B):
+  `checked_add`/`checked_sub` superseded by the calendar owner's `apply` and
+  **deleted**; `to_time_string`/`start_of_day`/`cmp_date` **deleted**;
+  `to_offset_string` **deleted** — its `…Z` mandate is satisfied instead by
+  `Serialize` (`to_rfc3339_opts(SecondsFormat::AutoSi, true)` at `src/date.rs`);
+  core `format_with` **deleted** (template copy survives). The live
+  `expect(dead_code)` set is six items: `DateValue::{shift, apply}`,
+  `DateTimeValue::apply`, `DurationValue::{from_seconds, parts, is_calendar}` —
+  all declared spec-mandated surface with declared consumers (04's `classify`,
+  ticket 05). Deletion test re-run on `into_inner`/`From` chrono surface after
+  the calendar owner landed confirms the need shrank (D7 honored).
+- The config-module default-format constant is removed; callers substitute the
+  crate's `DEFAULT_DATETIME_FORMAT` (value-neutral — the config const already
+  holds that same datetime pattern despite its date-ish name; the misleading
+  naming is noted in the commit/docs).
 
 **Docs**
 
-- GLOSSARY.md gains: calendar-arithmetic owner clause; duration regime clause (identity = magnitude, application = calendar for day/week/month/year with sub-hour units exact, calendar frame = local wall clock, equal-values-may-shift-differently, test-backed); date interface facts (four-digit year, `YYYY-MM` → day 1, precision at recognition layer, naive datetime = local → stored UTC); funnel claim extended to deserialization; registry-owner claim without caveat; strictness-by-seam rule; pinned ISO Monday; DST policy (resolver cited to Temporal `'compatible'`/RFC 5545); single `*Avoid*` glossary rule.
-- ADR: null ordering — sort: null ranks below every non-null value (current behavior, pinned by existing tests); filter: null never satisfies any ordering (explicit guard, ADR supersedes the code comment); divergence register covering UTC instants, space-separated datetimes, magnitude-vs-calendar identity, explicit `NoteFieldType` rank, canonical duration Eq, null ordering, ISO Monday weeks, local-naive + DST, strictness-by-seam, strftime dialect, DST overlap resolves earlier (ecosystem consensus: Temporal/jiff/BigQuery; PostgreSQL resolves later — the outlier), first day of week pinned ISO Monday (elsewhere it is CLDR locale data — deliberately not followed), null ordering unique among engines (SQL engines themselves disagree: PG nulls-largest, Trino/DuckDB always-last, SQLite first), day/week/month/year calendar vs sub-hour exact (PG `1 day` ≠ `24 hours` parity), wasm `Local` caveat (chrono #1701) documented, out-of-scope — **plus the five §13 additions listed in user story 42 (computed-duration Display, non-finite Display, NU-2 gap if unfixed, String↔Duration equality if kept, fractional-month nominal remainder)**.
-- All touched public items documented per `rust-doc` (one-sentence summaries, real `# Errors` variants, intra-doc links).
+- GLOSSARY.md gains: calendar-arithmetic owner clause; duration regime clause
+  (identity = magnitude, application = calendar for day/week/month/year with
+  sub-hour units exact, calendar frame = local wall clock,
+  equal-values-may-shift-differently, test-backed); date interface facts
+  (four-digit year, `YYYY-MM` → day 1, precision at recognition layer, naive
+  datetime = local → stored UTC); funnel claim extended to deserialization;
+  registry-owner claim without caveat; strictness-by-seam rule; pinned ISO
+  Monday; DST policy (resolver cited to Temporal `'compatible'`/RFC 5545);
+  single `*Avoid*` glossary rule.
+- ADR: null ordering — sort: null ranks below every non-null value (current
+  behavior, pinned by existing tests); filter: null never satisfies any ordering
+  (explicit guard, ADR supersedes the code comment); divergence register
+  covering UTC instants, space-separated datetimes, magnitude-vs-calendar
+  identity, explicit `NoteFieldType` rank, canonical duration Eq, null ordering,
+  ISO Monday weeks, local-naive + DST, strictness-by-seam, strftime dialect, DST
+  overlap resolves earlier (ecosystem consensus: Temporal/jiff/BigQuery;
+  PostgreSQL resolves later — the outlier), first day of week pinned ISO Monday
+  (elsewhere it is CLDR locale data — deliberately not followed), null ordering
+  unique among engines (SQL engines themselves disagree: PG nulls-largest,
+  Trino/DuckDB always-last, SQLite first), day/week/month/year calendar vs
+  sub-hour exact (PG `1 day` ≠ `24 hours` parity), wasm `Local` caveat
+  (chrono #1701) documented, out-of-scope — **plus the five §13 additions listed
+  in user story 42 (computed-duration Display, non-finite Display, NU-2 gap if
+  unfixed, String↔Duration equality if kept, fractional-month nominal
+  remainder)**.
+- All touched public items documented per `rust-doc` (one-sentence summaries,
+  real `# Errors` variants, intra-doc links).
 
 ## Testing Decisions
 
-- **A good test here exercises external behavior through a seam — never past it.** Tests assert contracts (trichotomy, bit-exact Σ, round-trip, equal-values-different-shifts, L→R apply order) not implementation lines; Arrange/Act/Assert kept visually separate; fresh per-test fixtures; time and `TZ` injected per test, never shared/global.
-- **Seam 1 (primary) — value-type interfaces, in-module `#[cfg(test)]`:** parse/classify/shift/diff/format/serde for the date and duration types. Covers: panic→error (N1), signed-zero (`-0m`), `parts`/`fixed_seconds` invariants, the A2′ pinning test (and `1d` vs `24h` and `1w` vs `168h` shifting differently across DST with `1w` ≡ `7d` identical), bit-exact Σ (fold over signed `parts` in L→R order — `==`, for parsed values and `Some`+`Some` arithmetic results, both fold-based by construction; mixed-`None` arithmetic excluded from Σ, pinned structurally instead), multi-part `apply` written-order (`"1d 1h"` vs `"1h 1d"` across a DST boundary), non-finite `Mul` rejected by consuming conversions (`NonFiniteSeconds`, never panics), the D12 local-wall-clock clamp test (day/month shift across a DST transition keeps the local wall time; Jan 31 + 1 month → end-of-month clamp), DST earliest/gap tests with resolver gap-verification (error vs gap), `YYYY-MM` precision round-trip, serde's `…Z` interop round-trip while `Display` never emits `…Z`, error source chains, classify trichotomy asserted behaviorally (allocation itself is not observable through the seam), sign-rule pinning (N15b)**, and (added 2026-10-05, §13): f64→`TimeDelta` divergence pins `0.9999999996` and `-1e-10` through *both* entries (`seconds_delta` and `TryFrom<DurationSeconds>`); sub-second `DateTimeValue` serde round-trip (Serialize→Deserialize keeps the fraction); Display/Serialize of a *computed* duration (NU-1 drift — an arithmetic result's spelling is not a faithful encoding of its parts); accept-or-reject pin for space-separated fractional datetimes (`2026-07-29 14:30:00.123`, NU-2 — verify chrono's optional `%.f` first); leading-comma `raw` spelling (`",1h"`, NU-3 residue)**.
-- **Seam 2 — query `FilterFunction` registry, integration (`tests/integration/`):** every public temporal function workflow and edge failure (null operand, wrong type, out-of-range `date_component` argument) maps to a case or an explicit out-of-scope reason. Prior art: `index_query`, `task_tag_filters`.
-- **Seam 3 — template filters/engine, integration:** `durationformat`, moment-token rendering (incl. the token-naming error), shorthands, `weekday`, local-clock display. The engine adapter is tested **through the template seam only**. Prior art: `template_render`.
-- **Doctests:** every changed public example runs under `cargo test --doc`; new rustdoc examples marked with the appropriate attribute and reason where not runnable.
-- **Skills per ticket:** `rust-skills` (rules named per ticket from the findings catalogue and conformance table: `err-result-over-panic`, `num-float-compare`, `type-numeric-fmt`, `type-display-vs-debug`, `serde-try-from-validate`, `api-parse-dont-validate`, `api-non-exhaustive`, `type-enum-states`, `num-overflow-explicit`, `conv-tryfrom-fallible`, `err-source-chain`, `proj-pub-crate-internal`, `anti-over-abstraction`), `rust-unit-testing` (suite shape, completion = every case-surface row maps to a named test), `rust-integration-testing` (edge strategies named per workflow), `rust-doc` (completion checklist incl. `RUSTDOCFLAGS=-D warnings`), plus `codebase-design` on seam-touching tickets.
-- **Verification gate on every ticket:** `mise run verify` (fmt → check/lint/test in parallel) and `mise run lint` strict-clippy clean; docs tickets additionally `mise run doc --all-features` clean.
+- **A good test here exercises external behavior through a seam — never past
+  it.** Tests assert contracts (trichotomy, bit-exact Σ, round-trip,
+  equal-values-different-shifts, L→R apply order) not implementation lines;
+  Arrange/Act/Assert kept visually separate; fresh per-test fixtures; time and
+  `TZ` injected per test, never shared/global.
+- **Seam 1 (primary) — value-type interfaces, in-module `#[cfg(test)]`:**
+  parse/classify/shift/diff/format/serde for the date and duration types.
+  Covers: panic→error (N1), signed-zero (`-0m`), `parts`/`fixed_seconds`
+  invariants, the A2′ pinning test (and `1d` vs `24h` and `1w` vs `168h`
+  shifting differently across DST with `1w` ≡ `7d` identical), bit-exact Σ (fold
+  over signed `parts` in L→R order — `==`, for parsed values and `Some`+`Some`
+  arithmetic results, both fold-based by construction; mixed-`None` arithmetic
+  excluded from Σ, pinned structurally instead), multi-part `apply`
+  written-order (`"1d 1h"` vs `"1h 1d"` across a DST boundary), non-finite `Mul`
+  rejected by consuming conversions (`NonFiniteSeconds`, never panics), the D12
+  local-wall-clock clamp test (day/month shift across a DST transition keeps the
+  local wall time; Jan 31 + 1 month → end-of-month clamp), DST earliest/gap
+  tests with resolver gap-verification (error vs gap), `YYYY-MM` precision
+  round-trip, serde's `…Z` interop round-trip while `Display` never emits `…Z`,
+  error source chains, classify trichotomy asserted behaviorally (allocation
+  itself is not observable through the seam), sign-rule pinning (N15b)**, and
+  (added 2026-10-05, §13): f64→`TimeDelta` divergence pins `0.9999999996` and
+  `-1e-10` through *both* entries (`seconds_delta` and
+  `TryFrom<DurationSeconds>`); sub-second `DateTimeValue` serde round-trip
+  (Serialize→Deserialize keeps the fraction); Display/Serialize of a *computed*
+  duration (NU-1 drift — an arithmetic result's spelling is not a faithful
+  encoding of its parts); accept-or-reject pin for space-separated fractional
+  datetimes (`2026-07-29 14:30:00.123`, NU-2 — verify chrono's optional `%.f`
+  first); leading-comma `raw` spelling (`",1h"`, NU-3 residue)**.
+- **Seam 2 — query `FilterFunction` registry, integration
+  (`tests/integration/`):** every public temporal function workflow and edge
+  failure (null operand, wrong type, out-of-range `date_component` argument)
+  maps to a case or an explicit out-of-scope reason. Prior art: `index_query`,
+  `task_tag_filters`.
+- **Seam 3 — template filters/engine, integration:** `durationformat`,
+  moment-token rendering (incl. the token-naming error), shorthands, `weekday`,
+  local-clock display. The engine adapter is tested
+  **through the template seam only**. Prior art: `template_render`.
+- **Doctests:** every changed public example runs under `cargo test --doc`; new
+  rustdoc examples marked with the appropriate attribute and reason where not
+  runnable.
+- **Skills per ticket:** `rust-skills` (rules named per ticket from the findings
+  catalogue and conformance table: `err-result-over-panic`, `num-float-compare`,
+  `type-numeric-fmt`, `type-display-vs-debug`, `serde-try-from-validate`,
+  `api-parse-dont-validate`, `api-non-exhaustive`, `type-enum-states`,
+  `num-overflow-explicit`, `conv-tryfrom-fallible`, `err-source-chain`,
+  `proj-pub-crate-internal`, `anti-over-abstraction`), `rust-unit-testing`
+  (suite shape, completion = every case-surface row maps to a named test),
+  `rust-integration-testing` (edge strategies named per workflow), `rust-doc`
+  (completion checklist incl. `RUSTDOCFLAGS=-D warnings`), plus
+  `codebase-design` on seam-touching tickets.
+- **Verification gate on every ticket:** `mise run verify` (fmt →
+  check/lint/test in parallel) and `mise run lint` strict-clippy clean; docs
+  tickets additionally `mise run doc --all-features` clean.
 
 ## Out of Scope
 
-- Dataview's `.week` = `floor(day/7)+1` (documented do-not-port), epoch-falsy comparisons, Luxon `YYYY` week-year semantics, null-min/max comparisons, parse-then-fail `today()`/`now()`, alphabetical type ordering.
-- Templater's type-overloaded `offset`, `P-1M` internal-sign handling, lenient reference-format guessing, locale-dependent weekday names, `stat.ctime` misreporting, unvalidated format strings.
+- Dataview's `.week` = `floor(day/7)+1` (documented do-not-port), epoch-falsy
+  comparisons, Luxon `YYYY` week-year semantics, null-min/max comparisons,
+  parse-then-fail `today()`/`now()`, alphabetical type ordering.
+- Templater's type-overloaded `offset`, `P-1M` internal-sign handling, lenient
+  reference-format guessing, locale-dependent weekday names, `stat.ctime`
+  misreporting, unvalidated format strings.
 - Full moment.js token table (scope 1 only; growth is additive later).
-- Locale-configurable first day of week; `Clock`/`TimeZone`/`Dialect` traits; typestate builders; merged error enums; `date/` directory split (revisit only if the calendar owner + precision hoist + `parse_with` actually push the module size; **revisit only after tickets 04 *and* 05 — freeze criteria 2026-10-05 §13.6: prod lines >~1.3k AND ≥2 independently-changing regions** — the count is non-monotonic through 04, so a decision on today's line count is not durable).
+- Locale-configurable first day of week; `Clock`/`TimeZone`/`Dialect` traits;
+  typestate builders; merged error enums; `date/` directory split (revisit only
+  if the calendar owner + precision hoist + `parse_with` actually push the
+  module size;
+  **revisit only after tickets 04 *and* 05 — freeze criteria 2026-10-05 §13.6: prod lines >~1.3k AND ≥2 independently-changing regions**
+  — the count is non-monotonic through 04, so a decision on today's line count
+  is not durable).
 - Benchmark work; changes to chrono, minijinja, or other dependency pins.
-- wasm target — chrono `Local` returns only `Single` on wasm (chrono #1701); documented, not supported.
+- wasm target — chrono `Local` returns only `Single` on wasm (chrono #1701);
+  documented, not supported.
 
 ## Further Notes
 
 **Execution order (tickets will encode these blocking edges):**
-> *Amended 2026-10-05 (§11 X-D/X-E): the encoded edges as of this writing are — 01/02 → 03 (ticket 03's `Blocked by` header now reads `01, 02`; spec L143 put the seam chain after correctness, and ticket 01's own text already said "ticket 03 (`Blocked by: 01`)") → 04 → 05 (05's header now states 03 **and** 04 as dependencies, chain 03 → 04 → 05) → 06 → 07 → 08 → 09 (amended 2026-10-05: 06's edge is **04 only** — no 06 item consumes 05's output, so 05 and 06 parallelize after 04; ticket 06's `Blocked by` header updated). **Gates resolved 2026-10-05:** the expression-surface question above (L77) closed as option (i) — this document's lock line now names the minimal value-expression surface; ticket 05's multi-part `apply` answer closed as option (a) — 05 wires compound durations through `apply`, so 09's exemption path is dead unless 05 fails to deliver. Decisions recorded in tickets 05, 06, 09.*
-1. Correctness: N1, N4, N3′, N14, N19, D9, local-naive parse + DST policy (decided: earliest/gap-forward), pinning tests (N15b, A2′ incoherence) + serde repair (N12, N17).
-2. Load-bearing seam chain: parts/registry (S2) → calendar owner (S1) → classify (S5) → precision hoist (S7) — strictly in this order; each depends on the previous.
-3. Parity features: query temporal functions (S3, biggest gap) → durationformat/format wiring (S4) → moment translator (S8) → shorthands (S9) → `parse_with` (S11) → `file.day` (S12).
-4. Docs: GLOSSARY.md clauses, null-ordering ADR, divergence register, config-const removal (S13).
+> *Amended 2026-10-05 (§11 X-D/X-E): the encoded edges as of this writing are —
+> 01/02 → 03 (ticket 03's `Blocked by` header now reads `01, 02`; spec L143 put
+> the seam chain after correctness, and ticket 01's own text already said
+> "ticket 03 (`Blocked by: 01`)") → 04 → 05 (05's header now states 03 **and**
+> 04 as dependencies, chain 03 → 04 → 05) → 06 → 07 → 08 → 09 (amended
+> 2026-10-05: 06's edge is **04 only** — no 06 item consumes 05's output, so 05
+> and 06 parallelize after 04; ticket 06's `Blocked by` header updated). **Gates
+> resolved 2026-10-05:** the expression-surface question above (L77) closed as
+> option (i) — this document's lock line now names the minimal value-expression
+> surface; ticket 05's multi-part `apply` answer closed as option (a) — 05 wires
+> compound durations through `apply`, so 09's exemption path is dead unless 05
+> fails to deliver. Decisions recorded in tickets 05, 06, 09.*
+1. Correctness: N1, N4, N3′, N14, N19, D9, local-naive parse + DST policy
+   (decided: earliest/gap-forward), pinning tests (N15b, A2′ incoherence) +
+   serde repair (N12, N17).
+2. Load-bearing seam chain: parts/registry (S2) → calendar owner (S1) → classify
+   (S5) → precision hoist (S7) — strictly in this order; each depends on the
+   previous.
+3. Parity features: query temporal functions (S3, biggest gap) →
+   durationformat/format wiring (S4) → moment translator (S8) → shorthands (S9)
+   → `parse_with` (S11) → `file.day` (S12).
+4. Docs: GLOSSARY.md clauses, null-ordering ADR, divergence register,
+   config-const removal (S13).
 5. Decision-C dead-surface deletions/wirings.
 
-**Decisions fully settled:** A2′ (parts + fixed-ratio identity + calendar application), B1 + naive=local→UTC with earliest/gap DST policy, D-b scoped translator with token-naming errors, D11 doc widening bundled with the precision fix, ISO Monday, null-ordering ADR (sort: null ranks below every non-null value; filter: null never satisfies any ordering), signed `parts` entries with exactly two filling paths (mixed-`None` ⇒ `None`, `Sub` negates rhs), non-finite `Mul` declared-and-rejected-at-consumption, week as calendar application unit (≡ 7 wall-days). No open questions remain.
+**Decisions fully settled:** A2′ (parts + fixed-ratio identity + calendar
+application), B1 + naive=local→UTC with earliest/gap DST policy, D-b scoped
+translator with token-naming errors, D11 doc widening bundled with the precision
+fix, ISO Monday, null-ordering ADR (sort: null ranks below every non-null value;
+filter: null never satisfies any ordering), signed `parts` entries with exactly
+two filling paths (mixed-`None` ⇒ `None`, `Sub` negates rhs), non-finite `Mul`
+declared-and-rejected-at-consumption, week as calendar application unit (≡ 7
+wall-days). No open questions remain.
 
-**Design record:** the full findings catalogue (the N/D/B/S/H/T finding IDs recorded in `review.md`, decisions D1–D14 (D12–D14 defined in this spec)), seam landscape, principles audit, and rust-skills conformance table live alongside this spec in `review.md` — tickets should cite finding IDs from it rather than re-deriving them. External prior-art evidence lives in `research/` (`research/sql-temporal-conventions.md`, `research/general-temporal-libraries.md`, `research/rust-temporal-ecosystem.md`).
+**Design record:** the full findings catalogue (the N/D/B/S/H/T finding IDs
+recorded in `review.md`, decisions D1–D14 (D12–D14 defined in this spec)), seam
+landscape, principles audit, and rust-skills conformance table live alongside
+this spec in `review.md` — tickets should cite finding IDs from it rather than
+re-deriving them. External prior-art evidence lives in `research/`
+(`research/sql-temporal-conventions.md`,
+`research/general-temporal-libraries.md`,
+`research/rust-temporal-ecosystem.md`).

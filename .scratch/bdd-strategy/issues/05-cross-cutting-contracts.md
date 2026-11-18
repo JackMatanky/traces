@@ -25,8 +25,8 @@ tags) and the `docs/agents/` docs that describe these contracts. The
 seam through which ticket 08's layer boundaries will run.
 
 **Deliverable**: candidate-guarantee inventory in
-`.scratch/bdd-strategy/research/05-cross-cutting-contracts.md`, same entry format
-and citation convention as ticket 01. Explicitly inventory what the 46
+`.scratch/bdd-strategy/research/05-cross-cutting-contracts.md`, same entry
+format and citation convention as ticket 01. Explicitly inventory what the 46
 `test-utils` identifiers expose and whether each is a guarantee or a test
 convenience. Max ~400 lines.
 

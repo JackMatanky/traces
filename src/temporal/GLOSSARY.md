@@ -18,12 +18,12 @@ a whole calendar date using Jiff's zone-free civil date type; written precision
 
 #### Date-Time
 
-A point on the timeline stored as UTC and rendered using the process-local clock.
-Unzoned input resolves in the process's local zone. A repeated local time takes
-the earlier occurrence; a skipped local time shifts forward by the gap length.
-Comparisons with Date promote the Date to local midnight. If the local offset
-cannot be applied at the representable range edge, the UTC reading is used.
-*Avoid*: timestamp, instant
+A point on the timeline stored as UTC and rendered using the process-local
+clock. Unzoned input resolves in the process's local zone. A repeated local time
+takes the earlier occurrence; a skipped local time shifts forward by the gap
+length. Comparisons with Date promote the Date to local midnight. If the local
+offset cannot be applied at the representable range edge, the UTC reading is
+used. *Avoid*: timestamp, instant
 
 #### Duration
 
@@ -37,9 +37,9 @@ an exact-only Duration applies as elapsed time.
 ### Calendar Regime
 
 Calendar units (day, week, month, and year) apply left-to-right on the local
-clock. Exact units (hour and smaller) apply as elapsed time. Thus equal Durations
-such as `1d` and `24h` can move a Date-Time differently across calendar
-boundaries and daylight-saving transitions.
+clock. Exact units (hour and smaller) apply as elapsed time. Thus equal
+Durations such as `1d` and `24h` can move a Date-Time differently across
+calendar boundaries and daylight-saving transitions.
 
 #### Zone
 

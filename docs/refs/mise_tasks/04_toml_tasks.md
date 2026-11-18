@@ -1,6 +1,8 @@
 # TOML-based Tasks
 
-Tasks can be defined in `mise.toml` files in different ways. Trivial tasks can be written into a `[tasks]` section, while more detailed tasks each get their own section.
+Tasks can be defined in `mise.toml` files in different ways. Trivial tasks can
+be written into a `[tasks]` section, while more detailed tasks each get their
+own section.
 
 ## Trivial task examples
 
@@ -54,7 +56,8 @@ description = 'Cut a new release'
 file = 'scripts/release.sh' # execute an external script
 ```
 
-You can use [environment variables](/environments/) or [`vars`](/configuration/vars) to define common arguments:
+You can use [environment variables](/environments/) or
+[`vars`](/configuration/vars) to define common arguments:
 
 ```mise-toml [mise.toml]
 [env]
@@ -71,7 +74,8 @@ run = './scripts/test-e2e.sh {{vars.e2e_args}} $VERBOSE_ARGS'
 
 ## Adding tasks
 
-You can edit the `mise.toml` file directly or using [`mise tasks add`](/cli/tasks/add)
+You can edit the `mise.toml` file directly or using
+[`mise tasks add`](/cli/tasks/add)
 
 ```shell
 mise tasks add pre-commit --depends "test" --depends "render" -- echo pre-commit
@@ -98,7 +102,8 @@ Provide the script to run. Can be a single command or an array of commands:
 run = 'cargo test'
 ```
 
-Commands are run in series. If a command fails, the task will stop and the remaining commands will not run.
+Commands are run in series. If a command fails, the task will stop and the
+remaining commands will not run.
 
 ```mise-toml
 [tasks.test]
@@ -108,7 +113,8 @@ run = [
 ]
 ```
 
-You can specify an alternate command to run on Windows by using the `run_windows` key:
+You can specify an alternate command to run on Windows by using the
+`run_windows` key:
 
 ```mise-toml
 [tasks.test]
@@ -118,8 +124,9 @@ run_windows = 'cargo test --features windows'
 
 ### Specifying which directory to use
 
-The [`dir`](/tasks/task-configuration.html#dir) property determines the `cwd` in which the task is executed. You can use the directory
-from where the task was run with <span v-pre>`dir = "{{cwd}}"`</span>:
+The [`dir`](/tasks/task-configuration.html#dir) property determines the `cwd` in
+which the task is executed. You can use the directory from where the task was
+run with <span v-pre>`dir = "{{cwd}}"`</span>:
 
 ```mise-toml
 [tasks.test]
@@ -127,7 +134,8 @@ run = 'cargo test'
 dir = "{{cwd}}"
 ```
 
-Also, `MISE_ORIGINAL_CWD` is set to the original working directory and will be passed to the task.
+Also, `MISE_ORIGINAL_CWD` is set to the original working directory and will be
+passed to the task.
 
 ### Adding a description and alias
 
@@ -141,7 +149,9 @@ alias = 'b' # `mise run b`
 ```
 
 - This alias can be used to run the task
-- The description will be displayed when running [`mise tasks ls`](/cli/tasks/ls.html) or [`mise run`](/cli/run.html) with no arguments.
+- The description will be displayed when running
+  [`mise tasks ls`](/cli/tasks/ls.html) or [`mise run`](/cli/run.html) with no
+  arguments.
 
 ```shell
 ❯ mise run
@@ -153,7 +163,8 @@ Tasks
 
 ### Dependencies
 
-You can specify dependencies for a task. Dependencies are run before the task itself. If a dependency fails, the task will not run.
+You can specify dependencies for a task. Dependencies are run before the task
+itself. If a dependency fails, the task will not run.
 
 ```mise-toml
 [tasks.build]
@@ -163,7 +174,9 @@ run = 'cargo build'
 depends = ['build']
 ```
 
-There are other ways to specify dependencies, see [wait_for](/tasks/task-configuration.html#wait-for) and [depends_post](/tasks/task-configuration.html#depends-post)
+There are other ways to specify dependencies, see
+[wait_for](/tasks/task-configuration.html#wait-for) and
+[depends_post](/tasks/task-configuration.html#depends-post)
 
 ### Environment variables
 
@@ -182,7 +195,8 @@ cargo clippy
 
 ### Sources / Outputs
 
-If you want to skip executing a task if certain files haven't changed (up-to-date), you should specify `sources` and `outputs`:
+If you want to skip executing a task if certain files haven't changed
+(up-to-date), you should specify `sources` and `outputs`:
 
 ```mise-toml
 [tasks.build]
@@ -192,13 +206,16 @@ sources = ['Cargo.toml', 'src/**/*.rs'] # skip running if these files haven't ch
 outputs = ['target/debug/mycli']
 ```
 
-You can use `sources` alone if with [`mise watch`](/cli/watch.html) to run the task when the sources change.
-You can use the [`task_source_files()`](../templates.md#task-source-files) function to get the resolved paths of a task's `sources` from within
-its [template](../templates.md).
+You can use `sources` alone if with [`mise watch`](/cli/watch.html) to run the
+task when the sources change. You can use the
+[`task_source_files()`](../templates.md#task-source-files) function to get the
+resolved paths of a task's `sources` from within its
+[template](../templates.md).
 
 ### Confirmation
 
-A message to show before running the task. The user will be prompted to confirm before the task is run.
+A message to show before running the task. The user will be prompted to confirm
+before the task is run.
 
 ```mise-toml
 [tasks.release]
@@ -209,8 +226,9 @@ file = 'scripts/release.sh'
 
 ## Specifying a shell or an interpreter {#shell-shebang}
 
-Tasks are executed with `set -e` (`set -o erropt`) if the shell is `sh`, `bash`, or `zsh`. This means that the script
-will exit if any command fails. You can disable this by running `set +e` in the script.
+Tasks are executed with `set -e` (`set -o erropt`) if the shell is `sh`, `bash`,
+or `zsh`. This means that the script will exit if any command fails. You can
+disable this by running `set +e` in the script.
 
 ```mise-toml
 [tasks.echo]
@@ -221,7 +239,9 @@ echo "This will not fail the task"
 '''
 ```
 
-You can specify a `shell` command to run the script with (default is [`sh -c`](/configuration/settings.html#unix_default_inline_shell_args) or [`cmd /c`](/configuration/settings.html#windows_default_inline_shell_args)):
+You can specify a `shell` command to run the script with (default is
+[`sh -c`](/configuration/settings.html#unix_default_inline_shell_args) or
+[`cmd /c`](/configuration/settings.html#windows_default_inline_shell_args)):
 
 ```mise-toml
 [tasks.lint]
@@ -239,9 +259,9 @@ cargo clippy
 '''
 ```
 
-Shebang tasks are executed as script files. Extra arguments that are not defined by a
-[`usage` specification](/tasks/task-arguments#usage-field) are passed as normal script arguments,
-such as `$1` and `$@` in Bash:
+Shebang tasks are executed as script files. Extra arguments that are not defined
+by a [`usage` specification](/tasks/task-arguments#usage-field) are passed as
+normal script arguments, such as `$1` and `$@` in Bash:
 
 ```mise-toml
 [tasks.greet]
@@ -256,7 +276,8 @@ $ mise run greet world
 hello world
 ```
 
-By using a `shebang` (or `shell`), you can run tasks in different languages (e.g., Python, Node.js, Ruby, etc.):
+By using a `shebang` (or `shell`), you can run tasks in different languages
+(e.g., Python, Node.js, Ruby, etc.):
 
 ::: code-group
 
@@ -365,10 +386,13 @@ puts 'Hello, ruby!'
 
 ::: details What's a shebang? What's the difference between `#!/usr/bin/env` and `#!/usr/bin/env -S`
 
-A shebang is the character sequence `#!` at the beginning of a script file that tells the system which program should be used to interpret/execute the script.
-The [env command](https://manpages.ubuntu.com/manpages/jammy/man1/env.1.html) comes from GNU Coreutils. `mise` does not use `env` but will behave similarly.
+A shebang is the character sequence `#!` at the beginning of a script file that
+tells the system which program should be used to interpret/execute the script.
+The [env command](https://manpages.ubuntu.com/manpages/jammy/man1/env.1.html)
+comes from GNU Coreutils. `mise` does not use `env` but will behave similarly.
 
-For example, `#!/usr/bin/env python` will run the script with the Python interpreter found in the `PATH`.
+For example, `#!/usr/bin/env python` will run the script with the Python
+interpreter found in the `PATH`.
 
 The `-S` flag allows passing multiple arguments to the interpreter.
 It treats the rest of the line as a single argument string to be split.
@@ -399,7 +423,8 @@ Task files can be fetched remotely with multiple protocols:
 file = "https://example.com/build.sh"
 ```
 
-Please note that the file will be downloaded and executed. Make sure you trust the source.
+Please note that the file will be downloaded and executed. Make sure you trust
+the source.
 
 #### Git <Badge type="warning" text="experimental" />
 
@@ -431,29 +456,33 @@ Optional fields:
 
 #### Cache
 
-Each task file is cached in the `MISE_CACHE_DIR` directory. If the file is updated, it will not be re-downloaded unless the cache is cleared.
+Each task file is cached in the `MISE_CACHE_DIR` directory. If the file is
+updated, it will not be re-downloaded unless the cache is cleared.
 
 :::tip
 You can reset the cache by running `mise cache clear`.
 :::
 
-You can use the `MISE_TASK_REMOTE_NO_CACHE` environment variable to disable caching of remote tasks.
+You can use the `MISE_TASK_REMOTE_NO_CACHE` environment variable to disable
+caching of remote tasks.
 
 ## Arguments
 
 ::: tip
-For comprehensive information about task arguments, see the dedicated [Task Arguments](/tasks/task-arguments) page.
+For comprehensive information about task arguments, see the dedicated
+[Task Arguments](/tasks/task-arguments) page.
 :::
 
-By default, arguments are passed to the last script in the `run` array. So if a task was defined as:
+By default, arguments are passed to the last script in the `run` array. So if a
+task was defined as:
 
 ```mise-toml
 [tasks.test]
 run = ['cargo test', './scripts/test-e2e.sh']
 ```
 
-Then running `mise run test foo bar` will pass `foo bar` to `./scripts/test-e2e.sh` but not to
-`cargo test`.
+Then running `mise run test foo bar` will pass `foo bar` to
+`./scripts/test-e2e.sh` but not to `cargo test`.
 
 ### Recommended: Using the Usage Field
 
@@ -469,22 +498,28 @@ flag "-v --verbose" help="Enable verbose output"
 run = 'cargo test ${usage_file?} --format ${usage_format?}'
 ```
 
-Arguments defined in the usage field are available as environment variables prefixed with `usage_`.
+Arguments defined in the usage field are available as environment variables
+prefixed with `usage_`.
 
-See the [Task Arguments](/tasks/task-arguments#usage-field) page for complete documentation.
+See the [Task Arguments](/tasks/task-arguments#usage-field) page for complete
+documentation.
 
 ### Tera Template Functions <Badge type="danger" text="deprecated" />
 
 ::: danger Deprecated - Removal in 2027.5.0
-Using Tera template functions (`arg()`, `option()`, `flag()`) in run scripts is **deprecated** and will be **removed in mise 2027.5.0**. Versions >= 2026.5.0 will show a deprecation warning.
+Using Tera template functions (`arg()`, `option()`, `flag()`) in run scripts is
+**deprecated** and will be **removed in mise 2027.5.0**. Versions >= 2026.5.0
+will show a deprecation warning.
 
 **Why it's being removed:**
 
-- Template functions return empty strings during spec collection (two-pass parsing issue)
+- Template functions return empty strings during spec collection (two-pass
+  parsing issue)
 - Complex and unpredictable shell escaping rules
 - Doesn't work consistently between TOML/file tasks
 
-**Please migrate to using the `usage` field instead.** See the [migration guide](/tasks/task-arguments#tera-templates).
+**Please migrate to using the `usage` field instead.** See the
+[migration guide](/tasks/task-arguments#tera-templates).
 :::
 
 <details>
@@ -505,8 +540,8 @@ Then running `mise run test foo bar` will pass `foo bar` to `cargo test`.
 
 #### Positional Arguments
 
-These are defined in scripts with <span v-pre>`{{arg()}}`</span>. They are used for positional
-arguments where the order matters.
+These are defined in scripts with <span v-pre>`{{arg()}}`</span>. They are used
+for positional arguments where the order matters.
 
 Example:
 
@@ -517,16 +552,16 @@ run = 'cargo test {{arg(name="file")}}'
 # runs: cargo test my-test-file
 ```
 
-- `i`: The index of the argument. This can be used to specify the order of arguments. Defaults to
-  the order they're defined in the scripts.
+- `i`: The index of the argument. This can be used to specify the order of
+  arguments. Defaults to the order they're defined in the scripts.
 - `name`: The name of the argument. This is used for help/error messages.
 - `var`: If `true`, multiple arguments can be passed.
 - `default`: The default value if the argument is not provided.
 
 #### Options
 
-These are defined in scripts with <span v-pre>`{{option()}}`</span>. They are used for named
-arguments where the order doesn't matter.
+These are defined in scripts with <span v-pre>`{{option()}}`</span>. They are
+used for named arguments where the order doesn't matter.
 
 Example:
 
@@ -543,8 +578,8 @@ run = 'cargo test {{option(name="file")}}'
 
 #### Flags
 
-Flags are like options except they don't take values. They are defined in scripts with <span v-pre>
-`{{flag()}}`</span>.
+Flags are like options except they don't take values. They are defined in
+scripts with <span v-pre> `{{flag()}}`</span>.
 
 Examples:
 

@@ -95,8 +95,9 @@ isolated `/tmp` directories without root privileges.
 - **Goal:** Determine what editors, shells, and processes observe when an NFSv3
   server rejects an operation due to schema violation.
 - **Setup:** Modified the `nfsserve` VFS implementation:
-  1. `write`: If data contains `"INVALID"`, return `Err(nfsstat3::NFS3ERR_ACCES)`.
-     If data contains `"IO_ERROR"`, return `Err(nfsstat3::NFS3ERR_IO)`.
+  1. `write`: If data contains `"INVALID"`, return
+     `Err(nfsstat3::NFS3ERR_ACCES)`. If data contains `"IO_ERROR"`, return
+     `Err(nfsstat3::NFS3ERR_IO)`.
   2. `rename`: If destination filename contains `"blocked"`, return
      `Err(nfsstat3::NFS3ERR_ACCES)`.
 - **Observed Results:**
@@ -105,14 +106,14 @@ isolated `/tmp` directories without root privileges.
     Output: `mv: rename ... to ...: Permission denied` (Exit code `1`) [V].
     Server stderr: `Blocking rename with NFS3ERR_ACCES!` [V].
     Target file remained untouched; source file remained intact [V].
-  - **Asynchronous Write Buffering:**
-    Command: `echo 'INVALID_DATA' > /tmp/test_nfs_mnt/a.txt`
-    Output: Exit code `0` (no shell error reported) [V]!
-    Server stderr: `Rejected write with NFS3ERR_ACCES due to INVALID content!` [V].
-    Cause: In NFSv3, client writes are buffered asynchronously in the OS page
-    cache as `UNSTABLE`. The shell `echo` command does not issue `fsync(2)` or
-    check the return value of `close(2)`. The error occurred on background
-    writeback, escaping the shell process without halting it [V].
+  - **Asynchronous Write Buffering:** Command:
+    `echo 'INVALID_DATA' > /tmp/test_nfs_mnt/a.txt` Output: Exit code `0` (no
+    shell error reported) [V]! Server stderr:
+    `Rejected write with NFS3ERR_ACCES due to INVALID content!` [V]. Cause: In
+    NFSv3, client writes are buffered asynchronously in the OS page cache as
+    `UNSTABLE`. The shell `echo` command does not issue `fsync(2)` or check the
+    return value of `close(2)`. The error occurred on background writeback,
+    escaping the shell process without halting it [V].
 
 ### Experiment 3: Immutable Flags (`chflags uchg`) on macOS [V]
 
@@ -179,9 +180,9 @@ while editors and agents access the vault via the loopback mount point.
 ### Intervention Points for Validation
 
 1. **`NFSPROC3_RENAME` (The Atomic Gate):**
-   - When triggered: Atomic saves (Obsidian, VS Code, JetBrains, Vim `writebackup`,
-     Emacs). The writer writes `note.md.tmp.1234`, closes it, and invokes
-     `rename()`.
+   - When triggered: Atomic saves (Obsidian, VS Code, JetBrains, Vim
+     `writebackup`, Emacs). The writer writes `note.md.tmp.1234`, closes it, and
+     invokes `rename()`.
    - Inspection capability: The source file is completely written and stored in
      the backing directory. The server reads the complete proposed note,
      retrieves the existing target note as `before`, and evaluates
@@ -219,10 +220,10 @@ while editors and agents access the vault via the loopback mount point.
   Linux, mounting requires `sudo mount.nfs` or `/etc/fstab` configuration. On
   Windows, requires `mount.exe` available only in Pro/Enterprise editions.
 - **Latency Overhead:** Loopback network round-trips add ~0.2ms–0.5ms per RPC.
-  For single-file edits, this is imperceptible. For mass operations (`git status`,
-  vault indexing), thousands of `getattr` and `lookup` RPCs create measurable
-  slowdown compared to raw APFS unless aggressive metadata caching is enabled
-  (`actimeo=30`).
+  For single-file edits, this is imperceptible. For mass operations
+  (`git status`, vault indexing), thousands of `getattr` and `lookup` RPCs
+  create measurable slowdown compared to raw APFS unless aggressive metadata
+  caching is enabled (`actimeo=30`).
 - **Daemon Crash & Stale Mounts:** If the daemon crashes or is terminated:
   - Default hard mounts (`-o hard`): Any process touching the mount point hangs
     indefinitely in kernel uninterruptible sleep (`D` state). A hard reboot or
@@ -287,7 +288,8 @@ while editors and agents access the vault via the loopback mount point.
 
 - **How it works:** Filesystem in Userspace. Intercepts VFS calls directly.
 - **Stress-Test:**
-  - (a) Writes seen: Intercepts all VFS operations (`write`, `rename`, `unlink`).
+  - (a) Writes seen: Intercepts all VFS operations (`write`, `rename`,
+    `unlink`).
   - (b) Validation & rejection: Can intercept `rename` or `write`; returns
     `EACCES` or `EPERM`.
   - (c) Atomicity: Full control over open/write/flush/rename lifecycle.
@@ -329,20 +331,20 @@ while editors and agents access the vault via the loopback mount point.
   monitored processes until userspace responds.
 - **Stress-Test:**
   - (a) Writes seen: Intercepts open and access operations.
-  - (b) Validation & rejection: **Cannot gate write content [V].** Linux fanotify
-    only defines permission events for open (`FAN_OPEN_PERM`, `FAN_OPEN_EXEC_PERM`)
-    and read (`FAN_ACCESS_PERM`) [V]. There is NO `FAN_WRITE_PERM` in the Linux
-    kernel [V]. At `FAN_OPEN_PERM`, content has not been written yet. At
-    `FAN_CLOSE_WRITE`, content is already committed and the event is notification
-    only [V].
+  - (b) Validation & rejection: **Cannot gate write content [V].** Linux
+    fanotify only defines permission events for open (`FAN_OPEN_PERM`,
+    `FAN_OPEN_EXEC_PERM`) and read (`FAN_ACCESS_PERM`) [V]. There is NO
+    `FAN_WRITE_PERM` in the Linux kernel [V]. At `FAN_OPEN_PERM`, content has
+    not been written yet. At `FAN_CLOSE_WRITE`, content is already committed and
+    the event is notification only [V].
   - (c) Atomicity: N/A (cannot inspect write payload).
   - (d) Platforms: Linux only.
   - (e) Privilege/deployment: Requires root (`CAP_SYS_ADMIN`).
   - (f) Bypass: N/A.
   - (g) Failure mode: If daemon hangs, system-wide file access freezes.
   - (h) Fit with Rust: `fanotify` crate exists.
-- **Verdict: Reject.** Fundamentally incapable of gating written content; requires
-  root.
+- **Verdict: Reject.** Fundamentally incapable of gating written content;
+  requires root.
 
 ### 6. macOS Endpoint Security (`AUTH` Events, Entitlements)
 
@@ -350,8 +352,8 @@ while editors and agents access the vault via the loopback mount point.
   providing authorization callbacks before kernel operations complete.
 - **Stress-Test:**
   - (a) Writes seen: Intercepts `ES_EVENT_TYPE_AUTH_RENAME`,
-    `ES_EVENT_TYPE_AUTH_TRUNCATE`, `ES_EVENT_TYPE_AUTH_UNLINK`, `ES_EVENT_TYPE_AUTH_OPEN`
-    [V]. No `AUTH_WRITE` exists [V].
+    `ES_EVENT_TYPE_AUTH_TRUNCATE`, `ES_EVENT_TYPE_AUTH_UNLINK`,
+    `ES_EVENT_TYPE_AUTH_OPEN` [V]. No `AUTH_WRITE` exists [V].
   - (b) Validation: Can inspect source file on `AUTH_RENAME` and return
     `ES_AUTH_RESULT_DENY` [V].
   - (c) Atomicity: Excellent for temp+rename.
@@ -363,8 +365,8 @@ while editors and agents access the vault via the loopback mount point.
   - (f) Bypass: System-wide; no bypass within OS.
   - (g) Failure mode: Watchdog panics kernel if daemon is unresponsive.
   - (h) Fit with Rust: `endpoint-security` crate exists.
-- **Verdict: Reject.** Completely inaccessible to open-source developer tools and
-  general PKM desktop users due to Apple entitlement gating.
+- **Verdict: Reject.** Completely inaccessible to open-source developer tools
+  and general PKM desktop users due to Apple entitlement gating.
 
 ### 7. inotify / FSEvents / kqueue Limits
 
@@ -412,13 +414,13 @@ while editors and agents access the vault via the loopback mount point.
   through a validating local socket daemon.
 - **Stress-Test:**
   - (a) Writes seen: Gating is absolute (read-only filesystem).
-  - (b) Validation: Daemon validates payload before writing to the hidden backing
-    store.
+  - (b) Validation: Daemon validates payload before writing to the hidden
+    backing store.
   - (c) Atomicity: Managed by daemon.
   - (d) Platforms: Linux supports `mount --bind -o ro`. **macOS does not support
     bind mounts** (no `nullfs`, no `--bind`) [V].
-  - (e) Privilege/deployment: Requires root or user namespaces on Linux; unviable
-    on macOS.
+  - (e) Privilege/deployment: Requires root or user namespaces on Linux;
+    unviable on macOS.
   - (f) Bypass: Editors cannot write to read-only mounts without explicit plugin
     adaptation to talk to the helper daemon.
   - (g) Failure mode: Fails closed.
@@ -428,24 +430,25 @@ while editors and agents access the vault via the loopback mount point.
 
 ### 10. APFS Clonefile / Overlayfs Copy-on-Write Overlays (Validate-then-Merge)
 
-- **How it works:** The active vault remains protected. Agent sessions operate in
-  an instant, zero-cost copy-on-write APFS clone (`clonefile(2)` on macOS) [V]
-  or Linux `overlayfs`. A promotion command validates all modified clones and
-  atomically swaps them into the canonical vault via `renamex_np(RENAME_SWAP)`
-  [V].
+- **How it works:** The active vault remains protected. Agent sessions operate
+  in an instant, zero-cost copy-on-write APFS clone (`clonefile(2)` on macOS)
+  [V] or Linux `overlayfs`. A promotion command validates all modified clones
+  and atomically swaps them into the canonical vault via
+  `renamex_np(RENAME_SWAP)` [V].
 - **Stress-Test:**
   - (a) Writes seen: Agent writes freely inside the sandbox clone.
   - (b) Validation & rejection: Validation occurs during `traces promote` /
     `traces merge`. If invalid, promotion aborts; canonical vault remains pure.
   - (c) Atomicity: `renamex_np(RENAME_SWAP)` provides kernel-enforced atomic
     swap on macOS APFS [V].
-  - (d) Platforms: macOS (APFS `clonefile` is unprivileged and instantaneous) [V];
-    Linux (overlayfs requires root/user namespace; `btrfs`/`xfs` `reflink` works
-    unprivileged).
+  - (d) Platforms: macOS (APFS `clonefile` is unprivileged and instantaneous)
+    [V]; Linux (overlayfs requires root/user namespace; `btrfs`/`xfs` `reflink`
+    works unprivileged).
   - (e) Privilege/deployment: Zero privilege required on macOS APFS [V].
   - (f) Bypass: User or agent writing directly to the canonical directory path.
   - (g) Failure mode: Fails closed relative to canonical vault.
-  - (h) Fit with Rust: Direct libc binding to `clonefile(2)` and `renamex_np(2)`.
+  - (h) Fit with Rust: Direct libc binding to `clonefile(2)` and
+    `renamex_np(2)`.
 - **Verdict: Adopt as Opt-in Staging Recipe.** Excellent unprivileged sandbox
   workflow for agent tasks, but requires agent discipline or wrapper execution.
 
@@ -497,8 +500,9 @@ For users demanding preventative enforcement independent of agent harness
 compliance:
 
 1. **Rank 1: Validated MCP Edit Tools (Application Layer Gate - Tier 3 in R5)**
-   - The only zero-friction, cross-platform hard gate that prevents invalid bytes
-     before they touch the disk, providing structured schema feedback in-band.
+   - The only zero-friction, cross-platform hard gate that prevents invalid
+     bytes before they touch the disk, providing structured schema feedback
+     in-band.
 2. **Rank 2: Loopback NFS Mount (`nfsserve`) (Filesystem Layer Gate)**
    - The **only** mechanism that provides a pre-write / at-rename gate for *any
      arbitrary writer* (including Obsidian, external editors, and rogue shell

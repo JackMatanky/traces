@@ -167,7 +167,8 @@ not load assets from an external repository or network host.
 
 The report shows:
 
-- Run counts for total, killed, escaped, errored, not-covered, and skipped mutants
+- Run counts for total, killed, escaped, errored, not-covered, and skipped
+  mutants
 - Total mutation score and covered-code mutation score as percentages
 - A per-mutator result table
 - Escaped-mutant evidence grouped by source file, with stable mutant IDs,

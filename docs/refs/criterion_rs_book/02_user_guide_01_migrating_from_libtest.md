@@ -38,7 +38,8 @@ name = "example"
 harness = false
 ```
 
-We also need to add Criterion.rs to the `dev-dependencies` section of `Cargo.toml`:
+We also need to add Criterion.rs to the `dev-dependencies` section of
+`Cargo.toml`:
 
 ```toml
 [dev-dependencies]

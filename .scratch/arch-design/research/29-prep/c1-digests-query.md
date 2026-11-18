@@ -41,9 +41,8 @@ numbers in the digest files under `docs/digests/`.
 6. **Dataview inverse maps.** [V] Tag sources read `tags.getInverse`; folder
    sources walk a prefix structure; negation starts from every path
    (`docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:4275-4279,4600-4617,4671-4678`).
-   Lesson for 29: C3 — each source shape has a distinct candidate access.
-   Traces tickets 24 already assigns them; the plan maps predicates to those
-   accesses.
+   Lesson for 29: C3 — each source shape has a distinct candidate access. Traces
+   tickets 24 already assigns them; the plan maps predicates to those accesses.
 
 ## C. Rows, values and serialization (C5, C7, C11)
 

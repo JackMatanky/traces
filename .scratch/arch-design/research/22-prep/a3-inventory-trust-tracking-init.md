@@ -1,11 +1,18 @@
 # Inventory: Trust Store, Tracking Store, and Scaffolding Init (Ticket 22)
 
-Investigation of the current tree (`HEAD 8064cf76`) for sub-questions (d), (g), and the CLI-side config commands.
+Investigation of the current tree (`HEAD 8064cf76`) for sub-questions (d), (g),
+and the CLI-side config commands.
 
-- Sub-question (d): Twin `TrustStore`/`TrackerStore` over `FilePathTracker`, two-store ordering invariant, on-disk layout, failure modes, line counts, and store unification impact.
-- Sub-question (g): Ownership and mechanics of scaffolding (`cli::init`), prompts, templates, filesystem effects, default content, and trust interaction.
-- CLI-side config commands: `src/cli/trust.rs`, `src/cli/untrust.rs`, `src/cli/tracked.rs`, and `cli/mod.rs` composition of `ConfigService`.
-- Platform behavior: Unix vs Windows implementation in `FilePathTracker`, `cfg(windows)` code, and ordering invariant tests.
+- Sub-question (d): Twin `TrustStore`/`TrackerStore` over `FilePathTracker`,
+  two-store ordering invariant, on-disk layout, failure modes, line counts, and
+  store unification impact.
+- Sub-question (g): Ownership and mechanics of scaffolding (`cli::init`),
+  prompts, templates, filesystem effects, default content, and trust
+  interaction.
+- CLI-side config commands: `src/cli/trust.rs`, `src/cli/untrust.rs`,
+  `src/cli/tracked.rs`, and `cli/mod.rs` composition of `ConfigService`.
+- Platform behavior: Unix vs Windows implementation in `FilePathTracker`,
+  `cfg(windows)` code, and ordering invariant tests.
 - Reconciliation with survey `config-dialog.md`.
 - Surprises and Open Gaps.
 
@@ -19,9 +26,40 @@ Claim tags:
 
 ## 1. Executive Summary & Verification Context
 
-- **Sub-question (d) Verdict**: `TrustStore` (`src/config/trust.rs:164`) and `TrackerStore` (`src/config/tracker.rs:16`) are thin wrappers around `FilePathTracker` (`src/file_tracker.rs:32`). They manage two distinct, physically separated directory trees under `$TRACES_STATE_DIR`: `trusted-configs` and `tracked-configs` [V: `src/dirs.rs:176-189`]. `TrustStore` tracks workspace root directories and their companion BLAKE3 config digests (`.hash`), acting as an authorization gate [V: `src/config/trust.rs:182-197`]. `TrackerStore` tracks individual config file paths on a best-effort basis as an audit trail of observed configs [V: `src/config/tracker.rs:41-49`]. The ordering invariant (*track before grant*) is enforced at runtime in `ConfigService::trust` (`src/config/service.rs:128-136`) [V]. Merging them into a single record would lose the distinction between "observed config file" and "authorized workspace root", collapse the lifecycle separation where untrusting revokes permission while retaining tracking, and require redesigning `FilePathTracker` from symlinks to structured records [H].
-- **Sub-question (g) Verdict**: `traces init` (`src/cli/init.rs:34`) is an isolated CLI workflow without any core use case in `ConfigService` or `TemplateService` [V]. It directly interacts with `DialogProvider` [V: `src/cli/init.rs:52`], validates relative paths using `ConfigSubDir` [V: `src/cli/init.rs:61`], scaffolds `.traces/` and the chosen template directory [V: `src/cli/init.rs:130-142`], and atomically writes `.traces/config.toml` [V: `src/cli/init.rs:233-247`]. Crucially, **`init` does not interact with trust or tracking at all** [V]: it leaves the newly scaffolded workspace completely untrusted and untracked [V].
-- **Survey Drift**: Survey `config-dialog.md` was drafted at baseline `2dc3250d`. Between `207cc3fb` and `HEAD 8064cf76`, 4 files in this inventory changed (`src/config/tracker.rs`, `src/config/trust.rs`, `src/dirs.rs`, `src/file_tracker.rs`), replacing `at()` constructors with `for_test()` and standardizing on `Default::default()`, while `FilePathTracker` gained an `entry_paths` generator [V]. CLI files (`init.rs`, `trust.rs`, `untrust.rs`, `tracked.rs`) had zero line changes [V]. All architectural findings in `config-dialog.md` hold, but line citations in the survey are shifted by 10-35 lines.
+- **Sub-question (d) Verdict**: `TrustStore` (`src/config/trust.rs:164`) and
+  `TrackerStore` (`src/config/tracker.rs:16`) are thin wrappers around
+  `FilePathTracker` (`src/file_tracker.rs:32`). They manage two distinct,
+  physically separated directory trees under `$TRACES_STATE_DIR`:
+  `trusted-configs` and `tracked-configs` [V: `src/dirs.rs:176-189`].
+  `TrustStore` tracks workspace root directories and their companion BLAKE3
+  config digests (`.hash`), acting as an authorization gate [V:
+  `src/config/trust.rs:182-197`]. `TrackerStore` tracks individual config file
+  paths on a best-effort basis as an audit trail of observed configs [V:
+  `src/config/tracker.rs:41-49`]. The ordering invariant (*track before grant*)
+  is enforced at runtime in `ConfigService::trust`
+  (`src/config/service.rs:128-136`) [V]. Merging them into a single record would
+  lose the distinction between "observed config file" and "authorized workspace
+  root", collapse the lifecycle separation where untrusting revokes permission
+  while retaining tracking, and require redesigning `FilePathTracker` from
+  symlinks to structured records [H].
+- **Sub-question (g) Verdict**: `traces init` (`src/cli/init.rs:34`) is an
+  isolated CLI workflow without any core use case in `ConfigService` or
+  `TemplateService` [V]. It directly interacts with `DialogProvider` [V:
+  `src/cli/init.rs:52`], validates relative paths using `ConfigSubDir` [V:
+  `src/cli/init.rs:61`], scaffolds `.traces/` and the chosen template directory
+  [V: `src/cli/init.rs:130-142`], and atomically writes `.traces/config.toml`
+  [V: `src/cli/init.rs:233-247`]. Crucially,
+  **`init` does not interact with trust or tracking at all** [V]: it leaves the
+  newly scaffolded workspace completely untrusted and untracked [V].
+- **Survey Drift**: Survey `config-dialog.md` was drafted at baseline
+  `2dc3250d`. Between `207cc3fb` and `HEAD 8064cf76`, 4 files in this inventory
+  changed (`src/config/tracker.rs`, `src/config/trust.rs`, `src/dirs.rs`,
+  `src/file_tracker.rs`), replacing `at()` constructors with `for_test()` and
+  standardizing on `Default::default()`, while `FilePathTracker` gained an
+  `entry_paths` generator [V]. CLI files (`init.rs`, `trust.rs`, `untrust.rs`,
+  `tracked.rs`) had zero line changes [V]. All architectural findings in
+  `config-dialog.md` hold, but line citations in the survey are shifted by 10-35
+  lines.
 
 ---
 
@@ -29,7 +67,8 @@ Claim tags:
 
 ### 2.1 On-Disk Layout & Platform Storage
 
-Both stores persist entries under persistent state directories resolved in `src/dirs.rs:119-189`:
+Both stores persist entries under persistent state directories resolved in
+`src/dirs.rs:119-189`:
 
 | Configuration Variable | Resolution Chain (Highest to Lowest Priority) | Resolved Path on macOS (Default) |
 |---|---|---|
@@ -39,17 +78,35 @@ Both stores persist entries under persistent state directories resolved in `src/
 | `TRACKED_CONFIGS` | `TRACES_STATE_DIR/tracked-configs` | `$HOME/Library/Application Support/traces/tracked-configs` [V: `src/dirs.rs:176-177`] |
 | `TRUSTED_CONFIGS` | `TRACES_STATE_DIR/trusted-configs` | `$HOME/Library/Application Support/traces/trusted-configs` [V: `src/dirs.rs:188-189`] |
 
-On Linux/Unix, `STATE_HOME` resolves to `$XDG_STATE_HOME` or `$HOME/.local/state` [V: `src/dirs.rs:125-129`]. On Windows, `STATE_HOME` resolves to `%LOCALAPPDATA%` or `%USERPROFILE%\AppData\Local` [V: `src/dirs.rs:151-154`].
+On Linux/Unix, `STATE_HOME` resolves to `$XDG_STATE_HOME` or
+`$HOME/.local/state` [V: `src/dirs.rs:125-129`]. On Windows, `STATE_HOME`
+resolves to `%LOCALAPPDATA%` or `%USERPROFILE%\AppData\Local` [V:
+`src/dirs.rs:151-154`].
 
 #### Entry Encoding & Representation
 
-- **Entry Filename**: The entry filename is the 64-character lowercase hex string of the BLAKE3 hash of the canonicalized target path (`Blake3PathHash`) [V: `src/file_tracker.rs:425, 450-454`, `src/hash.rs:156-189`].
-- **Unix Entry Representation**: A symbolic link whose filename is `Blake3PathHash` and whose symlink target is the canonical target path (`std::os::unix::fs::symlink`) [V: `src/file_tracker.rs:73-74`].
-- **Windows Entry Representation**: A regular file whose filename is `Blake3PathHash` and whose file contents are the raw encoded bytes of the canonical target path (`entry.canonical_target.as_os_str().as_encoded_bytes()`) [V: `src/file_tracker.rs:76-79`].
+- **Entry Filename**: The entry filename is the 64-character lowercase hex
+  string of the BLAKE3 hash of the canonicalized target path (`Blake3PathHash`)
+  [V: `src/file_tracker.rs:425, 450-454`, `src/hash.rs:156-189`].
+- **Unix Entry Representation**: A symbolic link whose filename is
+  `Blake3PathHash` and whose symlink target is the canonical target path
+  (`std::os::unix::fs::symlink`) [V: `src/file_tracker.rs:73-74`].
+- **Windows Entry Representation**: A regular file whose filename is
+  `Blake3PathHash` and whose file contents are the raw encoded bytes of the
+  canonical target path
+  (`entry.canonical_target.as_os_str().as_encoded_bytes()`) [V:
+  `src/file_tracker.rs:76-79`].
 - **Companion Files**:
-  - Filename: `<hash><suffix>`. For trust digests, suffix is `const COMPANION_SUFFIX: &str = ".hash"`, yielding `<hash>.hash` [V: `src/config/trust.rs:18`, `src/file_tracker.rs:458-462`].
-  - Contents: 64-character hex string of the BLAKE3 digest of the UTF-8 config file content (`Blake3Digest::from(content.as_str()).to_string()`) [V: `src/config/trust.rs:188-193`].
-  - Exclusivity: Companion files exist **only** in `TrustStore` for `TrustRequest::Config` subjects [V: `src/config/trust.rs:186-194`]. `TrackerStore` never creates or inspects companion files [V: `src/config/tracker.rs:59, 72`].
+  - Filename: `<hash><suffix>`. For trust digests, suffix is
+    `const COMPANION_SUFFIX: &str = ".hash"`, yielding `<hash>.hash` [V:
+    `src/config/trust.rs:18`, `src/file_tracker.rs:458-462`].
+  - Contents: 64-character hex string of the BLAKE3 digest of the UTF-8 config
+    file content (`Blake3Digest::from(content.as_str()).to_string()`) [V:
+    `src/config/trust.rs:188-193`].
+  - Exclusivity: Companion files exist **only** in `TrustStore` for
+    `TrustRequest::Config` subjects [V: `src/config/trust.rs:186-194`].
+    `TrackerStore` never creates or inspects companion files [V:
+    `src/config/tracker.rs:59, 72`].
 
 ### 2.2 Public Operations, Callers, and Signatures
 
@@ -99,7 +156,9 @@ Core filesystem persistence engine underlying both stores.
 
 ### 2.3 Operation x Store Matrix
 
-The following matrix documents every system operation affecting the stores, detailing the input subject, actions performed on each store, failure impact, and calling enforcement sites:
+The following matrix documents every system operation affecting the stores,
+detailing the input subject, actions performed on each store, failure impact,
+and calling enforcement sites:
 
 | Operation | Subject / Path Target | `TrustStore` Action & State Impact | `TrackerStore` Action & State Impact | Atomicity & Partial Failure Impact | Enforcement Site & Callers |
 |---|---|---|---|---|---|
@@ -120,7 +179,9 @@ The following matrix documents every system operation affecting the stores, deta
 
 #### The Two-Store Ordering Invariant: "Track Before Grant"
 
-`ConfigService::trust` enforces an invariant: **A local config file must be recorded in `TrackerStore` before its workspace root is granted trust in `TrustStore`** [V: `src/config/service.rs:6-8, 117-118, 128-136`].
+`ConfigService::trust` enforces an invariant: **A local config file must be
+recorded in `TrackerStore` before its workspace root is granted trust in
+`TrustStore`** [V: `src/config/service.rs:6-8, 117-118, 128-136`].
 
 ```rust
 // src/config/service.rs:128-136
@@ -132,18 +193,39 @@ pub(crate) fn trust(&self, subject: &TrustRequest) -> Result<(), ConfigTrustErro
 }
 ```
 
-If `self.tracked.record` fails, the function returns immediately via `?`, preventing `self.trust.trust(subject)` from executing [V: `src/config/service.rs:133`]. Consequently, the workspace root remains untrusted [V: `src/config/service.rs:476-498`].
+If `self.tracked.record` fails, the function returns immediately via `?`,
+preventing `self.trust.trust(subject)` from executing [V:
+`src/config/service.rs:133`]. Consequently, the workspace root remains untrusted
+[V: `src/config/service.rs:476-498`].
 
 #### Verified Invariant & Store Tests
 
-The codebase contains tests verifying the two-store ordering and lifecycle behavior:
+The codebase contains tests verifying the two-store ordering and lifecycle
+behavior:
 
-1. `a_failing_tracker_aborts_the_grant` (`src/config/service.rs:476-498`) [V]: Blocks `tracked_root` with a regular file, attempts `service.trust(&request)`, asserts `ConfigTrustError::Tracker(_)`, and asserts `trust_store().trust_status()` remains `ConfigTrustStatus::Untrusted`.
-2. `untrust_keeps_the_config_tracked` (`src/config/service.rs:514-531`) [V]: Trusts a config, calls `service.untrust()`, asserts `trust_store().list()` is empty, but `tracker_store().list()` retains the config file path.
-3. `a_refused_load_still_tracks_the_config` (`src/config/service.rs:533-549`) [V]: Loads an untrusted workspace, asserts load fails with `ConfigError::Trust(ConfigTrustError::Untrusted)`, but asserts `tracker_store().list()` successfully recorded the config file.
-4. `granting_a_root_only_subject_tracks_nothing` (`src/config/service.rs:459-474`) [V]: Trusts a root-only subject (`TrustRequest::Root`), asserts `trust_store().list()` contains root, but `tracker_store().list()` is empty.
-5. `granting_a_config_subject_records_it_in_the_tracker` (`src/config/service.rs:445-458`) [V]: Trusts a config subject, asserts `tracker_store().list()` contains canonicalized config path.
-6. `succeeds_even_when_tracking_store_write_fails` (`src/config/service.rs:589-605`) [V]: Blocks `tracked_root`, executes `load()`, asserts load succeeds despite tracker failure because load uses best-effort tracking.
+1. `a_failing_tracker_aborts_the_grant` (`src/config/service.rs:476-498`) [V]:
+   Blocks `tracked_root` with a regular file, attempts
+   `service.trust(&request)`, asserts `ConfigTrustError::Tracker(_)`, and
+   asserts `trust_store().trust_status()` remains
+   `ConfigTrustStatus::Untrusted`.
+2. `untrust_keeps_the_config_tracked` (`src/config/service.rs:514-531`) [V]:
+   Trusts a config, calls `service.untrust()`, asserts `trust_store().list()` is
+   empty, but `tracker_store().list()` retains the config file path.
+3. `a_refused_load_still_tracks_the_config`
+   (`src/config/service.rs:533-549`) [V]: Loads an untrusted workspace, asserts
+   load fails with `ConfigError::Trust(ConfigTrustError::Untrusted)`, but
+   asserts `tracker_store().list()` successfully recorded the config file.
+4. `granting_a_root_only_subject_tracks_nothing`
+   (`src/config/service.rs:459-474`) [V]: Trusts a root-only subject
+   (`TrustRequest::Root`), asserts `trust_store().list()` contains root, but
+   `tracker_store().list()` is empty.
+5. `granting_a_config_subject_records_it_in_the_tracker`
+   (`src/config/service.rs:445-458`) [V]: Trusts a config subject, asserts
+   `tracker_store().list()` contains canonicalized config path.
+6. `succeeds_even_when_tracking_store_write_fails`
+   (`src/config/service.rs:589-605`) [V]: Blocks `tracked_root`, executes
+   `load()`, asserts load succeeds despite tracker failure because load uses
+   best-effort tracking.
 
 #### Failure Modes and Recovery Analysis
 
@@ -161,19 +243,53 @@ The codebase contains tests verifying the two-store ordering and lifecycle behav
      let write_entry = std::os::unix::fs::symlink(&entry.canonical_target, &entry_path);
      ```
 
-   - In Rust's std library, `Path::exists()` calls `fs::metadata(self).is_ok()`, which **follows symbolic links**.
-   - If an entry symlink is dangling (its target was deleted from disk), `entry_path.exists()` returns `false` [V].
-   - If an operation subsequently attempts to write a symlink at `entry_path` (e.g. if an external program or test manually planted a dangling symlink at `entry_path`), `std::os::unix::fs::symlink` fails with `io::ErrorKind::AlreadyExists` (`EEXIST`) [V].
-   - However, in normal operation: `StoreEntry::from_target(target)` runs `fs::canonicalize(target)` [V: `src/file_tracker.rs:444`]. If `target` does not exist, `from_target` immediately errors with `FilePathTrackerError::Canonicalize` [V: `src/file_tracker.rs:445`]. Therefore, `record` can never be called on a non-existent target; any existing symlink at `entry_path` pointing to `canonical_target` will see its target exist, so `entry_path.exists()` returns `true` and hits the idempotency guard [V: `src/file_tracker.rs:62-64`].
+   - In Rust's std library, `Path::exists()` calls `fs::metadata(self).is_ok()`,
+     which **follows symbolic links**.
+   - If an entry symlink is dangling (its target was deleted from disk),
+     `entry_path.exists()` returns `false` [V].
+   - If an operation subsequently attempts to write a symlink at `entry_path`
+     (e.g. if an external program or test manually planted a dangling symlink at
+     `entry_path`), `std::os::unix::fs::symlink` fails with
+     `io::ErrorKind::AlreadyExists` (`EEXIST`) [V].
+   - However, in normal operation: `StoreEntry::from_target(target)` runs
+     `fs::canonicalize(target)` [V: `src/file_tracker.rs:444`]. If `target` does
+     not exist, `from_target` immediately errors with
+     `FilePathTrackerError::Canonicalize` [V: `src/file_tracker.rs:445`].
+     Therefore, `record` can never be called on a non-existent target; any
+     existing symlink at `entry_path` pointing to `canonical_target` will see
+     its target exist, so `entry_path.exists()` returns `true` and hits the
+     idempotency guard [V: `src/file_tracker.rs:62-64`].
 2. **Stale Trust vs Stale Files**:
-   - If a trusted config file's content is modified: `TrustStore::config_file_trust_check` computes `Blake3Digest::from(content)` and compares with recorded `.hash`. On mismatch, it returns `ConfigTrustCheck::Stale` [V: `src/config/trust.rs:258`]. `into_trusted` maps this to `ConfigTrustError::Untrusted { status: ConfigTrustStatus::Stale }` [V: `src/config/file.rs:227, 232`].
-   - If a workspace root or config file is deleted from disk: `list()` filters it out dynamically because `target.try_exists().unwrap_or(true)` evaluates to `false` [V: `src/file_tracker.rs:139-140`]. Stale symlinks remain on disk until explicit cleanup via `traces trust clean` or `traces tracked clean` [V: `src/cli/trust.rs:84`, `src/cli/tracked.rs:66`].
+   - If a trusted config file's content is modified:
+     `TrustStore::config_file_trust_check` computes
+     `Blake3Digest::from(content)` and compares with recorded `.hash`. On
+     mismatch, it returns `ConfigTrustCheck::Stale` [V:
+     `src/config/trust.rs:258`]. `into_trusted` maps this to
+     `ConfigTrustError::Untrusted { status: ConfigTrustStatus::Stale }` [V:
+     `src/config/file.rs:227, 232`].
+   - If a workspace root or config file is deleted from disk: `list()` filters
+     it out dynamically because `target.try_exists().unwrap_or(true)` evaluates
+     to `false` [V: `src/file_tracker.rs:139-140`]. Stale symlinks remain on
+     disk until explicit cleanup via `traces trust clean` or
+     `traces tracked clean` [V: `src/cli/trust.rs:84`, `src/cli/tracked.rs:66`].
 3. **Corrupted Store Entries**:
-   - `clean()` iterates through `entry_paths` and calls `recorded_target(&entry)` [V: `src/file_tracker.rs:330`].
-   - If a file in the store root cannot be read as a symlink (Unix) or valid UTF-8 string (Windows), `recorded_target` returns `None` [V: `src/file_tracker.rs:478`].
-   - `clean()` skips such entries (`let Some(target) = recorded_target(&entry) else { continue; };`) [V: `src/file_tracker.rs:331-332`]. Corrupted non-entry files are ignored rather than pruned.
+   - `clean()` iterates through `entry_paths` and calls
+     `recorded_target(&entry)` [V: `src/file_tracker.rs:330`].
+   - If a file in the store root cannot be read as a symlink (Unix) or valid
+     UTF-8 string (Windows), `recorded_target` returns `None` [V:
+     `src/file_tracker.rs:478`].
+   - `clean()` skips such entries
+     (`let Some(target) = recorded_target(&entry) else { continue; };`) [V:
+     `src/file_tracker.rs:331-332`]. Corrupted non-entry files are ignored
+     rather than pruned.
 4. **Partial Failure Between Stores**:
-   - If `TrackerStore::record` succeeds, but `TrustStore::trust` fails (e.g. writing companion hash fails or disk full): `ConfigService::trust` returns `Err` [V: `src/config/service.rs:135`]. There is **no rollback mechanism** to untrack the config file [V]. The config file remains in `tracked-configs`, while `trusted-configs` has no entry. This does not violate security, because `load()` gates execution on `TrustStore`, not `TrackerStore` [V: `src/config/file.rs:220`].
+   - If `TrackerStore::record` succeeds, but `TrustStore::trust` fails (e.g.
+     writing companion hash fails or disk full): `ConfigService::trust` returns
+     `Err` [V: `src/config/service.rs:135`]. There is **no rollback mechanism**
+     to untrack the config file [V]. The config file remains in
+     `tracked-configs`, while `trusted-configs` has no entry. This does not
+     violate security, because `load()` gates execution on `TrustStore`, not
+     `TrackerStore` [V: `src/config/file.rs:220`].
 
 ### 2.5 Code Metrics, Duplication, and Merging Impact
 
@@ -188,27 +304,66 @@ The codebase contains tests verifying the two-store ordering and lifecycle behav
 
 #### Duplication Between `TrustStore` and `TrackerStore`
 
-1. Both structs wrap a private `store: FilePathTracker` [V: `src/config/trust.rs:165`, `src/config/tracker.rs:17`].
-2. Both implement `Default` delegating to `dirs::TRUSTED_CONFIGS` vs `dirs::TRACKED_CONFIGS` [V: `src/config/trust.rs:326-330`, `src/config/tracker.rs:89-94`].
-3. Both implement `for_test<P: Into<PathBuf>>(root: P) -> Self` delegating to `FilePathTracker::for_test` [V: `src/config/trust.rs:316-320`, `src/config/tracker.rs:80-84`].
-4. Both implement `list() -> Result<Vec<PathBuf>, ConfigTrustError>` calling `self.store.list_all(...)` [V: `src/config/trust.rs:290-292`, `src/config/tracker.rs:59-61`].
-5. Both implement `clean() -> Result<usize, ConfigTrustError>` calling `self.store.clean(...)` [V: `src/config/trust.rs:305-309`, `src/config/tracker.rs:71-73`].
-6. The CLI wrappers `traces trust list/clean` (`src/cli/trust.rs:68-93`) and `traces tracked list/clean` (`src/cli/tracked.rs:50-76`) duplicate identical command structures, argument patterns, and stdout/stderr formatting.
+1. Both structs wrap a private `store: FilePathTracker` [V:
+   `src/config/trust.rs:165`, `src/config/tracker.rs:17`].
+2. Both implement `Default` delegating to `dirs::TRUSTED_CONFIGS` vs
+   `dirs::TRACKED_CONFIGS` [V: `src/config/trust.rs:326-330`,
+   `src/config/tracker.rs:89-94`].
+3. Both implement `for_test<P: Into<PathBuf>>(root: P) -> Self` delegating to
+   `FilePathTracker::for_test` [V: `src/config/trust.rs:316-320`,
+   `src/config/tracker.rs:80-84`].
+4. Both implement `list() -> Result<Vec<PathBuf>, ConfigTrustError>` calling
+   `self.store.list_all(...)` [V: `src/config/trust.rs:290-292`,
+   `src/config/tracker.rs:59-61`].
+5. Both implement `clean() -> Result<usize, ConfigTrustError>` calling
+   `self.store.clean(...)` [V: `src/config/trust.rs:305-309`,
+   `src/config/tracker.rs:71-73`].
+6. The CLI wrappers `traces trust list/clean` (`src/cli/trust.rs:68-93`) and
+   `traces tracked list/clean` (`src/cli/tracked.rs:50-76`) duplicate identical
+   command structures, argument patterns, and stdout/stderr formatting.
 
 #### Who Reads `tracked-configs`?
 
-- **Production readers**: `tracked.list()` is called **only** by `src/cli/tracked.rs:52` in response to `traces tracked list` [V]. `tracked.clean()` is called **only** by `src/cli/tracked.rs:68` in response to `traces tracked clean` [V].
-- **Engine consumption**: **Zero** consumers. No loader, indexer, query engine, or template component reads or relies upon the contents of `TrackerStore` [V]. `TrackerStore` is solely a machine-local audit registry for human CLI inspection.
+- **Production readers**: `tracked.list()` is called **only** by
+  `src/cli/tracked.rs:52` in response to `traces tracked list` [V].
+  `tracked.clean()` is called **only** by `src/cli/tracked.rs:68` in response to
+  `traces tracked clean` [V].
+- **Engine consumption**: **Zero** consumers. No loader, indexer, query engine,
+  or template component reads or relies upon the contents of `TrackerStore` [V].
+  `TrackerStore` is solely a machine-local audit registry for human CLI
+  inspection.
 
 #### Information Lost if Merged into One Record
 
-If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `WorkspaceRegistry` in `dirs::WORKSPACES`), the following distinct semantics would be affected:
+If `TrustStore` and `TrackerStore` were merged into a single store (e.g.
+`WorkspaceRegistry` in `dirs::WORKSPACES`), the following distinct semantics
+would be affected:
 
-1. **Root vs File Path**: `TrustStore` keys entries by canonical workspace root directory (e.g. `/repo`), authorizing the root perimeter [V: `src/config/trust.rs:195`]. `TrackerStore` keys entries by individual config file path (e.g. `/repo/.traces/config.toml`) [V: `src/config/service.rs:133`]. A single-pointer symlink cannot point to both paths simultaneously [H].
-2. **Lifecycle Decoupling (Revocation vs Tracking)**: Calling `traces untrust` removes the workspace root and companion `.hash` from `TrustStore`, but deliberately preserves the config path in `TrackerStore` [V: `src/config/service.rs:138, 514-531`]. If merged into a single entry deletion, untrusting would erase audit tracking history [H].
-3. **Tracking Untrusted Workspaces**: `load()` tracks untrusted config paths before rejecting them [V: `src/config/file.rs:219`, `src/config/service.rs:533-548`]. In a single-entry model, an untrusted workspace would either not be recorded at all (losing discovery audit) or would require recording an entry with an explicit "untrusted" state flag [H].
-4. **Root-Only Trust**: `TrustRequest::Root` trusts a root without a config file [V: `src/config/service.rs:459-474`]. A merged record tied strictly to config files would have no config path to store [H].
-5. **Storage Mechanism Transformation**: `FilePathTracker` relies on filesystem symlinks (Unix) or raw text files (Windows), plus suffix-appended companion files [V: `src/file_tracker.rs:72-79, 458-462`]. Storing multiple paths (root + config file), a status enum (`Untrusted`, `Trusted`, `Stale`), and a digest in a single record would require replacing filesystem symlinks with structured files (e.g. TOML, JSON, or SQLite) [H].
+1. **Root vs File Path**: `TrustStore` keys entries by canonical workspace root
+   directory (e.g. `/repo`), authorizing the root perimeter [V:
+   `src/config/trust.rs:195`]. `TrackerStore` keys entries by individual config
+   file path (e.g. `/repo/.traces/config.toml`) [V:
+   `src/config/service.rs:133`]. A single-pointer symlink cannot point to both
+   paths simultaneously [H].
+2. **Lifecycle Decoupling (Revocation vs Tracking)**: Calling `traces untrust`
+   removes the workspace root and companion `.hash` from `TrustStore`, but
+   deliberately preserves the config path in `TrackerStore` [V:
+   `src/config/service.rs:138, 514-531`]. If merged into a single entry
+   deletion, untrusting would erase audit tracking history [H].
+3. **Tracking Untrusted Workspaces**: `load()` tracks untrusted config paths
+   before rejecting them [V: `src/config/file.rs:219`,
+   `src/config/service.rs:533-548`]. In a single-entry model, an untrusted
+   workspace would either not be recorded at all (losing discovery audit) or
+   would require recording an entry with an explicit "untrusted" state flag [H].
+4. **Root-Only Trust**: `TrustRequest::Root` trusts a root without a config file
+   [V: `src/config/service.rs:459-474`]. A merged record tied strictly to config
+   files would have no config path to store [H].
+5. **Storage Mechanism Transformation**: `FilePathTracker` relies on filesystem
+   symlinks (Unix) or raw text files (Windows), plus suffix-appended companion
+   files [V: `src/file_tracker.rs:72-79, 458-462`]. Storing multiple paths
+   (root + config file), a status enum (`Untrusted`, `Trusted`, `Stale`), and a
+   digest in a single record would require replacing filesystem symlinks with
+   structured files (e.g. TOML, JSON, or SQLite) [H].
 
 ---
 
@@ -243,40 +398,71 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
 
 #### 1. Prompt Flow (`src/cli/init.rs:90-107`)
 
-- Prompts the user interactively via `provider: &dyn DialogProvider` [V: `src/cli/init.rs:52, 91`].
-- Prompt 1: `provider.text("Template directory", Some(DEFAULT_LOCAL_TEMPLATES_DIR))` [V: `93-97`].
-- Prompt 2: `provider.text("Output directory", Some(DEFAULT_OUTPUT_DIRECTORY))` [V: `98-102`].
-- Encapsulates collected paths in `struct InitInput { directory: PathBuf, output_dir: PathBuf }` [V: `103-106, 250-254`].
-- Abort handling: If the user presses Escape (cancels) or Ctrl-C (interrupts), `DialogError` propagates as `CliError::InitPrompt`, which `Cli::run` translates to `CommandOutcome::Aborted` [V: `src/cli/mod.rs:140-142`, `src/cli/init.rs:310-320`].
+- Prompts the user interactively via `provider: &dyn DialogProvider` [V:
+  `src/cli/init.rs:52, 91`].
+- Prompt 1:
+  `provider.text("Template directory", Some(DEFAULT_LOCAL_TEMPLATES_DIR))` [V:
+  `93-97`].
+- Prompt 2: `provider.text("Output directory", Some(DEFAULT_OUTPUT_DIRECTORY))`
+  [V: `98-102`].
+- Encapsulates collected paths in
+  `struct InitInput { directory: PathBuf, output_dir: PathBuf }` [V:
+  `103-106, 250-254`].
+- Abort handling: If the user presses Escape (cancels) or Ctrl-C (interrupts),
+  `DialogError` propagates as `CliError::InitPrompt`, which `Cli::run`
+  translates to `CommandOutcome::Aborted` [V: `src/cli/mod.rs:140-142`,
+  `src/cli/init.rs:310-320`].
 
 #### 2. Decision Logic (`src/cli/init.rs:53-65, 125-129`)
 
-- Resolves process current directory as workspace root: `let root = super::current_dir()?.into_inner();` [V: `53`].
-- **Pre-condition guard**: Checks if `.traces/` already exists (`root.join(LOCAL_CONFIG_DIR).exists()`). If so, immediately halts with `CliError::InitAlreadyInitialized { root }` [V: `55-60, 455-470`].
-- **Path confinement & containment**: Calls `ConfigSubDir::resolve(&input.directory, &root)` [V: `61`].
-  - Checks that the template path is relative, does not contain `..` components, and does not resolve outside the workspace root [V: `src/config/subdir.rs:44-59`].
-  - On violation (absolute path, parent traversal, symlink escape), rejects without writing: `CliError::InitInvalidTemplateDir` [V: `src/cli/init.rs:62-65, 374-414`].
-- **Filesystem type guard**: If `templates_dir` already exists and is not a directory (e.g. a regular file), aborts with `CliError::InitScaffold(io::ErrorKind::NotADirectory)` [V: `125-129, 440-451`].
+- Resolves process current directory as workspace root:
+  `let root = super::current_dir()?.into_inner();` [V: `53`].
+- **Pre-condition guard**: Checks if `.traces/` already exists
+  (`root.join(LOCAL_CONFIG_DIR).exists()`). If so, immediately halts with
+  `CliError::InitAlreadyInitialized { root }` [V: `55-60, 455-470`].
+- **Path confinement & containment**: Calls
+  `ConfigSubDir::resolve(&input.directory, &root)` [V: `61`].
+  - Checks that the template path is relative, does not contain `..` components,
+    and does not resolve outside the workspace root [V:
+    `src/config/subdir.rs:44-59`].
+  - On violation (absolute path, parent traversal, symlink escape), rejects
+    without writing: `CliError::InitInvalidTemplateDir` [V:
+    `src/cli/init.rs:62-65, 374-414`].
+- **Filesystem type guard**: If `templates_dir` already exists and is not a
+  directory (e.g. a regular file), aborts with
+  `CliError::InitScaffold(io::ErrorKind::NotADirectory)` [V:
+  `125-129, 440-451`].
 
 #### 3. Filesystem Effects & Rollback Journal (`src/cli/init.rs:67-80, 116-144, 168-173, 233-247`)
 
-- **Scaffold journal**: Maintains `let mut created = Vec::new();` to track created directories in order [V: `67`].
+- **Scaffold journal**: Maintains `let mut created = Vec::new();` to track
+  created directories in order [V: `67`].
 - **Directory creation**:
-  - Creates `.traces/` (`root.join(LOCAL_CONFIG_DIR)`), records in `created` [V: `130-132`].
-  - Discovers all missing directory ancestors between `root` and `templates_dir` [V: `134-138`].
-  - Creates each ancestor from outermost to innermost using `fs::create_dir`, recording each in `created` [V: `139-142`].
+  - Creates `.traces/` (`root.join(LOCAL_CONFIG_DIR)`), records in `created` [V:
+    `130-132`].
+  - Discovers all missing directory ancestors between `root` and `templates_dir`
+    [V: `134-138`].
+  - Creates each ancestor from outermost to innermost using `fs::create_dir`,
+    recording each in `created` [V: `139-142`].
 - **Atomic config write**:
-  - Uses `fs::File::create_new(&path)` to create `.traces/config.toml` [V: `234`].
-  - Prevents TOCTOU clobbering: fails atomically if the file already exists [V: `206-209, 534-555`].
+  - Uses `fs::File::create_new(&path)` to create `.traces/config.toml` [V:
+    `234`].
+  - Prevents TOCTOU clobbering: fails atomically if the file already exists [V:
+    `206-209, 534-555`].
   - Writes serialized TOML bytes via `file.write_all()` [V: `239`].
-  - If writing fails midway, drops file handle and removes half-written file via `fs::remove_file(&path)` [V: `240-246`].
+  - If writing fails midway, drops file handle and removes half-written file via
+    `fs::remove_file(&path)` [V: `240-246`].
 - **Rollback (`Init::undo`)**:
-  - If any error occurs during directory scaffolding or config writing: iterates `created` in **reverse order** (newest first) and calls `fs::remove_dir(dir)` [V: `77-80, 168-173`].
-  - Never recursive (`remove_dir`, not `remove_dir_all`): non-empty directories or pre-existing files are untouched [V: `165-167, 485-498`].
+  - If any error occurs during directory scaffolding or config writing: iterates
+    `created` in **reverse order** (newest first) and calls
+    `fs::remove_dir(dir)` [V: `77-80, 168-173`].
+  - Never recursive (`remove_dir`, not `remove_dir_all`): non-empty directories
+    or pre-existing files are untouched [V: `165-167, 485-498`].
 
 #### 4. Default Content & TOML Serialization (`src/cli/init.rs:216-248`)
 
-- Constructs `RawConfig` with user-chosen template directory and output directory [V: `221-227`]:
+- Constructs `RawConfig` with user-chosen template directory and output
+  directory [V: `221-227`]:
 
   ```rust
   let config = RawConfig {
@@ -301,20 +487,37 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
   [frontmatter]
   ```
 
-  `[schemas]` and `[frontmatter]` serialize as empty tables due to their serde defaults (`src/config/raw.rs:36, 53-56, 70, 77-80`) [V: `src/cli/init.rs:202-205`]. Task configuration (`[tasks]`) is omitted entirely, defaulting to built-in task filters [V: `src/config/raw.rs:92-101`].
-- **Schema directories**: `init` **does not** create `.traces/schemas/` [V]. Only `.traces/` and `templates_dir` are scaffolded.
+  `[schemas]` and `[frontmatter]` serialize as empty tables due to their serde
+  defaults (`src/config/raw.rs:36, 53-56, 70, 77-80`) [V:
+  `src/cli/init.rs:202-205`]. Task configuration (`[tasks]`) is omitted
+  entirely, defaulting to built-in task filters [V: `src/config/raw.rs:92-101`].
+- **Schema directories**: `init` **does not** create `.traces/schemas/` [V].
+  Only `.traces/` and `templates_dir` are scaffolded.
 
 ### 3.2 Constants, Boundaries, and Services
 
 - **Constants Used**:
   - `DEFAULT_OUTPUT_DIRECTORY: &str = "."` (`src/cli/init.rs:25`) [V]
-  - `DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates"` (`src/config/constants.rs:7`, re-exported `src/config/mod.rs:20`) [V]
+  - `DEFAULT_LOCAL_TEMPLATES_DIR: &str = ".traces/templates"`
+    (`src/config/constants.rs:7`, re-exported `src/config/mod.rs:20`) [V]
   - `LOCAL_CONFIG_DIR: &str = ".traces"` (`src/config/constants.rs:13`) [V]
-  - `LOCAL_CONFIG_FILE: &str = ".traces/config.toml"` (`src/config/constants.rs:16`) [V]
-- **Types Touched**: `DialogProvider` (`src/dialog/mod.rs:37`), `ConfigSubDir` (`src/config/subdir.rs:17`), `RawConfig` (`src/config/raw.rs:17`), `RawTemplateConfig` (`src/config/raw.rs:38`), `InitInput` (`src/cli/init.rs:251`), `ConfigScaffoldError` (`src/cli/init.rs:178`), `CliError` (`src/cli/error.rs:15`).
-- **Services Touched**: **None** [V]. `Init` touches neither `ConfigService`, `TemplateService`, `SchemaService`, `IndexStore`, `TrustStore`, nor `TrackerStore`.
-- **Core Use Case Equivalent**: **Does not exist** [V]. No initialization or scaffolding logic exists in `src/config/` or `src/template/`. The scaffolding logic is coupled to `src/cli/init.rs`.
-- **Command Dispatch Discrepancy**: In `src/cli/mod.rs:186-207`, `Commands::run` routes 9 commands with `service` (or `service.trust_store()`, `service.tracker_store()`, or `run_with_config(service, ...)`). Only `Init` takes solely `provider` [V: `src/cli/mod.rs:187`]:
+  - `LOCAL_CONFIG_FILE: &str = ".traces/config.toml"`
+    (`src/config/constants.rs:16`) [V]
+- **Types Touched**: `DialogProvider` (`src/dialog/mod.rs:37`), `ConfigSubDir`
+  (`src/config/subdir.rs:17`), `RawConfig` (`src/config/raw.rs:17`),
+  `RawTemplateConfig` (`src/config/raw.rs:38`), `InitInput`
+  (`src/cli/init.rs:251`), `ConfigScaffoldError` (`src/cli/init.rs:178`),
+  `CliError` (`src/cli/error.rs:15`).
+- **Services Touched**: **None** [V]. `Init` touches neither `ConfigService`,
+  `TemplateService`, `SchemaService`, `IndexStore`, `TrustStore`, nor
+  `TrackerStore`.
+- **Core Use Case Equivalent**: **Does not exist** [V]. No initialization or
+  scaffolding logic exists in `src/config/` or `src/template/`. The scaffolding
+  logic is coupled to `src/cli/init.rs`.
+- **Command Dispatch Discrepancy**: In `src/cli/mod.rs:186-207`, `Commands::run`
+  routes 9 commands with `service` (or `service.trust_store()`,
+  `service.tracker_store()`, or `run_with_config(service, ...)`). Only `Init`
+  takes solely `provider` [V: `src/cli/mod.rs:187`]:
 
   ```rust
   Self::Init(args) => args.run(provider.as_ref()),
@@ -322,14 +525,27 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
 
 ### 3.3 Scaffolding Interaction with Trust & Tracking
 
-- **Trust Interaction**: **None**. `traces init` does **not** grant trust to the workspace root or the newly created `.traces/config.toml` [V: `src/cli/init.rs:52-83`].
-- **Tracking Interaction**: **None**. `traces init` does **not** record the config path in `TrackerStore` [V: `src/cli/init.rs:52-83`].
-- **Post-Init State**: The repository is left in an uninitialized trust state. When the user executes their first subsequent traces command (such as `traces template`, `traces index`, or `traces list`), `ConfigService::load` executes [V: `src/cli/mod.rs:191-204`]:
+- **Trust Interaction**: **None**. `traces init` does **not** grant trust to the
+  workspace root or the newly created `.traces/config.toml` [V:
+  `src/cli/init.rs:52-83`].
+- **Tracking Interaction**: **None**. `traces init` does **not** record the
+  config path in `TrackerStore` [V: `src/cli/init.rs:52-83`].
+- **Post-Init State**: The repository is left in an uninitialized trust state.
+  When the user executes their first subsequent traces command (such as
+  `traces template`, `traces index`, or `traces list`), `ConfigService::load`
+  executes [V: `src/cli/mod.rs:191-204`]:
   1. Locates `.traces/config.toml` [V: `src/config/service.rs:75`].
-  2. Records it in `TrackerStore` via best-effort tracking [V: `src/config/file.rs:219`].
-  3. Evaluates `TrustStore::config_file_trust_check` [V: `src/config/file.rs:220`].
-  4. **Fails immediately with `ConfigError::Trust(ConfigTrustError::Untrusted)`** [V: `src/config/file.rs:229-234`].
-- **User Experience Consequence**: A user who runs `traces init` must explicitly run `traces trust` before they can render a template or query their notes [H]. Alternatively, an interactive prompt or automatic trust grant during `init` would eliminate this friction [P].
+  2. Records it in `TrackerStore` via best-effort tracking [V:
+     `src/config/file.rs:219`].
+  3. Evaluates `TrustStore::config_file_trust_check` [V:
+     `src/config/file.rs:220`].
+  4. **Fails immediately with
+     `ConfigError::Trust(ConfigTrustError::Untrusted)`** [V:
+     `src/config/file.rs:229-234`].
+- **User Experience Consequence**: A user who runs `traces init` must explicitly
+  run `traces trust` before they can render a template or query their notes [H].
+  Alternatively, an interactive prompt or automatic trust grant during `init`
+  would eliminate this friction [P].
 
 ---
 
@@ -345,7 +561,8 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
 
 ### 4.2 Composition of `ConfigService` in `src/cli/mod.rs`
 
-- **Single Production Composition Root**: `ConfigService` is instantiated in **exactly one place** in production:
+- **Single Production Composition Root**: `ConfigService` is instantiated in
+  **exactly one place** in production:
 
   ```rust
   // src/cli/mod.rs:224-228
@@ -357,16 +574,24 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
   ```
 
   [V: `src/cli/mod.rs:224-228`].
-- **Directory Origins**: `ConfigService::default()` constructs stores using static `StateDirRoot` values [V: `src/config/service.rs:197-205`]:
-  - `tracked: TrackerStore::default()` -> `dirs::TRACKED_CONFIGS` (`$TRACES_STATE_DIR/tracked-configs`) [V: `src/config/tracker.rs:87-95`, `src/dirs.rs:176-177`].
-  - `trust: TrustStore::default()` -> `dirs::TRUSTED_CONFIGS` (`$TRACES_STATE_DIR/trusted-configs`) [V: `src/config/trust.rs:323-331`, `src/dirs.rs:188-189`].
-- **Test Composition Roots**: In tests, `ConfigService::for_test(tracked_root, trusted_root)` isolates state in temporary directories:
+- **Directory Origins**: `ConfigService::default()` constructs stores using
+  static `StateDirRoot` values [V: `src/config/service.rs:197-205`]:
+  - `tracked: TrackerStore::default()` -> `dirs::TRACKED_CONFIGS`
+    (`$TRACES_STATE_DIR/tracked-configs`) [V: `src/config/tracker.rs:87-95`,
+    `src/dirs.rs:176-177`].
+  - `trust: TrustStore::default()` -> `dirs::TRUSTED_CONFIGS`
+    (`$TRACES_STATE_DIR/trusted-configs`) [V: `src/config/trust.rs:323-331`,
+    `src/dirs.rs:188-189`].
+- **Test Composition Roots**: In tests,
+  `ConfigService::for_test(tracked_root, trusted_root)` isolates state in
+  temporary directories:
   - `src/lib.rs:645`: `pub fn fixture_service(root: &Path) -> ConfigService`
   - `src/cli/mod.rs:1062` (query integration tests)
   - `src/cli/mod.rs:1443` (template integration tests)
   - `src/cli/mod.rs:1538` (completions integration tests)
-- **Service Dependency Passing**:
-  `ConfigService` is passed as a reference `&ConfigService` to `Commands::run` [V: `src/cli/mod.rs:181-185`]. Commands requiring full configuration execute through `run_with_config(service, ...)` [V: `src/cli/mod.rs:190-204`]:
+- **Service Dependency Passing**: `ConfigService` is passed as a reference
+  `&ConfigService` to `Commands::run` [V: `src/cli/mod.rs:181-185`]. Commands
+  requiring full configuration execute through `run_with_config(service, ...)` [V: `src/cli/mod.rs:190-204`]:
 
   ```rust
   fn run_with_config(
@@ -387,7 +612,8 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
 
 ### 5.1 Unix vs Windows Implementation in `FilePathTracker`
 
-`src/file_tracker.rs` implements platform abstraction via conditional compilation (`#[cfg(unix)]` / `#[cfg(windows)]`):
+`src/file_tracker.rs` implements platform abstraction via conditional
+compilation (`#[cfg(unix)]` / `#[cfg(windows)]`):
 
 | Concern | Unix Implementation | Windows Implementation |
 |---|---|---|
@@ -401,15 +627,19 @@ If `TrustStore` and `TrackerStore` were merged into a single store (e.g. `Worksp
 
 - `src/file_tracker.rs:75-80`: Windows entry writer via `fs::write`.
 - `src/file_tracker.rs:476-478`: Windows entry reader via `fs::read_to_string`.
-- `src/dirs.rs:67-78`: Windows `HOME` resolution (`%USERPROFILE%` -> `%HOMEDRIVE%%HOMEPATH%` -> `C:\`).
-- `src/dirs.rs:114-117`: Windows `CONFIG_HOME` resolution (`%APPDATA%` -> `%USERPROFILE%\AppData\Roaming`).
-- `src/dirs.rs:150-154`: Windows `STATE_HOME` resolution (`%LOCALAPPDATA%` -> `%USERPROFILE%\AppData\Local`).
+- `src/dirs.rs:67-78`: Windows `HOME` resolution (`%USERPROFILE%` ->
+  `%HOMEDRIVE%%HOMEPATH%` -> `C:\`).
+- `src/dirs.rs:114-117`: Windows `CONFIG_HOME` resolution (`%APPDATA%` ->
+  `%USERPROFILE%\AppData\Roaming`).
+- `src/dirs.rs:150-154`: Windows `STATE_HOME` resolution (`%LOCALAPPDATA%` ->
+  `%USERPROFILE%\AppData\Local`).
 
 ---
 
 ## 6. Survey Reconciliation (`config-dialog.md`)
 
-Survey `config-dialog.md` was authored against `2dc3250d`. This inventory verified all findings against HEAD `8064cf76`:
+Survey `config-dialog.md` was authored against `2dc3250d`. This inventory
+verified all findings against HEAD `8064cf76`:
 
 | Survey Claim / Hypothesis | Survey Citation | HEAD `8064cf76` Citation | Status / Verification Note |
 |---|---|---|---|
@@ -422,16 +652,28 @@ Survey `config-dialog.md` was authored against `2dc3250d`. This inventory verifi
 
 ### Evaluation of Survey Hypothesis [H3] (Unify into `WorkspaceRegistry`)
 
-Survey [H3] proposed replacing `TrustStore` and `TrackerStore` with a single `WorkspaceRegistry`.
+Survey [H3] proposed replacing `TrustStore` and `TrackerStore` with a single
+`WorkspaceRegistry`.
 
 - **Arguments in Favor**:
-  1. Deletes `src/config/tracker.rs` (~244 lines) and eliminates parallel wrappers over `FilePathTracker` [V].
-  2. Eliminates cross-store coordination and the two-store ordering invariant in `ConfigService::trust` (`src/config/service.rs:128-136`) [V].
-  3. Eliminates duplicate CLI commands: `traces tracked list/clean` and `traces trust list/clean` could merge into unified workspace status inspection [H].
+  1. Deletes `src/config/tracker.rs` (~244 lines) and eliminates parallel
+     wrappers over `FilePathTracker` [V].
+  2. Eliminates cross-store coordination and the two-store ordering invariant in
+     `ConfigService::trust` (`src/config/service.rs:128-136`) [V].
+  3. Eliminates duplicate CLI commands: `traces tracked list/clean` and
+     `traces trust list/clean` could merge into unified workspace status
+     inspection [H].
 - **Tradeoffs / Blockers Identified in Inventory**:
-  1. `TrustStore` tracks the workspace root (e.g. `/repo`), while `TrackerStore` tracks config files (e.g. `/repo/.traces/config.toml`) [V: `src/config/trust.rs:195`, `src/config/service.rs:133`].
-  2. `FilePathTracker` relies on one symlink per hash. Storing both root, config path, trust state (`Trusted`, `Untrusted`, `Stale`), and config digest requires migrating `FilePathTracker` to structured storage (e.g. JSON/TOML state file or SQLite) [H].
-  3. Untrusting a workspace currently keeps the config tracked for audit purposes [V: `src/config/service.rs:514-531`]. In a unified record, revocation must mutate a status field rather than deleting a symlink [H].
+  1. `TrustStore` tracks the workspace root (e.g. `/repo`), while `TrackerStore`
+     tracks config files (e.g. `/repo/.traces/config.toml`) [V:
+     `src/config/trust.rs:195`, `src/config/service.rs:133`].
+  2. `FilePathTracker` relies on one symlink per hash. Storing both root, config
+     path, trust state (`Trusted`, `Untrusted`, `Stale`), and config digest
+     requires migrating `FilePathTracker` to structured storage (e.g. JSON/TOML
+     state file or SQLite) [H].
+  3. Untrusting a workspace currently keeps the config tracked for audit
+     purposes [V: `src/config/service.rs:514-531`]. In a unified record,
+     revocation must mutate a status field rather than deleting a symlink [H].
 
 ---
 
@@ -439,22 +681,46 @@ Survey [H3] proposed replacing `TrustStore` and `TrackerStore` with a single `Wo
 
 ### Surprises Discovered in Code Inventory
 
-1. **`traces init` Leaves Workspace Completely Untrusted**:
-   A freshly scaffolded repository created via `traces init` cannot execute any subsequent `traces` command without immediately failing with `ConfigTrustError::Untrusted` [V: `src/cli/init.rs:52-83`, `src/config/file.rs:229-234`]. The user is forced to know and execute `traces trust` immediately after `init`.
-2. **`TrackerStore` is Completely Unused by the Core Engine**:
-   Despite the complexity of the two-store ordering invariant, `TrackerStore::record_best_effort`, and failure handling, `TrackerStore` has **zero callers** in indexing, querying, template rendering, or configuration resolution [V]. Its only readers are the CLI commands `traces tracked list` and `traces tracked clean` [V: `src/cli/tracked.rs:52, 68`].
-3. **`FilePathTracker` Relies on Symlink-Following `exists()`**:
-   In `src/file_tracker.rs:62`, `if entry_path.exists() { return Ok(()); }` follows symlinks. A dangling symlink at `entry_path` returns `false`, proceeding to `symlink()`, which returns `EEXIST` [V]. While protected in practice by `fs::canonicalize(target)` requiring target existence [V: `src/file_tracker.rs:444`], using `symlink_metadata().is_ok()` would be more robust against pre-existing dangling symlinks.
-4. **Command Routing Asymmetry in `cli/mod.rs`**:
-   `Commands::run` routes 9 of 10 commands with `&ConfigService` (or stores derived from it), but `Init` alone takes no service and receives only `provider: Arc<dyn DialogProvider>` [V: `src/cli/mod.rs:186-207`].
+1. **`traces init` Leaves Workspace Completely Untrusted**: A freshly scaffolded
+   repository created via `traces init` cannot execute any subsequent `traces`
+   command without immediately failing with `ConfigTrustError::Untrusted` [V:
+   `src/cli/init.rs:52-83`, `src/config/file.rs:229-234`]. The user is forced to
+   know and execute `traces trust` immediately after `init`.
+2. **`TrackerStore` is Completely Unused by the Core Engine**: Despite the
+   complexity of the two-store ordering invariant,
+   `TrackerStore::record_best_effort`, and failure handling, `TrackerStore` has
+   **zero callers** in indexing, querying, template rendering, or configuration
+   resolution [V]. Its only readers are the CLI commands `traces tracked list`
+   and `traces tracked clean` [V: `src/cli/tracked.rs:52, 68`].
+3. **`FilePathTracker` Relies on Symlink-Following `exists()`**: In
+   `src/file_tracker.rs:62`, `if entry_path.exists() { return Ok(()); }` follows
+   symlinks. A dangling symlink at `entry_path` returns `false`, proceeding to
+   `symlink()`, which returns `EEXIST` [V]. While protected in practice by
+   `fs::canonicalize(target)` requiring target existence [V:
+   `src/file_tracker.rs:444`], using `symlink_metadata().is_ok()` would be more
+   robust against pre-existing dangling symlinks.
+4. **Command Routing Asymmetry in `cli/mod.rs`**: `Commands::run` routes 9 of 10
+   commands with `&ConfigService` (or stores derived from it), but `Init` alone
+   takes no service and receives only `provider: Arc<dyn DialogProvider>` [V:
+   `src/cli/mod.rs:186-207`].
 
 ### Open Gaps for Ticket 22 Grilling Session
 
-1. **Should `init` Auto-Trust the Scaffolding?**:
-   Does `traces init` have user authorization to automatically grant trust to the workspace it just scaffolded? If yes, what is the ordering with tracking? (In `ConfigService::trust`, tracking precedes trust).
-2. **Where Does Init Logic Belong?**:
-   Sub-question (g) asks: "Decide the ownership of the scaffolding (`cli::init`)." Currently, all validation (`ConfigSubDir`), directory creation, rollback journal, and TOML generation live in `src/cli/init.rs`. Should a `WorkspaceInitService` or `ConfigService::init` exist in the core domain, leaving only prompts in `cli`?
-3. **Is `TrackerStore` Worth Keeping?**:
-   Given that no core service uses `tracked-configs`, is `traces tracked` a necessary feature, or can it be retired / folded into a single workspace registry?
-4. **Ordering Invariant Simplification**:
-   If `TrustStore` and `TrackerStore` remain separate, why is `TrackerStore` recorded before `TrustStore` during a trust grant if `TrackerStore` failure is ignored during `load`? The invariant ensures that every trusted workspace is tracked, but `untrust` leaves it tracked anyway.
+1. **Should `init` Auto-Trust the Scaffolding?**: Does `traces init` have user
+   authorization to automatically grant trust to the workspace it just
+   scaffolded? If yes, what is the ordering with tracking? (In
+   `ConfigService::trust`, tracking precedes trust).
+2. **Where Does Init Logic Belong?**: Sub-question (g) asks: "Decide the
+   ownership of the scaffolding (`cli::init`)." Currently, all validation
+   (`ConfigSubDir`), directory creation, rollback journal, and TOML generation
+   live in `src/cli/init.rs`. Should a `WorkspaceInitService` or
+   `ConfigService::init` exist in the core domain, leaving only prompts in
+   `cli`?
+3. **Is `TrackerStore` Worth Keeping?**: Given that no core service uses
+   `tracked-configs`, is `traces tracked` a necessary feature, or can it be
+   retired / folded into a single workspace registry?
+4. **Ordering Invariant Simplification**: If `TrustStore` and `TrackerStore`
+   remain separate, why is `TrackerStore` recorded before `TrustStore` during a
+   trust grant if `TrackerStore` failure is ignored during `load`? The invariant
+   ensures that every trusted workspace is tracked, but `untrust` leaves it
+   tracked anyway.

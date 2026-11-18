@@ -1,43 +1,102 @@
 # 01: Hardening — panic-free conversion, signed zero, honest display, error sources, serde, exports
 
-**What to build:** The date and duration value types become safe and truthful under hostile or extreme input: nothing in parse/convert/display can panic, signed zero compares like zero, extreme magnitudes render honestly, deserialized YAML dates behave exactly like inline dates, errors carry their source chains, and the two domains' public surfaces are symmetric. Verifiable entirely through in-module tests at the value-type seam.
+**What to build:** The date and duration value types become safe and truthful
+under hostile or extreme input: nothing in parse/convert/display can panic,
+signed zero compares like zero, extreme magnitudes render honestly, deserialized
+YAML dates behave exactly like inline dates, errors carry their source chains,
+and the two domains' public surfaces are symmetric. Verifiable entirely through
+in-module tests at the value-type seam.
 
 **Blocked by:** None (can start immediately).
 
 **Status:** resolved — merged into `main` (`c990f6c9`)
 
-Skills: `rust-skills`, `rust-unit-testing`. Rules: `err-result-over-panic` (value-side guard tests), `num-float-compare` (N3′), `type-display-vs-debug` + `type-numeric-fmt` (N14/N19), `serde-try-from-validate` + `api-parse-dont-validate` (N12), `api-non-exhaustive` + `proj-pub-crate-internal` (N17). Design record: `../review.md` §2, §5.5.
+Skills: `rust-skills`, `rust-unit-testing`. Rules: `err-result-over-panic`
+(value-side guard tests), `num-float-compare` (N3′), `type-display-vs-debug` +
+`type-numeric-fmt` (N14/N19), `serde-try-from-validate` +
+`api-parse-dont-validate` (N12), `api-non-exhaustive` +
+`proj-pub-crate-internal` (N17). Design record: `../review.md` §2, §5.5.
 
-- [x] Value-side out-of-range conversions pinned by guard tests: they return `Result`, never panic (value-side N1 only); (N1 engine panic fix → ticket 02)
-- [x] `"-0m"` equals `"0m"` and satisfies `>= 0`; signed-zero can't fail a range filter (N3′)
-- [x] Display never renders a nonzero duration as `"0s"` and never dumps raw 301-digit `f64` — chosen rendering dialect with exponent threshold (N14, N19)
-- [x] Deserialization runs through the module's own parser: four-digit-year rule honored, `YYYY-MM` accepted; `Serialize` emits the explicit RFC3339 `…Z` interop spelling, which round-trips to the identical instant (resolved 2026-10-05, ticket 08 RPT-F3 option a: `to_rfc3339_opts(SecondsFormat::AutoSi, use_z=true)` preserves sub-seconds without truncation), while human `Display` remains local-naive and the ticket 02 local-zone rule applies only to naive user-authored input; never `%+` and never plain `to_rfc3339()` (yields `+00:00`) (N12)
-- [x] Value-type parse failures expose their `Error::source` chain — `DateError`/`DurationError` carry the underlying cause, asserted by test (spec seam 1)
-- [x] Both errors are `#[non_exhaustive]`; `DateTimeValue`/`DateError` exported symmetrically with duration counterparts (N17)
+- [x] Value-side out-of-range conversions pinned by guard tests: they return
+      `Result`, never panic (value-side N1 only); (N1 engine panic fix → ticket
+      02)
+- [x] `"-0m"` equals `"0m"` and satisfies `>= 0`; signed-zero can't fail a range
+      filter (N3′)
+- [x] Display never renders a nonzero duration as `"0s"` and never dumps raw
+      301-digit `f64` — chosen rendering dialect with exponent threshold (N14,
+      N19)
+- [x] Deserialization runs through the module's own parser: four-digit-year rule
+      honored, `YYYY-MM` accepted; `Serialize` emits the explicit RFC3339 `…Z`
+      interop spelling, which round-trips to the identical instant (resolved
+      2026-10-05, ticket 08 RPT-F3 option a:
+      `to_rfc3339_opts(SecondsFormat::AutoSi, use_z=true)` preserves sub-seconds
+      without truncation), while human `Display` remains local-naive and the
+      ticket 02 local-zone rule applies only to naive user-authored input; never
+      `%+` and never plain `to_rfc3339()` (yields `+00:00`) (N12)
+- [x] Value-type parse failures expose their `Error::source` chain —
+      `DateError`/`DurationError` carry the underlying cause, asserted by test
+      (spec seam 1)
+- [x] Both errors are `#[non_exhaustive]`; `DateTimeValue`/`DateError` exported
+      symmetrically with duration counterparts (N17)
 - [x] `"-1h 30m"` whole-duration sign rule pinned by a test (N15b)
-- [x] Demo scenario: a hostile YAML note (extreme-magnitude duration, `-0m`, `YYYY-MM` date, `…Z` datetime) parses, round-trips, and displays without panic, silent coercion, or lying output
-- [x] Engine-side error source chains (N4) are ticket 02's scope — not claimed here
-- [x] New/changed suites: every case-surface row maps to a named test; `mise run verify` green
+- [x] Demo scenario: a hostile YAML note (extreme-magnitude duration, `-0m`,
+      `YYYY-MM` date, `…Z` datetime) parses, round-trips, and displays without
+      panic, silent coercion, or lying output
+- [x] Engine-side error source chains (N4) are ticket 02's scope — not claimed
+      here
+- [x] New/changed suites: every case-surface row maps to a named test;
+      `mise run verify` green
 
 ## Comments
 
 > *This was generated by AI during triage.*
 
-**AC erratum (2026-10-05, §13 RPT-F3) — ticket stays `resolved`, clause corrected, not reopened:** the serde AC above self-contradicts — "round-trips to the identical instant" holds only for whole-second values. `SecondsFormat::Secs` (`src/date.rs:771`) truncates sub-seconds on Serialize→Deserialize, while human `Display` keeps them (`src/date.rs:704-708`). No test serializes a sub-second `DateTimeValue` (all three serde tests use `fixed_datetime()`, nanos=0 — `src/date.rs:2284`/`:2293`, `src/note/field.rs:1776`), so truncation has zero pins. The decision (a: switch to `SecondsFormat::AutoSi` + amend spec L102/L108/L113 and this clause — AutoSi verified safe, prints nothing at nano==0 so every pinned `…Z` test survives; or b: register the precision loss) is **ticket 08's** (spec's OPEN RPT-F3 note). This record preserves the clause as written plus the correction; nothing here is silently re-edited and no implementation is implied.
+**AC erratum (2026-10-05, §13 RPT-F3) — ticket stays `resolved`, clause
+corrected, not reopened:** the serde AC above self-contradicts — "round-trips to
+the identical instant" holds only for whole-second values. `SecondsFormat::Secs`
+(`src/date.rs:771`) truncates sub-seconds on Serialize→Deserialize, while human
+`Display` keeps them (`src/date.rs:704-708`). No test serializes a sub-second
+`DateTimeValue` (all three serde tests use `fixed_datetime()`, nanos=0 —
+`src/date.rs:2284`/`:2293`, `src/note/field.rs:1776`), so truncation has zero
+pins. The decision (a: switch to `SecondsFormat::AutoSi` + amend spec
+L102/L108/L113 and this clause — AutoSi verified safe, prints nothing at nano==0
+so every pinned `…Z` test survives; or b: register the precision loss) is
+**ticket 08's** (spec's OPEN RPT-F3 note). This record preserves the clause as
+written plus the correction; nothing here is silently re-edited and no
+implementation is implied.
 
 **Triage confirmation (verification pass, no state change):**
 
-- **Category:** `bug` — panic-safety, lying `Display`, signed-zero comparison, and the serde/`parse_iso` inconsistency are all broken-today defects, not new capability.
-- **State:** confirmed `ready-for-agent` (unchanged). No grilling needed — the brief already pins exact chrono APIs, evidence line ranges, and a demo scenario.
-- **Redundancy check:** `git log -- src/date.rs src/duration.rs` shows no hardening work landed on `main` since the review; nothing in this ticket is already implemented.
+- **Category:** `bug` — panic-safety, lying `Display`, signed-zero comparison,
+  and the serde/`parse_iso` inconsistency are all broken-today defects, not new
+  capability.
+- **State:** confirmed `ready-for-agent` (unchanged). No grilling needed — the
+  brief already pins exact chrono APIs, evidence line ranges, and a demo
+  scenario.
+- **Redundancy check:** `git log -- src/date.rs src/duration.rs` shows no
+  hardening work landed on `main` since the review; nothing in this ticket is
+  already implemented.
 - **Claims re-verified against current `src/duration.rs`/`src/date.rs`:**
-  - N14/N19 live: `from_seconds` truncates via `.to_u64().unwrap_or(0)`, so `1e300` and `0.0004` both silently synthesize `"0s"`; `DurationSeconds`'s `Display` forwards raw `f64` formatting, so `1e300` renders as a 301-digit literal.
-  - N3′ live: `DurationSeconds`'s `Eq`/`Ord` route through `total_cmp` — the signed-zero guard this ticket asks for isn't in place yet.
-  - N15b confirmed unpinned: the leading-sign rule is documented on `parse_prefix`, but no test parses a multi-part negative string (`"-1h 30m"`) through `DurationValue::parse` itself — only `from_seconds` synthesis and single-part cases are covered.
-  - N17 live: `DateValue` is `pub use`d at the crate root while `DateTimeValue` is only `pub(crate) use`d; neither `DateError` nor `DurationError` is re-exported at all, and neither carries `#[non_exhaustive]`.
-- **In-flight worktree collision check:** the only active worktrees (`frontmatter-tag-unification`, `quality-gates`) show an empty `git diff main...HEAD --stat` for `src/date.rs`, `src/duration.rs`, `src/template/engine/date.rs`, and `src/schema/fields/date.rs`. No sequencing conflict; ticket 01 is clear to start immediately as stated.
-- **Downstream note:** ticket 03 (`Blocked by: 01`) is the only open ticket depending on this one settling; no other collisions found.
-
+  - N14/N19 live: `from_seconds` truncates via `.to_u64().unwrap_or(0)`, so
+    `1e300` and `0.0004` both silently synthesize `"0s"`; `DurationSeconds`'s
+    `Display` forwards raw `f64` formatting, so `1e300` renders as a 301-digit
+    literal.
+  - N3′ live: `DurationSeconds`'s `Eq`/`Ord` route through `total_cmp` — the
+    signed-zero guard this ticket asks for isn't in place yet.
+  - N15b confirmed unpinned: the leading-sign rule is documented on
+    `parse_prefix`, but no test parses a multi-part negative string
+    (`"-1h 30m"`) through `DurationValue::parse` itself — only `from_seconds`
+    synthesis and single-part cases are covered.
+  - N17 live: `DateValue` is `pub use`d at the crate root while `DateTimeValue`
+    is only `pub(crate) use`d; neither `DateError` nor `DurationError` is
+    re-exported at all, and neither carries `#[non_exhaustive]`.
+- **In-flight worktree collision check:** the only active worktrees
+  (`frontmatter-tag-unification`, `quality-gates`) show an empty
+  `git diff main...HEAD --stat` for `src/date.rs`, `src/duration.rs`,
+  `src/template/engine/date.rs`, and `src/schema/fields/date.rs`. No sequencing
+  conflict; ticket 01 is clear to start immediately as stated.
+- **Downstream note:** ticket 03 (`Blocked by: 01`) is the only open ticket
+  depending on this one settling; no other collisions found.
 - **2026-09-28 (agent, branch `temporal-core-hardening-pass`, worktree
   `.worktrees/temporal-core-hardening-pass`):** Implemented per spec.
   `src/date.rs`/`src/duration.rs` hardened against hostile input; `src/lib.rs`

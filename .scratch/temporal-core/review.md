@@ -1,12 +1,47 @@
 # Comprehensive Review v4 — `src/date.rs` + `src/duration.rs`
 
-Companion to `spec.md` (the tracker feature `temporal-core`): the full findings/analysis/deepening record. Tickets cite IDs from here rather than re-deriving them.
+Companion to `spec.md` (the tracker feature `temporal-core`): the full
+findings/analysis/deepening record. Tickets cite IDs from here rather than
+re-deriving them.
 
-**Status:** decisions A2′, B1+local-naive, D-b(scoped), and D11-doc-widening are **accepted**. This document is the full findings/analysis/deepening record.
+**Status:** decisions A2′, B1+local-naive, D-b(scoped), and D11-doc-widening are
+**accepted**. This document is the full findings/analysis/deepening record.
 
-**Implementation status (amended 2026-10-05 — the original line here read "No implementation performed", which stopped being true):** tickets **01** (`c990f6c9`, resolved), **02** (`90696f25`, resolved), and **03** (`57ea1b09` + remediation `bcc938b5`, resolved) have landed. Consequences for this document: §1's adapter counts, §2.3's dead-surface rows, §4's format-basis lines, §9's S1/S2/S6/S10 rows, and §10's steps 2–3/5–6 are stale where marked below; tickets **04–09** remain `ready-for-agent`. Findings that arrived from the 2026-10-05 adversarial pass are in §11. **Second 2026-10-05 pass (stress-test + bloat audit + blast radius) is §13** — its verdicts supersede the earlier chrono-audit report where they conflict (notably: the "collapse the `Ambiguous` arm to `.earliest()`" proposal was refuted as a would-be DST bug).
+**Implementation status (amended 2026-10-05 — the original line here read "No
+implementation performed", which stopped being true):** tickets **01**
+(`c990f6c9`, resolved), **02** (`90696f25`, resolved), and **03** (`57ea1b09` +
+remediation `bcc938b5`, resolved) have landed. Consequences for this document:
+§1's adapter counts, §2.3's dead-surface rows, §4's format-basis lines, §9's
+S1/S2/S6/S10 rows, and §10's steps 2–3/5–6 are stale where marked below; tickets
+**04–09** remain `ready-for-agent`. Findings that arrived from the 2026-10-05
+adversarial pass are in §11.
+**Second 2026-10-05 pass (stress-test + bloat audit + blast radius) is §13** —
+its verdicts supersede the earlier chrono-audit report where they conflict
+(notably: the "collapse the `Ambiguous` arm to `.earliest()`" proposal was
+refuted as a would-be DST bug).
 
-**Post-v4 evolutions (settled at spec time, marked inline below):** DST policy = ambiguous → earliest **by the resolver's own `local_minus_utc()` comparison** (`src/date.rs:1064-1076`) — **not** chrono's `.earliest()`: chrono's `Ambiguous` pair ordering is platform-dependent (unix = smaller-offset-first = later-instant-first; Windows = opposite) and `.earliest()` returns the *latest* occurrence on unix, so the manual comparison is load-bearing (§13 RPT-F1, refuted — do not simplify), nonexistent → shift forward (was the single open item); null ordering = keep current behavior, ADR replaces the code comment; the three test seams confirmed (value types / `FilterFunction` registry / template filters); calendar frame = local wall clock for day/week/month/year application (chrono `checked_add_*` + local round-trip; Temporal/Luxon/PG parity), sub-hour units exact, incoherence extended to `1d` vs `24h` across DST (pinned by test); week joins day as a calendar application unit (≡ 7 wall-days; moment/Temporal parity — research items 24–25); one gap-verified local→UTC resolver (`MappedLocalTime` exhaustive match; tz-data errors must not shift; rustdoc cited to Temporal `'compatible'`/RFC 5545 and jiff `Compatible`; wasm caveat chrono #1701 out-of-scope); format grammar formally bound to `chrono::format::strftime` (intra-doc link, no parallel invalid-pattern validator, `%+` forbidden, interop `…Z` via `to_rfc3339_opts(Secs, use_z=true)`), week bucketing mandated to `iso_week()`/`from_isoywd_opt`; external prior-art research completed (see `research/`), backing the divergence register.
+**Post-v4 evolutions (settled at spec time, marked inline below):** DST policy =
+ambiguous → earliest **by the resolver's own `local_minus_utc()` comparison**
+(`src/date.rs:1064-1076`) — **not** chrono's `.earliest()`: chrono's `Ambiguous`
+pair ordering is platform-dependent (unix = smaller-offset-first =
+later-instant-first; Windows = opposite) and `.earliest()` returns the *latest*
+occurrence on unix, so the manual comparison is load-bearing (§13 RPT-F1,
+refuted — do not simplify), nonexistent → shift forward (was the single open
+item); null ordering = keep current behavior, ADR replaces the code comment; the
+three test seams confirmed (value types / `FilterFunction` registry / template
+filters); calendar frame = local wall clock for day/week/month/year application
+(chrono `checked_add_*` + local round-trip; Temporal/Luxon/PG parity), sub-hour
+units exact, incoherence extended to `1d` vs `24h` across DST (pinned by test);
+week joins day as a calendar application unit (≡ 7 wall-days; moment/Temporal
+parity — research items 24–25); one gap-verified local→UTC resolver
+(`MappedLocalTime` exhaustive match; tz-data errors must not shift; rustdoc
+cited to Temporal `'compatible'`/RFC 5545 and jiff `Compatible`; wasm caveat
+chrono #1701 out-of-scope); format grammar formally bound to
+`chrono::format::strftime` (intra-doc link, no parallel invalid-pattern
+validator, `%+` forbidden, interop `…Z` via
+`to_rfc3339_opts(Secs, use_z=true)`), week bucketing mandated to
+`iso_week()`/`from_isoywd_opt`; external prior-art research completed (see
+`research/`), backing the divergence register.
 
 ---
 
@@ -21,9 +56,26 @@ Companion to `spec.md` (the tracker feature `temporal-core`): the full findings/
 | Clock               | **no doctrine**                             | `Local::now` ×4, `Utc::now` ×3 (engine)                                   | naive-zone = local (decided), display policy (D9 → S10)              |
 | Precision           | engine-private `DatePrecision`/`ParsedDate` | arithmetic re-serialization only                                      | recognition result should own it (N16/D10 → S7)                      |
 
-Deletion test: every value type earns its keep (grammar + registry + error taxonomy reappear across ≥6 call sites). Row 3 is the structural root of N2/D1/D9; row 6 is a seam an adapter had to invent because the public one lost information.
+Deletion test: every value type earns its keep (grammar + registry + error
+taxonomy reappear across ≥6 call sites). Row 3 is the structural root of
+N2/D1/D9; row 6 is a seam an adapter had to invent because the public one lost
+information.
 
-**Table status note (2026-10-05, verified at HEAD `5b7dc748`):** rows **2, 3, 5** drifted — **row 2:** core `format_with` was deleted (only the engine's private copy at `src/template/engine/date.rs:304` remains; `rg "fn format_with" src/date.rs` → 0 hits), so `date.rs` no longer hosts a format-with adapter; `durationformat` still missing (S4, ticket 06). **row 3:** the calendar owner **exists** — ticket 03 landed `shift`/`apply`/`diff` on the value types (`src/date.rs`, shift at `:1143` + folds at `:1176-1206`), and `checked_add`/`checked_sub` are **deleted** (`rg "fn checked_add" src/` → 0 hits); the engine now *delegates* — though it still owns the precision-match frame (§11 D1). **row 5:** clock doctrine landed with ticket 02 — `Local::now` has no production call (`rg "Local::now" src/` → doc mention only at `engine/date.rs:91`); counts in the row are pre-02. Rows 1, 4, 6 remain accurate; row 1's serde note (N12) is *also* stale — manual `Deserialize` impls now exist for both value types (`src/date.rs:337`, `:778`), pending confirmation against N12's full AC in ticket 08's docs pass.
+**Table status note (2026-10-05, verified at HEAD `5b7dc748`):** rows
+**2, 3, 5** drifted — **row 2:** core `format_with` was deleted (only the
+engine's private copy at `src/template/engine/date.rs:304` remains;
+`rg "fn format_with" src/date.rs` → 0 hits), so `date.rs` no longer hosts a
+format-with adapter; `durationformat` still missing (S4, ticket 06). **row 3:**
+the calendar owner **exists** — ticket 03 landed `shift`/`apply`/`diff` on the
+value types (`src/date.rs`, shift at `:1143` + folds at `:1176-1206`), and
+`checked_add`/`checked_sub` are **deleted** (`rg "fn checked_add" src/` → 0
+hits); the engine now *delegates* — though it still owns the precision-match
+frame (§11 D1). **row 5:** clock doctrine landed with ticket 02 — `Local::now`
+has no production call (`rg "Local::now" src/` → doc mention only at
+`engine/date.rs:91`); counts in the row are pre-02. Rows 1, 4, 6 remain
+accurate; row 1's serde note (N12) is *also* stale — manual `Deserialize` impls
+now exist for both value types (`src/date.rs:337`, `:778`), pending confirmation
+against N12's full AC in ticket 08's docs pass.
 
 ---
 
@@ -77,104 +129,240 @@ Deletion test: every value type earns its keep (grammar + registry + error taxon
 ## 3. Parity assessment (condensed)
 
 ### Dataview (22,124 lines, L-cited)
-**At parity:** ISO recognition incl. `YYYY-MM`; multi-unit durations (superset with `y`/`ms` — keep); cross-spelling value equality (stronger than theirs, E4); template-side arithmetic; `file.ctime/cday/mtime/mdate`; task date fields; midnight coercion; null-placement superset.
 
-**Gaps:** **B17** query `date ± duration`, `date − date` (their headline idiom L13501/L4807) → `FilterFunction` entries (`filter.rs:116–125`), never operators; **B18** duration arithmetic (follows); **B14** `durationformat` (spec L6803–6825); **B12** parse-with-format (L6075); **B11** `sow/eow/soy/eoy` (L14960); **B24** components minus `.week`; **B26/B30** `file.day` (L3652).
+**At parity:** ISO recognition incl. `YYYY-MM`; multi-unit durations (superset
+with `y`/`ms` — keep); cross-spelling value equality (stronger than theirs, E4);
+template-side arithmetic; `file.ctime/cday/mtime/mdate`; task date fields;
+midnight coercion; null-placement superset.
 
-**Divergences to register:** UTC instants (tz-bug pedigree #1412/#601 — *strengthened by the local-naive decision: parse is now TZ-dependent by design, storage stays UTC*); null never satisfies an ordering (**ADR needed — currently a comment**; *decided at spec time: keep current behavior, ADR replaces the comment*); explicit `NoteFieldType` rank; canonical duration Eq; space-datetime acceptance (note `TextShape` reclassification side effect); strftime-dialect.
+**Gaps:** **B17** query `date ± duration`, `date − date` (their headline idiom
+L13501/L4807) → `FilterFunction` entries (`filter.rs:116–125`), never operators;
+**B18** duration arithmetic (follows); **B14** `durationformat` (spec
+L6803–6825); **B12** parse-with-format (L6075); **B11** `sow/eow/soy/eoy`
+(L14960); **B24** components minus `.week`; **B26/B30** `file.day` (L3652).
 
-**Do-not-port:** `.week`=`floor(day/7)+1`; epoch-falsy; Luxon `YYYY` week-year; null-min comparisons; `today()`/`now()` parse-then-fail; alphabetical type ordering.
+**Divergences to register:** UTC instants (tz-bug pedigree #1412/#601 —
+*strengthened by the local-naive decision: parse is now TZ-dependent by design,
+storage stays UTC*); null never satisfies an ordering
+(**ADR needed — currently a comment**;
+*decided at spec time: keep current behavior, ADR replaces the comment*);
+explicit `NoteFieldType` rank; canonical duration Eq; space-datetime acceptance
+(note `TextShape` reclassification side effect); strftime-dialect.
+
+**Do-not-port:** `.week`=`floor(day/7)+1`; epoch-falsy; Luxon `YYYY` week-year;
+null-min comparisons; `today()`/`now()` parse-then-fail; alphabetical type
+ordering.
 
 ### Templater (13,045 lines, L-cited)
-**At parity:** day offsets; `tomorrow`/`yesterday`; arbitrary format output; `start/end_of_month`.
 
-**Gaps:** **T1** ISO-8601 `P1M`/`P-1M` offsets (L4973) → adapter translation at `date.now`, not a second grammar; **T2** `reference`/`reference_format` (L4968) → converges with B12, one `parse_with`; **T3** `weekday(n)` (L4992), pinned ISO Monday; **T4** moment tokens (L10978/11106) → D-b; **T5** 100% local clock (L4963) → B1.
+**At parity:** day offsets; `tomorrow`/`yesterday`; arbitrary format output;
+`start/end_of_month`.
 
-**Do-not-port:** type-overloaded `offset`; `P-1M` internal sign; lenient reference guessing; locale weekday; `stat.ctime` lie; unvalidated format strings (we keep `InvalidPattern`).
+**Gaps:** **T1** ISO-8601 `P1M`/`P-1M` offsets (L4973) → adapter translation at
+`date.now`, not a second grammar; **T2** `reference`/`reference_format` (L4968)
+→ converges with B12, one `parse_with`; **T3** `weekday(n)` (L4992), pinned ISO
+Monday; **T4** moment tokens (L10978/11106) → D-b; **T5** 100% local clock
+(L4963) → B1.
+
+**Do-not-port:** type-overloaded `offset`; `P-1M` internal sign; lenient
+reference guessing; locale weekday; `stat.ctime` lie; unvalidated format strings
+(we keep `InvalidPattern`).
 
 ---
 
 ## 4. Decisions (final)
 
 ### A2′ — accepted
-- `mo/y` stay parseable; `DurationValue` retains `parts: Option<Box<[(f64, DurationUnit)]>>` alongside `seconds`.
-- **Identity stays seconds-based** (`fixed_seconds()` ratios, renamed to carry the regime in the name); **application** to dates is calendar for Month/Year parts via one owner (S1), applied left-to-right in written order.
-- The Luxon-style incoherence (`"1mo" == "30d"` but different date-shifts) is **accepted and declared**, not hidden — every reference implementation runs this dual regime; ours stops pretending otherwise. **Amendment:** prose alone won't tame it — add a pinning test that *demonstrates* the behavior (equal values, different shifts) so the contract is executable, plus the GLOSSARY.md clause.
-- A1′ (reject `mo/y`) breaks Dataview L4814 and Templater L4973; A3′ (shape identity) breaks pinned `"1h 30m" == "90m"`. Rejected.
+
+- `mo/y` stay parseable; `DurationValue` retains
+  `parts: Option<Box<[(f64, DurationUnit)]>>` alongside `seconds`.
+- **Identity stays seconds-based** (`fixed_seconds()` ratios, renamed to carry
+  the regime in the name); **application** to dates is calendar for Month/Year
+  parts via one owner (S1), applied left-to-right in written order.
+- The Luxon-style incoherence (`"1mo" == "30d"` but different date-shifts) is
+  **accepted and declared**, not hidden — every reference implementation runs
+  this dual regime; ours stops pretending otherwise. **Amendment:** prose alone
+  won't tame it — add a pinning test that *demonstrates* the behavior (equal
+  values, different shifts) so the contract is executable, plus the GLOSSARY.md
+  clause.
+- A1′ (reject `mo/y`) breaks Dataview L4814 and Templater L4973; A3′ (shape
+  identity) breaks pinned `"1h 30m" == "90m"`. Rejected.
 
 ### B1 + naive-input = **local → UTC on parse** — accepted (revised)
-- Instants stored as `DateTime<Utc>`; **naive input (`2026-07-29 14:30`) is interpreted in the local zone and converted to UTC at parse** (parity with both plugins; avoids wrong-by-hours comparisons against `file.mtime` for non-UTC users — the prior "keep UTC" lean optimised for test convenience, not user correctness).
+
+- Instants stored as `DateTime<Utc>`; **naive input (`2026-07-29 14:30`) is
+  interpreted in the local zone and converted to UTC at parse** (parity with
+  both plugins; avoids wrong-by-hours comparisons against `file.mtime` for
+  non-UTC users — the prior "keep UTC" lean optimised for test convenience, not
+  user correctness).
 - Date-only values are civil dates — no zone applies; `DateValue` untouched.
-- `now`/`today`/`tomorrow`/`weekday`/file-stat **formatting** from the local clock; storage always UTC.
-- **DST ambiguity policy for local parse — SETTLED at spec time (was this review's single open item):** ambiguous fall-back → earliest by the resolver's own `local_minus_utc()` comparison (policy: earliest occurrence; **mechanism: the manual comparison at `src/date.rs:1064-1076`, not chrono `.earliest()`** — see §13 RPT-F1); nonexistent spring-forward → shifted forward by the gap; documented in the divergence register, pinned by a test. (Original options were `.single()` reject / `.earliest()` / `.latest()` — note the `.earliest()` option is only correct as *policy wording*; the API is not the implementation.)
+- `now`/`today`/`tomorrow`/`weekday`/file-stat **formatting** from the local
+  clock; storage always UTC.
+- **DST ambiguity policy for local parse — SETTLED at spec time (was this
+  review's single open item):** ambiguous fall-back → earliest by the resolver's
+  own `local_minus_utc()` comparison (policy: earliest occurrence; **mechanism:
+  the manual comparison at `src/date.rs:1064-1076`, not chrono `.earliest()`** —
+  see §13 RPT-F1); nonexistent spring-forward → shifted forward by the gap;
+  documented in the divergence register, pinned by a test. (Original options
+  were `.single()` reject / `.earliest()` / `.latest()` — note the `.earliest()`
+  option is only correct as *policy wording*; the API is not the
+  implementation.)
 - Tests inject `TZ` to stay deterministic (the engineering cost, accepted).
 
 ### D-b — accepted, scoped
-- moment→strftime translator **at the template seam only**. *(2026-10-05: "`DateValue::format_with` keeps exactly one grammar (strftime)" is now moot as written — ticket 03's remediation deleted core `format_with`; the sole strftime surface is the engine's private copy at `src/template/engine/date.rs:304`. The decision's intent — one grammar, one seam — survives and is now true by deletion.)*
-- *(2026-10-24, temporal-offload Task 6: the translator moved to `temporal::token`; the engine retains only a `pattern_to_strftime` wrapper that delegates dialect dispatch and maps `TemporalTokenError`. The "template seam only" location claim above is retired; the error-message and scope decisions stand.)*
-- **Scope 1:** bracket literals `[Daily]`, `YYYY MM DD HH mm ss` family (pass-through), `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`. Everything else → `InvalidPattern`.
-- **Error message is part of the design:** must name the offending token, identify the input as moment-dialect, and point at the supported list — a bare "invalid pattern" on `Do MMM` would be baffling.
-- Strictness is deliberate: silently mistranslating an ambiguous token (`YYYY` week-year) would be *worse* than erroring. Full token coverage grows additively later (OCP).
+
+- moment→strftime translator **at the template seam only**. *(2026-10-05:
+  "`DateValue::format_with` keeps exactly one grammar (strftime)" is now moot as
+  written — ticket 03's remediation deleted core `format_with`; the sole
+  strftime surface is the engine's private copy at
+  `src/template/engine/date.rs:304`. The decision's intent — one grammar, one
+  seam — survives and is now true by deletion.)*
+- *(2026-10-24, temporal-offload Task 6: the translator moved to
+  `temporal::token`; the engine retains only a `pattern_to_strftime` wrapper
+  that delegates dialect dispatch and maps `TemporalTokenError`. The "template
+  seam only" location claim above is retired; the error-message and scope
+  decisions stand.)*
+- **Scope 1:** bracket literals `[Daily]`, `YYYY MM DD HH mm ss` family
+  (pass-through), `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`. Everything else
+  → `InvalidPattern`.
+- **Error message is part of the design:** must name the offending token,
+  identify the input as moment-dialect, and point at the supported list — a bare
+  "invalid pattern" on `Do MMM` would be baffling.
+- Strictness is deliberate: silently mistranslating an ambiguous token (`YYYY`
+  week-year) would be *worse* than erroring. Full token coverage grows
+  additively later (OCP).
 
 ### D11 — widen doc, bundle with S7
-- `date_add` docs state "`unit` accepts any `DurationUnit` spelling" — never a second, smaller registry (that's N18 again).
-- The real user trap isn't the vocabulary — it's **precision truncation**: sub-day units on date-only inputs format back through `%Y-%m-%d` and visibly do nothing. That's D3/N16, fixed by S7; the doc line and S7 land together.
+
+- `date_add` docs state "`unit` accepts any `DurationUnit` spelling" — never a
+  second, smaller registry (that's N18 again).
+- The real user trap isn't the vocabulary — it's **precision truncation**:
+  sub-day units on date-only inputs format back through `%Y-%m-%d` and visibly
+  do nothing. That's D3/N16, fixed by S7; the doc line and S7 land together.
 
 ### Also decided, carried (not yet executed — 2026-10-05 correction; this block was titled "Also fixed (carried)", which overclaimed)
+
 - Start-of-week = ISO Monday, documented divergence.
-- `DEFAULT_DATE_FORMAT` removal from `config/model.rs` (live const at **`:52`**, not the `:49` this doc originally cited; still present at HEAD `5b7dc748` with its two read sites at `:814`/`:837`) → substitute **`crate::date::DEFAULT_DATETIME_FORMAT`** (not `DEFAULT_DATE_FORMAT` — different value; `src/date.rs:48` vs `:51`). Executed by ticket 08's checklist item.
+- `DEFAULT_DATE_FORMAT` removal from `config/model.rs` (live const at **`:52`**,
+  not the `:49` this doc originally cited; still present at HEAD `5b7dc748` with
+  its two read sites at `:814`/`:837`) → substitute
+  **`crate::date::DEFAULT_DATETIME_FORMAT`** (not `DEFAULT_DATE_FORMAT` —
+  different value; `src/date.rs:48` vs `:51`). Executed by ticket 08's checklist
+  item.
 
 ---
 
 ## 5. Type & pattern designs (Rust-specific)
 
 ### 5.1 `DurationParts` — A2′ without dual authority
+
 ```text
 DurationValue { raw: Box<str>, seconds: DurationSeconds, parts: Option<Box<[(f64, DurationUnit)]>> }
 ```
-- **Sole identity = `seconds`** (Eq/Ord/Hash unchanged). `parts` is the parsed *shape*, `None` for synthesized values (`from_seconds` can't know Month/Year — and its ms-round means exact-parts claims would be false anyway; N14 class stays honest as `None`).
-- **Invariant by construction:** `parse` computes `seconds` by a single left-to-right fold over exactly the parts it stores — no state where they disagree; duration arithmetic preserves Σ by construction too (below). `api-parse-dont-validate` satisfied without runtime checks.
-- **`parts` doubles as the regime witness:** `Some` containing `Day|Week|Month|Year` ⇒ calendar application; else fixed. `None` ⇒ always fixed (correct). No extra enum; the state is data, matched exhaustively.
-- **Signed entries:** parse stores each entry with the whole-duration sign applied (N15b), so Σ is one left-to-right fold.
-- **Exactly two filling paths:** `parse` and duration arithmetic. `Add` concatenates when both `Some`; `Sub` concatenates with each rhs entry negated (Σ survives); `Mul` scales entries; **either side `None` ⇒ `None`** — Σ forces it, and the regime then honestly reads `None` ⇒ fixed.
-- Rejected: deriving `seconds` on demand (dies on `None`, O(k) Eq for nothing); always-`Some` with approximations (violates Σ invariant = representable invalid state).
+
+- **Sole identity = `seconds`** (Eq/Ord/Hash unchanged). `parts` is the parsed
+  *shape*, `None` for synthesized values (`from_seconds` can't know Month/Year —
+  and its ms-round means exact-parts claims would be false anyway; N14 class
+  stays honest as `None`).
+- **Invariant by construction:** `parse` computes `seconds` by a single
+  left-to-right fold over exactly the parts it stores — no state where they
+  disagree; duration arithmetic preserves Σ by construction too (below).
+  `api-parse-dont-validate` satisfied without runtime checks.
+- **`parts` doubles as the regime witness:** `Some` containing
+  `Day|Week|Month|Year` ⇒ calendar application; else fixed. `None` ⇒ always
+  fixed (correct). No extra enum; the state is data, matched exhaustively.
+- **Signed entries:** parse stores each entry with the whole-duration sign
+  applied (N15b), so Σ is one left-to-right fold.
+- **Exactly two filling paths:** `parse` and duration arithmetic. `Add`
+  concatenates when both `Some`; `Sub` concatenates with each rhs entry negated
+  (Σ survives); `Mul` scales entries; **either side `None` ⇒ `None`** — Σ forces
+  it, and the regime then honestly reads `None` ⇒ fixed.
+- Rejected: deriving `seconds` on demand (dies on `None`, O(k) Eq for nothing);
+  always-`Some` with approximations (violates Σ invariant = representable
+  invalid state).
 
 ### 5.2 Declared regimes
-- `DurationUnit::seconds()` → **`fixed_seconds()`**, `seconds_i64()` → `fixed_seconds_i64()` — regime in the name.
-- Calendar meaning gets **no** counterpart method on the unit — it exists only behind S1's `shift`, so exactly one place can define it (locality).
+
+- `DurationUnit::seconds()` → **`fixed_seconds()`**, `seconds_i64()` →
+  `fixed_seconds_i64()` — regime in the name.
+- Calendar meaning gets **no** counterpart method on the unit — it exists only
+  behind S1's `shift`, so exactly one place can define it (locality).
 
 ### 5.3 `classify` — both domains, one protocol each
+
 ```text
 DateValue::classify(s)     -> Option<Result<DateValue,     DateError>>      // #[must_use]
 DurationValue::classify(s) -> Option<Result<DurationValue, DurationError>>
 ```
-- Trichotomy *is* the guard protocol: `None` = cheap shape gate (O(1), no allocation — preserves lexer hot path), `Some(Err)` = allocating detail, `Some(Ok)`.
-- Replaces `can_start && parse` at `sort.rs:473`, fixes N7 at `field.rs:525`, kills N8's loop divergence, absorbs N23's protocol copy; `has_four_digit_year`/`is_iso_shape`/`can_start` go **private** (N15 closed, interface shrinks).
+
+- Trichotomy *is* the guard protocol: `None` = cheap shape gate (O(1), no
+  allocation — preserves lexer hot path), `Some(Err)` = allocating detail,
+  `Some(Ok)`.
+- Replaces `can_start && parse` at `sort.rs:473`, fixes N7 at `field.rs:525`,
+  kills N8's loop divergence, absorbs N23's protocol copy;
+  `has_four_digit_year`/`is_iso_shape`/`can_start` go **private** (N15 closed,
+  interface shrinks).
 - `TextShape` becomes a *caller*, not a fourth fragment.
-- Rejected: one combined date-or-duration mega-classifier — the date/duration/link/string *decision* is coercion-layer policy (cohesion: policy at coercion seam, recognition at value seams).
+- Rejected: one combined date-or-duration mega-classifier — the
+  date/duration/link/string *decision* is coercion-layer policy (cohesion:
+  policy at coercion seam, recognition at value seams).
 
 ### 5.4 Precision hoist (N16/D10)
+
 ```text
 pub(crate) enum Precision { YearMonth, Date, DateTime }
 // parse_iso unchanged (clean value for Eq); precision-carrying entry for re-serialization
 ```
-- Engine's `ParsedDate`/`DatePrecision`/`format_precise` delegate → shadow interface deleted; `YYYY-MM` precision survives end-to-end; D3 fixable once.
-- `Precision` never enters `DateValue`'s `Eq` — recognition-layer fact, not value identity (`type-enum-states`, not two bools).
+
+- Engine's `ParsedDate`/`DatePrecision`/`format_precise` delegate → shadow
+  interface deleted; `YYYY-MM` precision survives end-to-end; D3 fixable once.
+- `Precision` never enters `DateValue`'s `Eq` — recognition-layer fact, not
+  value identity (`type-enum-states`, not two bools).
 
 ### 5.5 Serde repair (N12/N17)
-- Manual `Deserialize` via `parse_iso` (`Cow<'de, str>` + `Error::custom`) — exact `duration.rs:561–569` house precedent over `#[serde(try_from)]` (consistency wins).
-- One serial spelling per channel: serialize via `Display` (round-trips through `parse_iso` by construction); RFC3339 `…Z` reserved for explicit interop. *(2026-10-05: the interop channel named here as `to_offset_string` no longer exists — that method was deleted by ticket 03; the `…Z` producer is `Serialize for DateTimeValue` at `src/date.rs:771` (`to_rfc3339_opts(SecondsFormat::Secs, use_z=true)`), which matches spec's post-v4 serde note. `rg "to_rfc3339\(" src/` → 0 hits.)*
-- `#[non_exhaustive]` on `DateError` + `DurationError` — within-crate exhaustive matches unaffected.
+
+- Manual `Deserialize` via `parse_iso` (`Cow<'de, str>` + `Error::custom`) —
+  exact `duration.rs:561–569` house precedent over `#[serde(try_from)]`
+  (consistency wins).
+- One serial spelling per channel: serialize via `Display` (round-trips through
+  `parse_iso` by construction); RFC3339 `…Z` reserved for explicit interop.
+  *(2026-10-05: the interop channel named here as `to_offset_string` no longer
+  exists — that method was deleted by ticket 03; the `…Z` producer is
+  `Serialize for DateTimeValue` at `src/date.rs:771`
+  (`to_rfc3339_opts(SecondsFormat::Secs, use_z=true)`), which matches spec's
+  post-v4 serde note. `rg "to_rfc3339\(" src/` → 0 hits.)*
+- `#[non_exhaustive]` on `DateError` + `DurationError` — within-crate exhaustive
+  matches unaffected.
 
 ### 5.6 Smaller mechanisms
-- **N18:** delete ms-table; derive greedy units from one registry `const`; document Month/Year omission (un-synthesizable from magnitude).
-- **N21:** ~~private `render_pattern(display, pattern) -> Result<String, ()>` in `date.rs`; three call sites map its error to their own type~~ **moot (2026-10-05): the three copies were deleted rather than shared; one engine site remains (`engine/date.rs:304`), see ticket 06's rewritten item.**
-- **N20/D1:** `DateFormat::parse_any` / `DateTimeFormat::parse_any` own the cascade loop → adding a shape = variant + `ALL` + `pattern()`, one file.
-- **B18:** `Add`/`Sub` for `DurationValue` (seconds add; `Sub` = add of negated rhs; parts concat when both `Some`, rhs entries negated on `Sub`; either side `None` ⇒ `None` — Σ forces it; `-0.0` normalized; result `raw` re-synthesized via `from_seconds`); `Mul<f64>` scales both — non-finite scalar/overflow leaves `seconds` non-finite, declared in the type docs and rejected by consuming conversions (`NonFiniteSeconds`), never panics; Eq remains seconds-only.
-- **N19:** choose a rendering dialect for `DurationSeconds` Display (short/general, exponent above threshold) — user-facing once `durationformat` surfaces it.
+
+- **N18:** delete ms-table; derive greedy units from one registry `const`;
+  document Month/Year omission (un-synthesizable from magnitude).
+- **N21:** ~~private `render_pattern(display, pattern) -> Result<String, ()>` in
+  `date.rs`; three call sites map its error to their own type~~ **moot
+  (2026-10-05): the three copies were deleted rather than shared; one engine
+  site remains (`engine/date.rs:304`), see ticket 06's rewritten item.**
+- **N20/D1:** `DateFormat::parse_any` / `DateTimeFormat::parse_any` own the
+  cascade loop → adding a shape = variant + `ALL` + `pattern()`, one file.
+- **B18:** `Add`/`Sub` for `DurationValue` (seconds add; `Sub` = add of negated
+  rhs; parts concat when both `Some`, rhs entries negated on `Sub`; either side
+  `None` ⇒ `None` — Σ forces it; `-0.0` normalized; result `raw` re-synthesized
+  via `from_seconds`); `Mul<f64>` scales both — non-finite scalar/overflow
+  leaves `seconds` non-finite, declared in the type docs and rejected by
+  consuming conversions (`NonFiniteSeconds`), never panics; Eq remains
+  seconds-only.
+- **N19:** choose a rendering dialect for `DurationSeconds` Display
+  (short/general, exponent above threshold) — user-facing once `durationformat`
+  surfaces it.
 
 ### 5.7 Considered and rejected (`anti-over-abstraction`)
-`Clock`/`TimeZone` traits (one adapter = hypothetical seam — doctrine is data + docs); `Dialect` trait (D-b is a pure function at the template seam); typestate parse builders (interface growth, no state to protect); merged `DateError`+`DurationError` (distinct failure domains); `Cow<'a, str>` for `raw` (lifetime param on an index-stored value = interface bloat); locale first-day-of-week (pinned ISO Monday).
+
+`Clock`/`TimeZone` traits (one adapter = hypothetical seam — doctrine is data +
+docs); `Dialect` trait (D-b is a pure function at the template seam); typestate
+parse builders (interface growth, no state to protect); merged
+`DateError`+`DurationError` (distinct failure domains); `Cow<'a, str>` for `raw`
+(lifetime param on an index-stored value = interface bloat); locale
+first-day-of-week (pinned ISO Monday).
 
 ---
 
@@ -197,13 +385,22 @@ pub(crate) enum Precision { YearMonth, Date, DateTime }
 
 ## 7. GLOSSARY.md revisions
 
-- **(a)** Funnel claim made normative **and true**: "every date-shaped string — including deserialization — funnels through `parse_iso`" (true only after S6).
-- **(b)** Owner of anchored arithmetic named: "`date.rs` owns calendar shift/diff; template/query layers are thin adapters."
-- **(c)** Duration regime clause per A2′: identity = magnitude (ratios declared); application = calendar for month/year parts, left-to-right; equal values may shift dates differently (matches Luxon) — backed by a pinning test.
-- **(d)** Date interface facts: four-digit-year rule; `YYYY-MM` → day 1; precision at the recognition layer (S7); **naive datetime = local zone → stored UTC** (S10).
-- **(e)** Editorial: entries use their own *Avoid* terms inside definitions — stop, or define *Avoid* once as "never as a concept name."
-- **(f)** "Single owner of unit registry" true without caveat after `fixed_seconds()` + S1.
-- **(g)** Strictness-by-seam rule (lenient coercion / strict template / strict serde) + pinned ISO Monday + DST ambiguity policy.
+- **(a)** Funnel claim made normative **and true**: "every date-shaped string —
+  including deserialization — funnels through `parse_iso`" (true only after S6).
+- **(b)** Owner of anchored arithmetic named: "`date.rs` owns calendar
+  shift/diff; template/query layers are thin adapters."
+- **(c)** Duration regime clause per A2′: identity = magnitude (ratios
+  declared); application = calendar for month/year parts, left-to-right; equal
+  values may shift dates differently (matches Luxon) — backed by a pinning test.
+- **(d)** Date interface facts: four-digit-year rule; `YYYY-MM` → day 1;
+  precision at the recognition layer (S7);
+  **naive datetime = local zone → stored UTC** (S10).
+- **(e)** Editorial: entries use their own *Avoid* terms inside definitions —
+  stop, or define *Avoid* once as "never as a concept name."
+- **(f)** "Single owner of unit registry" true without caveat after
+  `fixed_seconds()` + S1.
+- **(g)** Strictness-by-seam rule (lenient coercion / strict template / strict
+  serde) + pinned ISO Monday + DST ambiguity policy.
 
 ---
 
@@ -246,20 +443,55 @@ pub(crate) enum Precision { YearMonth, Date, DateTime }
 ---
 
 ## 10. Execution order
-*(2026-10-05 status overlay: steps 1–3 partially executed by tickets 01/02/03; tickets 04–09 encode the remaining edges — see spec L141+ for the authoritative encoded chain.)*
 
-1. ~~Decisions~~ — **done**: A2′, B1+local-naive, D-b(scoped), D11-widen, ISO Monday.
-2. **Correctness:** S10 (N1, N4, N3′, N14, N19, D9, local-naive + DST policy, pinning tests) + S6 (N12/N17) — **done via tickets 01 + 02** (residual: N12's full funnel confirmation rides 08's docs pass; §1 row 1 note).
-3. **Load-bearing seam:** S2 → S1 → S5 → S7 (parts → calendar owner → classifier → precision) — **S2 + S1 landed in ticket 03; S5 + S7 are ticket 04** (this sequence unblocks everything structural).
-4. **Parity features:** S3 (biggest gap) → S4, S8, S9, S11, S12 — **all pending (05–07)**; S3 carries the §11 X1 grammar decision, S4's `format_with`/`render_pattern` halves are void per §9.
-5. **Docs:** S13 — **pending (08)**; carries §11 X4 and U1 register entries (entry numbers assigned when the register is written).
-6. **Dead surface:** Decision-C deletions/wirings — **the named set is already gone** (ticket 03 deleted `to_time_string`, `start_of_day`, `cmp_date`, `to_offset_string`, `checked_add`/`checked_sub`; `from_seconds` kept). The live work is the six-site `expect(dead_code)` census: `DateValue::{shift, apply}`, `DateTimeValue::apply`, `DurationValue::{from_seconds, parts, is_calendar}` — wire-or-delete each after 04–08 (ticket 09 item 11 + §11 X7's apply question).
+*(2026-10-05 status overlay: steps 1–3 partially executed by tickets 01/02/03;
+tickets 04–09 encode the remaining edges — see spec L141+ for the authoritative
+encoded chain.)*
+
+1. ~~Decisions~~ — **done**: A2′, B1+local-naive, D-b(scoped), D11-widen, ISO
+   Monday.
+2. **Correctness:** S10 (N1, N4, N3′, N14, N19, D9, local-naive + DST policy,
+   pinning tests) + S6 (N12/N17) — **done via tickets 01 + 02** (residual: N12's
+   full funnel confirmation rides 08's docs pass; §1 row 1 note).
+3. **Load-bearing seam:** S2 → S1 → S5 → S7 (parts → calendar owner → classifier
+   → precision) — **S2 + S1 landed in ticket 03; S5 + S7 are ticket 04** (this
+   sequence unblocks everything structural).
+4. **Parity features:** S3 (biggest gap) → S4, S8, S9, S11, S12 —
+   **all pending (05–07)**; S3 carries the §11 X1 grammar decision, S4's
+   `format_with`/`render_pattern` halves are void per §9.
+5. **Docs:** S13 — **pending (08)**; carries §11 X4 and U1 register entries
+   (entry numbers assigned when the register is written).
+6. **Dead surface:** Decision-C deletions/wirings —
+   **the named set is already gone** (ticket 03 deleted `to_time_string`,
+   `start_of_day`, `cmp_date`, `to_offset_string`, `checked_add`/`checked_sub`;
+   `from_seconds` kept). The live work is the six-site `expect(dead_code)`
+   census: `DateValue::{shift, apply}`, `DateTimeValue::apply`,
+   `DurationValue::{from_seconds, parts, is_calendar}` — wire-or-delete each
+   after 04–08 (ticket 09 item 11 + §11 X7's apply question).
 
 ## 11. 2026-10-05 adversarial pass — post-v4 findings & dispositions
 
-Three independent rust-design reviews (date, duration, corpus) were run against HEAD `5b7dc748` after tickets 01–03 landed. *(2026-10-05 integration: this pass began as four standalone draft files; the consolidated report now lives inline as §11.1–§11.10 below, and the three component reports are appended in full as §12.1 (date), §12.2 (duration), §12.3 (corpus).)*
+Three independent rust-design reviews (date, duration, corpus) were run against
+HEAD `5b7dc748` after tickets 01–03 landed. *(2026-10-05 integration: this pass
+began as four standalone draft files; the consolidated report now lives inline
+as §11.1–§11.10 below, and the three component reports are appended in full as
+§12.1 (date), §12.2 (duration), §12.3 (corpus).)*
 
-**ID warning:** these findings are namespaced in the consolidated report as **D#** (date), **U#** (duration), **X#** (corpus/process) to avoid collisions — but §2 above *also* uses `D1`/`D3`/`D6`/`D7`/`D9`/`D10`/`D11` for its own findings. **A cite like "D1" is ambiguous without a location: cite `§11 D1` (the consolidated report below; its findings carry the tag **FR** in the table) vs `this doc §2.3 D1`.** Component reports (§12) keep their original IDs — `C#` (date), `F#` (duration), `G#`/`Q1x`/`Q3-C#` (corpus), `R#` (correction register) — and §11 cites them by those names. **ID warning #2 (added 2026-10-05, §13):** the 2026-10-05 second pass (§13) must not reuse bare `F#`/`D#`/`U#`/`X#` — its findings are namespaced `RPT-F#` (chrono-audit report), `NU#`/`ND#` (new design), `T#` (bloat audit), `P#` (proposals). Bare `F#` always means §12.2's duration component report; bare `D3` is ambiguous three ways (`§2.1 D3` fractional truncation / `§11 D3` shift twins / `§11.10` cites) — always qualify. Disposition column shows where each was written into the tickets/spec (no code was changed in this pass).
+**ID warning:** these findings are namespaced in the consolidated report as
+**D#** (date), **U#** (duration), **X#** (corpus/process) to avoid collisions —
+but §2 above *also* uses `D1`/`D3`/`D6`/`D7`/`D9`/`D10`/`D11` for its own
+findings. **A cite like "D1" is ambiguous without a location: cite `§11 D1` (the
+consolidated report below; its findings carry the tag **FR** in the table) vs
+`this doc §2.3 D1`.** Component reports (§12) keep their original IDs — `C#`
+(date), `F#` (duration), `G#`/`Q1x`/`Q3-C#` (corpus), `R#` (correction register)
+— and §11 cites them by those names. **ID warning #2 (added 2026-10-05, §13):**
+the 2026-10-05 second pass (§13) must not reuse bare `F#`/`D#`/`U#`/`X#` — its
+findings are namespaced `RPT-F#` (chrono-audit report), `NU#`/`ND#` (new
+design), `T#` (bloat audit), `P#` (proposals). Bare `F#` always means §12.2's
+duration component report; bare `D3` is ambiguous three ways (`§2.1 D3`
+fractional truncation / `§11 D3` shift twins / `§11.10` cites) — always qualify.
+Disposition column shows where each was written into the tickets/spec (no code
+was changed in this pass).
 
 | ID | Finding (one line) | Disposition |
 | --- | --- | --- |
@@ -284,22 +516,40 @@ Three independent rust-design reviews (date, duration, corpus) were run against 
 | **X8** (FR) | No home named for the `YearMonth` strftime pattern (`%Y-%m`) post-precision-hoist, nor for `wall` recovery in `date_shift_unit` after `ParsedDate` deletion | **spec precision line amended (open) — ticket 04 must settle** |
 | **X-A…X-G** (FR) | Process/consistency findings: core-`format_with` premise retired (spec + 06 + §5.5 fixed); Decision-C census corrected (09 item 11, §2.3, §10 step 6); blocker edges wrong (03/05 headers fixed, spec L141 note); `to_offset_string` premise retired (09 item 13); S9 seam column undercounted (§9 fixed); `is_calendar` fate unassigned (04 checklist); gate-layering note for `note/field.rs:531` (04 checklist) | **all written into spec/tickets/this doc** |
 
-**Deliberately not re-proposed** (rejected candidates re-audited and confirmed): `DurationUnit::class()`, `DurationValue` split (reconfirmed with `api-parse-dont-validate` analysis — parse already the sole validated ctor; carried into spec's Rejected list), mega-classifier, `LocalWall` newtype, public `Shift` trait, `date/` directory split, `DateError`+`DurationError` merge, private `Frame` trait (D1 is the narrow-fold version instead), test-only `dead_code` surface (spec-mandated).
+**Deliberately not re-proposed** (rejected candidates re-audited and confirmed):
+`DurationUnit::class()`, `DurationValue` split (reconfirmed with
+`api-parse-dont-validate` analysis — parse already the sole validated ctor;
+carried into spec's Rejected list), mega-classifier, `LocalWall` newtype, public
+`Shift` trait, `date/` directory split, `DateError`+`DurationError` merge,
+private `Frame` trait (D1 is the narrow-fold version instead), test-only
+`dead_code` surface (spec-mandated).
 
-**Type:** focused review + audit (research only — no code changes; every candidate is an argument, not a patch).
-**Baseline:** HEAD `5b7dc748` (`refactor(date,duration): move module consts to top`, 2026-10-04 20:16, clean worktree). chrono pinned `0.4.45`.
-**Date:** 2026-10-05.
-**Method authority:** `.agents/skills/rust-design/` (TOOLING/DISCOVERY/DEEPENING/MODELING/METRICS), `.claude/skills/codebase-design/SKILL.md` (Module/Interface/Seam/Depth/Leverage/Locality vocabulary), `rust-skills` consulted per-candidate (notably `api-parse-dont-validate`).
+**Type:** focused review + audit (research only — no code changes; every
+candidate is an argument, not a patch). **Baseline:** HEAD `5b7dc748`
+(`refactor(date,duration): move module consts to top`, 2026-10-04 20:16, clean
+worktree). chrono pinned `0.4.45`. **Date:** 2026-10-05. **Method authority:**
+`.agents/skills/rust-design/` (TOOLING/DISCOVERY/DEEPENING/MODELING/METRICS),
+`.claude/skills/codebase-design/SKILL.md`
+(Module/Interface/Seam/Depth/Leverage/Locality vocabulary), `rust-skills`
+consulted per-candidate (notably `api-parse-dont-validate`).
 
 ### 11.1 Evidence contract
 
-1. Every claim carries `file:line` (verified at HEAD) plus caller evidence from `rg`/CodeGraph, or is marked **PREDICTED**.
-2. Findings are tagged by probe — **expansion** (should a seam exist / where should this live?) or **compression** (can two become one?) — with a direction: relocate / collapse / narrow / construct-behind-seam.
-3. Corpus status per candidate: `new` / `adjudicated` / `superseded-by-<ticket>` / `conflicts-with-<decision>` / `unowned`.
-4. Negative findings (items that look like candidates and survive scrutiny) are recorded with the same rigor as positives.
-5. Gauges: **measured** = span arithmetic or grep count on verified lines this session; **cited** = from 03/review.md, not re-run; **predicted** = projected effect of an unimplemented change.
+1. Every claim carries `file:line` (verified at HEAD) plus caller evidence from
+   `rg`/CodeGraph, or is marked **PREDICTED**.
+2. Findings are tagged by probe — **expansion** (should a seam exist / where
+   should this live?) or **compression** (can two become one?) — with a
+   direction: relocate / collapse / narrow / construct-behind-seam.
+3. Corpus status per candidate: `new` / `adjudicated` / `superseded-by-<ticket>`
+   / `conflicts-with-<decision>` / `unowned`.
+4. Negative findings (items that look like candidates and survive scrutiny) are
+   recorded with the same rigor as positives.
+5. Gauges: **measured** = span arithmetic or grep count on verified lines this
+   session; **cited** = from 03/review.md, not re-run; **predicted** = projected
+   effect of an unimplemented change.
 
-**Namespacing for this consolidated report:** `D#` = date.rs findings, `U#` = duration.rs findings, `X#` = corpus-level findings. Original IDs in parentheses.
+**Namespacing for this consolidated report:** `D#` = date.rs findings, `U#` =
+duration.rs findings, `X#` = corpus-level findings. Original IDs in parentheses.
 
 ---
 
@@ -320,7 +570,9 @@ Three independent rust-design reviews (date, duration, corpus) were run against 
 | `shift_months` `:1199`, `signed_years_since :1218`, `signed_months_since :1249` | private, single-caller chains | 03-relocated owners | correct |
 | `DateError` | `:1288` (`#[non_exhaustive]` landed) | 1 recognition + arithmetic/zone variants | `InvalidPattern :1314` has **zero producers** (match at engine:747) |
 
-**Policy state:** the calendar-vs-instant shift doctrine is stated in **five** places (engine:455-466, engine:475-479, engine:411-414, date.rs:1145-1148, date.rs:474-481).
+**Policy state:** the calendar-vs-instant shift doctrine is stated in **five**
+places (engine:455-466, engine:475-479, engine:411-414, date.rs:1145-1148,
+date.rs:474-481).
 
 #### 11.2.2 `src/duration.rs` (2299 lines: prod 1–1230, tests 1231–2299)
 
@@ -333,11 +585,17 @@ Three independent rust-design reviews (date, duration, corpus) were run against 
 | Scanner helpers | 9 fns (`can_start :499`, `skip_separators :539`, `parse_number :570`, …) | pure `(bytes,pos)→span` transforms | stateless; **foreign to the value namespace** (LCOM4 root cause) |
 | Synthesis | `from_seconds :359`, `canonical_raw :380` | seconds→text | test-only today; retained by 09:12 |
 
-**Verified seed table:** all 16 no-self associated fns exist at cited lines (3 entry points + 1 ctor + 1 synthesis = 5 value-type ops; 11 scanner/witness helpers).
+**Verified seed table:** all 16 no-self associated fns exist at cited lines (3
+entry points + 1 ctor + 1 synthesis = 5 value-type ops; 11 scanner/witness
+helpers).
 
 #### 11.2.3 `src/template/engine/date.rs` (sole external consumer of the date seam)
 
-`ParsedDate::parse :210`, `precision() :238-244`, `format_precise :331`, `date_shift_unit :469-491` (matches `DatePrecision`, calls `shift_wall` at :482 / `DateTimeValue::shift` at :486), `date_diff :631` (delegates to `DatePoint::diff`), `date_error :730-751` (minijinja translation — correct seam), format_with (engine-private, `:304`, 6 callers).
+`ParsedDate::parse :210`, `precision() :238-244`, `format_precise :331`,
+`date_shift_unit :469-491` (matches `DatePrecision`, calls `shift_wall` at :482
+/ `DateTimeValue::shift` at :486), `date_diff :631` (delegates to
+`DatePoint::diff`), `date_error :730-751` (minijinja translation — correct
+seam), format_with (engine-private, `:304`, 6 callers).
 
 #### 11.2.4 Boundary and funnel checks (observed)
 
@@ -360,9 +618,16 @@ Three independent rust-design reviews (date, duration, corpus) were run against 
 
 ### 11.3 Discovery probes and tool-finding dispositions (step 2)
 
-**Expansion probes (should a seam exist / where should this live?):** run over date.rs (shift/diff frame ownership, prefix recognition, constructor ownership, error-seam shape), duration.rs (spelling-table ownership, invariant enforcement, guard placement), engine (bypass of typed-value interface), corpus (grammar surface for ticket 05, apply's consumer, YearMonth pattern home).
+**Expansion probes (should a seam exist / where should this live?):** run over
+date.rs (shift/diff frame ownership, prefix recognition, constructor ownership,
+error-seam shape), duration.rs (spelling-table ownership, invariant enforcement,
+guard placement), engine (bypass of typed-value interface), corpus (grammar
+surface for ticket 05, apply's consumer, YearMonth pattern home).
 
-**Compression probes (can two become one?):** run over the `apply`/`apply_part` mirror pair, the two f64→TimeDelta algorithms, the `shift_wall`/`DateTimeValue::shift` twins, `normalize_zero` copies, UNIT_HINT/UNIT_MAP spellings, parse/parse_prefix loops (04-owned), guard sites.
+**Compression probes (can two become one?):** run over the `apply`/`apply_part`
+mirror pair, the two f64→TimeDelta algorithms, the
+`shift_wall`/`DateTimeValue::shift` twins, `normalize_zero` copies,
+UNIT_HINT/UNIT_MAP spellings, parse/parse_prefix loops (04-owned), guard sites.
 
 **Material tool findings, dispositioned:**
 
@@ -381,41 +646,99 @@ Three independent rust-design reviews (date, duration, corpus) were run against 
 
 ### 11.4 Ranked findings
 
-Ranking basis: knowledge-duplication × evidence confidence × corpus independence × leverage. `D2`/`X1` outrank raw depth because they catch in-flight tickets before they land wrong.
+Ranking basis: knowledge-duplication × evidence confidence × corpus independence
+× leverage. `D2`/`X1` outrank raw depth because they catch in-flight tickets
+before they land wrong.
 
 #### 11.4.1 date.rs findings (D-series)
 
 ##### D1 (C1+X6) — The frame dispatch for *shifting* lives in the engine; for *measuring* it lives in `DatePoint` — **top structural finding**
-`new` · expansion · direction: relocate the `DatePrecision` match → `DatePoint::shift(n, unit)` (or route the date arm through `DateValue::shift`) — **decided 2026-10-05: fold lands in 04, before its `YearMonth` arm**
 
-**Observed:** `DatePoint::diff` (date.rs:965) owns measurement; sole caller engine:640 only translates errors. Shifting has no owner: engine:469-491 matches `DatePrecision` itself, calling `shift_wall` at :482 and `DateTimeValue::shift` at :486. `shift_wall` is `pub(crate)` **solely** for engine:482. The policy is restated in 5 places (§11.2.1). Two entry shapes exist and the engine bypasses the one ticket 03 specified (review §9 S1: "interface on `DateValue`/`DateTimeValue`"; target graph `note/query/template → date.rs → chrono`; `DateValue::shift` has zero production callers while the wall-level core is reached directly).
+`new` · expansion · direction: relocate the `DatePrecision` match →
+`DatePoint::shift(n, unit)` (or route the date arm through `DateValue::shift`) —
+**decided 2026-10-05: fold lands in 04, before its `YearMonth` arm**
 
-**Behavior preservation:** the `DateTime` arm already discards the shifted instant (returns `local_wall()`, engine:488) — a wall-returning `DatePoint::shift` is observationally identical. The date-only arm touches no zone today (date.rs:1146 promises this), so returning `NaiveDateTime` (not `DatePoint`) avoids adding a resolver failure mode.
+**Observed:** `DatePoint::diff` (date.rs:965) owns measurement; sole caller
+engine:640 only translates errors. Shifting has no owner: engine:469-491 matches
+`DatePrecision` itself, calling `shift_wall` at :482 and `DateTimeValue::shift`
+at :486. `shift_wall` is `pub(crate)` **solely** for engine:482. The policy is
+restated in 5 places (§11.2.1). Two entry shapes exist and the engine bypasses
+the one ticket 03 specified (review §9 S1: "interface on
+`DateValue`/`DateTimeValue`"; target graph
+`note/query/template → date.rs → chrono`; `DateValue::shift` has zero production
+callers while the wall-level core is reached directly).
 
-**After relocation (PREDICTED):** `date_shift_unit` shrinks 23+2 lines → ~8; engine loses the `shift_wall` import; `shift_wall` → private; the engine's identity round-trip (engine:211-216, see D6) disappears; 5 doc restatements → 1 owner; ticket 05's "no reimplementation in the query layer" AC gets a named home.
+**Behavior preservation:** the `DateTime` arm already discards the shifted
+instant (returns `local_wall()`, engine:488) — a wall-returning
+`DatePoint::shift` is observationally identical. The date-only arm touches no
+zone today (date.rs:1146 promises this), so returning `NaiveDateTime` (not
+`DatePoint`) avoids adding a resolver failure mode.
 
-**Trade-offs:** the match is "only 10 lines" — the finding is the 5 restatements + the visibility leak + that 04 plans to *extend* this match in place (`YearMonth` arm). Coordination flag: **do D1 before ticket 04, or accept the match as 04's.**
+**After relocation (PREDICTED):** `date_shift_unit` shrinks 23+2 lines → ~8;
+engine loses the `shift_wall` import; `shift_wall` → private; the engine's
+identity round-trip (engine:211-216, see D6) disappears; 5 doc restatements → 1
+owner; ticket 05's "no reimplementation in the query layer" AC gets a named
+home.
+
+**Trade-offs:** the match is "only 10 lines" — the finding is the 5
+restatements + the visibility leak + that 04 plans to *extend* this match in
+place (`YearMonth` arm). Coordination flag:
+**do D1 before ticket 04, or accept the match as 04's.**
 
 ##### D2 (C2+G3) — Date-domain consumed-length has no owner; ticket 04 can't deliver its own items 13+16 without one
-`conflicts-with-04` (underspecified, not refuted) · expansion · direction: date-owned `parse_prefix(s) -> Option<(DateValue, usize)>`, mirroring duration
 
-**Observed:** duration solved this (`DurationValue::parse_prefix :233`, prod caller inline.rs:186). Date has **four caller-side copies** of "take 10 bytes then validate": inline.rs:219-222 (hardcoded `10`; sibling `ISO_DATE_LEN` unused), lexer.rs:72/247/257/263 (the constant, in the wrong module for reuse), **note/field.rs:109-116 (prefix-lenient — no atom boundary, so `"2026-01-01junk"` parses, locked by test note/field.rs:833; absent from 04's inventory)**, date.rs:127-137 (validation half inside date.rs while consumption lives at 3 call sites).
+`conflicts-with-04` (underspecified, not refuted) · expansion · direction:
+date-owned `parse_prefix(s) -> Option<(DateValue, usize)>`, mirroring duration
 
-**The 04 gap:** `spec.md:92` `classify` returns **no consumed length**, while 04 item 13 requires guards to go module-private and item 16 requires inline to keep its boundary rule (needs an `end` coordinate). These cannot all hold. **Recommended amendment:** `classify` = `parse_prefix`-backed (as duration's is); boundary/atomness stays at the parser seam (moving it would be the rejected mega-classifier in miniature).
+**Observed:** duration solved this (`DurationValue::parse_prefix :233`, prod
+caller inline.rs:186). Date has **four caller-side copies** of "take 10 bytes
+then validate": inline.rs:219-222 (hardcoded `10`; sibling `ISO_DATE_LEN`
+unused), lexer.rs:72/247/257/263 (the constant, in the wrong module for reuse),
+**note/field.rs:109-116 (prefix-lenient — no atom boundary, so
+`"2026-01-01junk"` parses, locked by test note/field.rs:833; absent from 04's
+inventory)**, date.rs:127-137 (validation half inside date.rs while consumption
+lives at 3 call sites).
 
-**Related corpus item:** `note/field.rs:114` is a grammar gate + N15 guard site that 04 classifies as neither (audit G3/C10) — after 04 widens to 7-byte `YYYY-MM`, this path's `.get(..10)` still returns `None`, leaving story 15 half-applied for the task-date String path (prod caller note/parser/task.rs:212).
+**The 04 gap:** `spec.md:92` `classify` returns **no consumed length**, while 04
+item 13 requires guards to go module-private and item 16 requires inline to keep
+its boundary rule (needs an `end` coordinate). These cannot all hold.
+**Recommended amendment:** `classify` = `parse_prefix`-backed (as duration's
+is); boundary/atomness stays at the parser seam (moving it would be the rejected
+mega-classifier in miniature).
+
+**Related corpus item:** `note/field.rs:114` is a grammar gate + N15 guard site
+that 04 classifies as neither (audit G3/C10) — after 04 widens to 7-byte
+`YYYY-MM`, this path's `.get(..10)` still returns `None`, leaving story 15
+half-applied for the task-date String path (prod caller
+note/parser/task.rs:212).
 
 ##### D3 (C3) — `DateTimeValue::shift`'s calendar arms are `shift_wall` re-coded
-`new`, flagged `conflicts-with-03-in-wording` for adjudication · compression · direction: delegate; keep the exhaustive unit match intact
 
-**Observed (line-by-line twins):** Year→months `checked_mul(12)` (:491-494 ↔ :1149-1151), month clamp via the same `shift_months` callee, week/day arithmetic (:496-500 ↔ :1152-1171), TimeDelta sub-day path, ms branch — all identical; the only genuine difference is the resolve envelope (wall→zone→wall). `DateValue::shift` **already delegates** (`:176`) — the pattern 03's remediation established. `shift_calendar_months`/`shift_calendar_days` are private with one caller each. `shift_wall`'s doc (:1145-1148) describes a wrapper relationship that is implemented as a copy.
+`new`, flagged `conflicts-with-03-in-wording` for adjudication · compression ·
+direction: delegate; keep the exhaustive unit match intact
 
-**Explicitly NOT the rejected `DurationUnit::class()`:** classification stays exactly where it is (the five-site exhaustive gate untouched); only arithmetic *inside* already-grouped arms moves. No predicate introduced.
+**Observed (line-by-line twins):** Year→months `checked_mul(12)` (:491-494
+↔ :1149-1151), month clamp via the same `shift_months` callee, week/day
+arithmetic (:496-500 ↔ :1152-1171), TimeDelta sub-day path, ms branch — all
+identical; the only genuine difference is the resolve envelope (wall→zone→wall).
+`DateValue::shift` **already delegates** (`:176`) — the pattern 03's remediation
+established. `shift_calendar_months`/`shift_calendar_days` are private with one
+caller each. `shift_wall`'s doc (:1145-1148) describes a wrapper relationship
+that is implemented as a copy.
 
-**Predicted:** ~28 lines deleted (span-measured `:538-565`); net resolver calls unchanged; `DateTimeValue::shift` becomes the 3-step wrapper its doc claims.
+**Explicitly NOT the rejected `DurationUnit::class()`:** classification stays
+exactly where it is (the five-site exhaustive gate untouched); only arithmetic
+*inside* already-grouped arms moves. No predicate introduced.
+
+**Predicted:** ~28 lines deleted (span-measured `:538-565`); net resolver calls
+unchanged; `DateTimeValue::shift` becomes the 3-step wrapper its doc claims.
 
 ##### D4 (C4) — Two independent `f64 → TimeDelta` algorithms, two error vocabularies, one erased source chain
-`new`, `conflicts-with-03` (intent, not letter — 03's wording is scoped to `apply_part`) · compression · direction: one conversion owner; map errors keeping the source — **routed to 05 (§13 P5); divergence inputs `0.9999999996` and `-1e-10` (equivalence claim at §12.1 C4 corrected 2026-10-05)**
+
+`new`, `conflicts-with-03` (intent, not letter — 03's wording is scoped to
+`apply_part`) · compression · direction: one conversion owner; map errors
+keeping the source — **routed to 05 (§13 P5); divergence inputs `0.9999999996`
+and `-1e-10` (equivalence claim at §12.1 C4 corrected 2026-10-05)**
 
 | | `date.rs::seconds_delta :1119-1129` | `duration.rs::TryFrom<DurationSeconds> :1043-1058` |
 | --- | --- | --- |
@@ -423,31 +746,86 @@ Ranking basis: knowledge-duplication × evidence confidence × corpus independen
 | Error | `DateError::OutOfRange` | `DurationError::NonFiniteSeconds` |
 | Callers | `:259 :273 :650 :668` (both `apply_part`s) | `:212` (`DateValue::apply`), `:603` (`DateTimeValue::apply`), duration.rs:771 |
 
-**Observed problems:** (1) 03's "single owner" claim is narrowly-true/design-false; (2) **`NonFiniteSeconds` lies** for finite out-of-range input (doc at :1048 admits the conflation); (3) both date call sites erase diagnosis via `.map_err(|_| DateError::OutOfRange)` (`:213`, `:604`) against the house source-chain rule. **Equivalence checked** (spot-evaluated `total = -0.5` and `-1e-10` through both) — currently behavior-compatible; a maintenance trap, not a live bug.
+**Observed problems:** (1) 03's "single owner" claim is
+narrowly-true/design-false; (2) **`NonFiniteSeconds` lies** for finite
+out-of-range input (doc at :1048 admits the conflation); (3) both date call
+sites erase diagnosis via `.map_err(|_| DateError::OutOfRange)` (`:213`, `:604`)
+against the house source-chain rule. **Equivalence checked** (spot-evaluated
+`total = -0.5` and `-1e-10` through both) — currently behavior-compatible; a
+maintenance trap, not a live bug.
 
 ##### D5 (C5) — `apply`/`apply_part` mirror pair: extract the decomposition+fold — *narrow helper, explicitly not a frame trait*
+
 `new`, held inside the public-`Shift`-trait rejection boundary · compression
 
-**Observed:** mirrored structure across `DateValue` (:197-280) and `DateTimeValue` (:590-676) — non-finite guard, whole→TimeDelta, trunc/fract decomposition, L→R fold, `OutOfRange` policy; only the frame differs (civil midnight + `.date()` vs local wall + resolver). Plus the midnight chain duplicated 4× inside `DateValue` (`:175 :211 :256-258 :272-274`) + a 5th at engine:226-229 (→ D9-a).
+**Observed:** mirrored structure across `DateValue` (:197-280) and
+`DateTimeValue` (:590-676) — non-finite guard, whole→TimeDelta, trunc/fract
+decomposition, L→R fold, `OutOfRange` policy; only the frame differs (civil
+midnight + `.date()` vs local wall + resolver). Plus the midnight chain
+duplicated 4× inside `DateValue` (`:175 :211 :256-258 :272-274`) + a 5th at
+engine:226-229 (→ D9-a).
 
-**Constraint:** extraction must not smuggle a shared `unit` predicate behind it — if it does, it *is* the rejected `is_calendar()`. If the fold helper can't be extracted while both exhaustive matches stay legible, the honest disposition is **adjudicated repetition** (dismiss). The earlier "private `Frame` trait" formulation is **rejected**: one behavior-varying pair per trait, and the corpus rejected the public `Shift` trait (review §5.7) — two adapters here are codebase-design's *real-seam* test, so the two impls stay.
+**Constraint:** extraction must not smuggle a shared `unit` predicate behind it
+— if it does, it *is* the rejected `is_calendar()`. If the fold helper can't be
+extracted while both exhaustive matches stay legible, the honest disposition is
+**adjudicated repetition** (dismiss). The earlier "private `Frame` trait"
+formulation is **rejected**: one behavior-varying pair per trait, and the corpus
+rejected the public `Shift` trait (review §5.7) — two adapters here are
+codebase-design's *real-seam* test, so the two impls stay.
 
 ##### D6 (C6+G5) — `DatePoint`'s invariant is built by its only caller, field-by-field
-`new`, partially `superseded-by-04` (precision signal), residue unowned · expansion · direction: own construction; fields go read-only (package deal: constructor **and** encapsulation, or neither)
 
-**Observed:** `DatePoint::new(wall, instant, has_time)` asserts nothing; engine supplies literals `true`/`false` (engine:218/232). A `DatePoint { wall: 10:30, has_time: false }` is constructible — 03's remediation claim "a stale precision flag is unrepresentable" (03 L97-101) **overclaims**; the invariant holds by convention. `precision()` re-derives `DatePrecision` from `has_time` (two names for one bit); the datetime branch recomputes its wall through an identity round-trip (`into_inner` + re-wrap, engine:211-216 ≡ `value.local_wall()`).
+`new`, partially `superseded-by-04` (precision signal), residue unowned ·
+expansion · direction: own construction; fields go read-only (package deal:
+constructor **and** encapsulation, or neither)
 
-**04 residue:** unless `new` takes `Precision` (or a `from_recognized` constructor) *inside 04*, the overclaim survives 04. Frame explicitly as constructor-ownership, **not** as the rejected `LocalWall` newtype.
+**Observed:** `DatePoint::new(wall, instant, has_time)` asserts nothing; engine
+supplies literals `true`/`false` (engine:218/232). A
+`DatePoint { wall: 10:30, has_time: false }` is constructible — 03's remediation
+claim "a stale precision flag is unrepresentable" (03 L97-101) **overclaims**;
+the invariant holds by convention. `precision()` re-derives `DatePrecision` from
+`has_time` (two names for one bit); the datetime branch recomputes its wall
+through an identity round-trip (`into_inner` + re-wrap, engine:211-216 ≡
+`value.local_wall()`).
+
+**04 residue:** unless `new` takes `Precision` (or a `from_recognized`
+constructor) *inside 04*, the overclaim survives 04. Frame explicitly as
+constructor-ownership, **not** as the rejected `LocalWall` newtype.
 
 ##### D7 (C7) — `DateTimeFormat::parse` returns a value typed as an instant it didn't parse
-`new` · expansion · direction: discriminated parse output (wall-or-instant), or branch on `zone()` before parsing
 
-**Observed:** naive patterns force the chrono `NaiveDateTime` through `and_utc()` into `DateTime<Utc>` (`:905-916`); `DateTimeValue::parse_iso` must undo the label with `if !matches!(matched, Rfc3339) { …naive_utc()… }` (`:421-427`) — correctness rests on an **identity law**, not a conversion. Blast radius: 1 producer, 1 undo, private representation. Coordination: 04's `parse_any` inherits the question — settle inside 04.
+`new` · expansion · direction: discriminated parse output (wall-or-instant), or
+branch on `zone()` before parsing
+
+**Observed:** naive patterns force the chrono `NaiveDateTime` through
+`and_utc()` into `DateTime<Utc>` (`:905-916`); `DateTimeValue::parse_iso` must
+undo the label with `if !matches!(matched, Rfc3339) { …naive_utc()… }`
+(`:421-427`) — correctness rests on an **identity law**, not a conversion. Blast
+radius: 1 producer, 1 undo, private representation. Coordination: 04's
+`parse_any` inherits the question — settle inside 04.
 
 ##### D8 (C8) — Recognition errors ride arithmetic seams; `diff` returns an unreachable error
-`new` · expansion/narrow · direction: choose deliberately between (a) within-domain split `DateParseError`/`DateError` or (b) narrowing seams (`diff`'s only error is provably unreachable) — **decided 2026-10-05: delete `InvalidPattern`; translator unsupported-token becomes a template-render error**
 
-**Observed:** `InvalidPattern :1314` zero producers (match engine:747); `date_error` mostly translates *impossible* into *misleading* ("date arithmetic overflowed" for parse outcomes, doc admits they cannot occur); `diff`'s `OutOfRange` documented defensive-only yet callers pay `map_err`. **Not** the rejected Date+Duration merge — a within-domain split. Ranks below D1-D5: judgment call, and (a) costs two public error types exactly where 03 deliberately simplified. `InvalidPattern` liveness checked 2026-10-05: zero constructors anywhere in the tree (definition + one display arm only). **Decided 2026-10-05:** delete the variant and its engine arm — the arm's overflow claim can never be true — and the translator's unsupported-token path becomes a template-render error at the engine seam (names the token, dialect, docs pointer), not a `DateError`. 06 checklist rewritten; 06's edge is 04 only. (2026-10-24, temporal-offload Task 6: the translator now lives in `temporal::token` and returns `TemporalTokenError`; the engine wrapper still maps it to a template-render error, so the "not a `DateError`" decision holds.)
+`new` · expansion/narrow · direction: choose deliberately between (a)
+within-domain split `DateParseError`/`DateError` or (b) narrowing seams
+(`diff`'s only error is provably unreachable) — **decided 2026-10-05: delete
+`InvalidPattern`; translator unsupported-token becomes a template-render error**
+
+**Observed:** `InvalidPattern :1314` zero producers (match engine:747);
+`date_error` mostly translates *impossible* into *misleading* ("date arithmetic
+overflowed" for parse outcomes, doc admits they cannot occur); `diff`'s
+`OutOfRange` documented defensive-only yet callers pay `map_err`. **Not** the
+rejected Date+Duration merge — a within-domain split. Ranks below D1-D5:
+judgment call, and (a) costs two public error types exactly where 03
+deliberately simplified. `InvalidPattern` liveness checked 2026-10-05: zero
+constructors anywhere in the tree (definition + one display arm only).
+**Decided 2026-10-05:** delete the variant and its engine arm — the arm's
+overflow claim can never be true — and the translator's unsupported-token path
+becomes a template-render error at the engine seam (names the token, dialect,
+docs pointer), not a `DateError`. 06 checklist rewritten; 06's edge is 04 only.
+(2026-10-24, temporal-offload Task 6: the translator now lives in
+`temporal::token` and returns `TemporalTokenError`; the engine wrapper still
+maps it to a template-render error, so the "not a `DateError`" decision holds.)
 
 ##### D9 — Minor cluster (each independently small)
 
@@ -460,87 +838,196 @@ Ranking basis: knowledge-duplication × evidence confidence × corpus independen
 | e | `parse_year_month` double-parses to fabricate a chrono error source | `:824-848` | construct source once, or dismiss (house err-source-chain rule) | `new` |
 | f | `DateError::InvalidPattern` dead variant | `:1314`; zero producers | remove (decided 2026-10-05, per D8) | `unowned` |
 
-Dismissed below threshold: `checked_neg` ×4 in `date_sub*` (one-line guards); `signed_*_since` ordering micro-pattern (2 sites, no divergence).
+Dismissed below threshold: `checked_neg` ×4 in `date_sub*` (one-line guards);
+`signed_*_since` ordering micro-pattern (2 sites, no divergence).
 
 #### 11.4.2 duration.rs findings (U-series)
 
 ##### U1 (F1) — `','` has two grammar owners; precedence is an accident, unpinned, unregistered
-`genuinely new` · duplicated policy across seams · OBSERVED collision, PREDICTED outcomes — **decided 2026-10-05 (b): list-first at the inline seam**
 
-**Evidence:** duration claims `,` as part separator (module doc `:5`, `skip_separators` admits `,` at 183/263); note-parser claims `,` as list delimiter (inline.rs:67,82, `parse_comma_list_from :91`); YAML assigns the same chars to list splitting *before* coercion (note/field.rs:656 test `list: [1h, 30m]` → `List([Duration, Duration])`).
+`genuinely new` · duplicated policy across seams · OBSERVED collision, PREDICTED
+outcomes — **decided 2026-10-05 (b): list-first at the inline seam**
 
-**Traced outcomes (PREDICTED, hand-traced through `parse_atom_at`):** `1h, 30m` → **one** `Duration(5400s)` (lookahead eats the comma); `1h, 45` → `String("1h, 45")` (MissingUnit → whole prefix None); `1h,` → `List([Duration])`. Inline duration-first lists are effectively unusable; the YAML seam silently disagrees with the inline seam; **no divergence-register entry, ticket, or test covers this.** **Decided 2026-10-05 — (b) list-first:** the note-parser tries the list reading when `","` follows a complete atom, so `1h, 30m` becomes a two-element list; commas inside `dur(…)` args and YAML scalars keep their duration-separator meaning (explicit contexts). Pins (5 asserts) ride in 04; register entry in 08 (number assigned at write).
+**Evidence:** duration claims `,` as part separator (module doc `:5`,
+`skip_separators` admits `,` at 183/263); note-parser claims `,` as list
+delimiter (inline.rs:67,82, `parse_comma_list_from :91`); YAML assigns the same
+chars to list splitting *before* coercion (note/field.rs:656 test
+`list: [1h, 30m]` → `List([Duration, Duration])`).
+
+**Traced outcomes (PREDICTED, hand-traced through `parse_atom_at`):** `1h, 30m`
+→ **one** `Duration(5400s)` (lookahead eats the comma); `1h, 45` →
+`String("1h, 45")` (MissingUnit → whole prefix None); `1h,` →
+`List([Duration])`. Inline duration-first lists are effectively unusable; the
+YAML seam silently disagrees with the inline seam;
+**no divergence-register entry, ticket, or test covers this.**
+**Decided 2026-10-05 — (b) list-first:** the note-parser tries the list reading
+when `","` follows a complete atom, so `1h, 30m` becomes a two-element list;
+commas inside `dur(…)` args and YAML scalars keep their duration-separator
+meaning (explicit contexts). Pins (5 asserts) ride in 04; register entry in 08
+(number assigned at write).
 
 ##### U2 (F2+G2) — Unit *spelling* vocabulary has four owners; sync is comment-enforced only
+
 `genuinely new` (distinct from S2/N18 ratios) · policy with no owner
 
-**Evidence:** `UNIT_MAP` 35 keys (`:53-89`); `UNIT_HINT :44-46` with sync stated **in prose only** (`:41-43` "a reminder to update both"); consumed by the user-facing message engine:764 whose doc *claims* "the message cannot drift" — **no test asserts it** (rg: no test references `UNIT_HINT`); `SUB_YEAR_DECOMPOSITION_UNITS :130` (literal `&str` suffix column); the `#[case::]` mirror in `parses_all_units_and_abbreviations` (35 vs 35, set-equal — but hand-maintained).
+**Evidence:** `UNIT_MAP` 35 keys (`:53-89`); `UNIT_HINT :44-46` with sync stated
+**in prose only** (`:41-43` "a reminder to update both"); consumed by the
+user-facing message engine:764 whose doc *claims* "the message cannot drift" —
+**no test asserts it** (rg: no test references `UNIT_HINT`);
+`SUB_YEAR_DECOMPOSITION_UNITS :130` (literal `&str` suffix column); the
+`#[case::]` mirror in `parses_all_units_and_abbreviations` (35 vs 35, set-equal
+— but hand-maintained).
 
-**Corpus precedent:** this exact failure class "hid weeks" (03 L117-119) — the fix removed the symptom, not the class. **Direction:** make it executable — derived test `UNIT_MAP`→`UNIT_HINT` coverage + iterate parse cases from `UNIT_MAP.entries()` (precedent: `duration.rs:2136-2139`).
+**Corpus precedent:** this exact failure class "hid weeks" (03 L117-119) — the
+fix removed the symptom, not the class. **Direction:** make it executable —
+derived test `UNIT_MAP`→`UNIT_HINT` coverage + iterate parse cases from
+`UNIT_MAP.entries()` (precedent: `duration.rs:2136-2139`).
 
 ##### U3 (F3) — `DurationSeconds` documents a type invariant its field visibility doesn't enforce
+
 `genuinely new` · representable-but-invalid · OBSERVED
 
-Type docs assert normalization happens "at construction" and holds "everywhere" (`:1007-1014`, `:1020-1021`), but `pub(crate) struct DurationSeconds(pub(crate) f64)` (`:1015`) lets ~50 in-file sites bypass `normalized`/`TryFrom`. **Actual violations today: one, benign** (`:417`, guarded by the `== 0.0` early-return at `:383`); zero external reach (only def + `:417` match `DurationSeconds(`). **Direction:** narrow the field to private — makes the doc true by construction, zero churn outside duration.rs. Deletion test: reverting re-opens the bypass the docs claim closed.
+Type docs assert normalization happens "at construction" and holds "everywhere"
+(`:1007-1014`, `:1020-1021`), but
+`pub(crate) struct DurationSeconds(pub(crate) f64)` (`:1015`) lets ~50 in-file
+sites bypass `normalized`/`TryFrom`. **Actual violations today: one, benign**
+(`:417`, guarded by the `== 0.0` early-return at `:383`); zero external reach
+(only def + `:417` match `DurationSeconds(`). **Direction:** narrow the field to
+private — makes the doc true by construction, zero churn outside duration.rs.
+Deletion test: reverting re-opens the bypass the docs claim closed.
 
 ##### U4 (F4) — The namespace is mislabeled; the seed's `Scanner` struct is the wrong remedy
+
 `new` (analysis) · the *type* rejected on corpus grounds; micro-move optional
 
-11 of 16 no-self fns are foreign to the value namespace (9 stateless scanner helpers + 2 parts-witness helpers). But: the helpers are stateless (no struct needed); the only stateful code is the two loops' locals, which **04 collapses into one parameterized `Whole | Prefix` loop**; post-04 a `Scanner` wraps ~5 locals of one function with no second consumer (second-adapter test fails); and 03:171-173 already rejected the adjacent parse-machinery/value split. **What survives:** optional namespace partition (move the 9 pure helpers to module-private free fns) — explicitly labeled **navigability, not deepening**, only for free while 04 rewrites the loops, never standalone, never a struct. Related: `apply_sign :314` post-pass is removable during 04's merge (sign known at first push).
+11 of 16 no-self fns are foreign to the value namespace (9 stateless scanner
+helpers + 2 parts-witness helpers). But: the helpers are stateless (no struct
+needed); the only stateful code is the two loops' locals, which
+**04 collapses into one parameterized `Whole | Prefix` loop**; post-04 a
+`Scanner` wraps ~5 locals of one function with no second consumer
+(second-adapter test fails); and 03:171-173 already rejected the adjacent
+parse-machinery/value split. **What survives:** optional namespace partition
+(move the 9 pure helpers to module-private free fns) — explicitly labeled
+**navigability, not deepening**, only for free while 04 rewrites the loops,
+never standalone, never a struct. Related: `apply_sign :314` post-pass is
+removable during 04's merge (sign known at first push).
 
 ##### U5 (F5) — Signed-zero normalization has three owners; two are byte-identical copies
+
 `genuinely new` · duplicated policy · OBSERVED
 
-`fn normalize_zero` at `note/field.rs:468-474` and `query/sort.rs:445` — byte-identical; `git log -S` shows **both introduced by `21ae8b1d`, the commit that closed signed-zero drift** (the fix duplicated the policy it closed). Third consumer `note/field.rs:263`. `DurationSeconds::normalized :1022` is the type-owned construction invariant (different responsibility — keep). **Direction:** one crate-level helper for the two raw-f64 sites; record the doctrine once (ticket 08).
+`fn normalize_zero` at `note/field.rs:468-474` and `query/sort.rs:445` —
+byte-identical; `git log -S` shows
+**both introduced by `21ae8b1d`, the commit that closed signed-zero drift** (the
+fix duplicated the policy it closed). Third consumer `note/field.rs:263`.
+`DurationSeconds::normalized :1022` is the type-owned construction invariant
+(different responsibility — keep). **Direction:** one crate-level helper for the
+two raw-f64 sites; record the doctrine once (ticket 08).
 
 ##### U6 (F6) — Trailing-separator `raw` spelling diverges by entry point
+
 `genuinely new` · pin during 04's loop merge · OBSERVED
 
-`parse` stores the trimmed whole input (`:214` → `"1h,"`); `parse_prefix` stores the consumed span (`:281` → `"1h"`). Same value, different `Display`, by constructor. Trailing whitespace is stripped; trailing comma is kept. Only trailing-separator test asserts seconds only. `raw` is display-only (spec:88), so nothing else constrains it — nobody decided. **Direction:** pick one (recommended: consumed-span, uniformly) at 04's merge.
+`parse` stores the trimmed whole input (`:214` → `"1h,"`); `parse_prefix` stores
+the consumed span (`:281` → `"1h"`). Same value, different `Display`, by
+constructor. Trailing whitespace is stripped; trailing comma is kept. Only
+trailing-separator test asserts seconds only. `raw` is display-only (spec:88),
+so nothing else constrains it — nobody decided. **Direction:** pick one
+(recommended: consumed-span, uniformly) at 04's merge.
 
 ##### U7 (F7) — Guard-fn visibility
-`superseded-by-04` — `can_start :499` / `can_start_duration_segment :504` privacy tightening belongs in 04's residue checklist. Census note: exactly **one** guarded production site (sort.rs:487), not a four-seam protocol.
+
+`superseded-by-04` — `can_start :499` / `can_start_duration_segment :504`
+privacy tightening belongs in 04's residue checklist. Census note: exactly
+**one** guarded production site (sort.rs:487), not a four-seam protocol.
 
 #### 11.4.3 Corpus findings (X-series)
 
 ##### X1 (G1 / Q3-C1) — The filter expression grammar cannot host ticket 05 — **single blocking unknown for the parity half** (resolved 2026-10-05, option (i))
-`genuinely new` (adjudicated 2026-10-05) · OBSERVED — decision: option (i), spec lock amended at L77
+
+`genuinely new` (adjudicated 2026-10-05) · OBSERVED — decision: option (i), spec
+lock amended at L77
 
 `FilterFunction` has exactly one variant, `Contains` (filter.rs:111-120); `FilterAtom` = comparison | function, **both predicates → bool; no value-producing expression node**. `parse_literal_arg` accepts only `Literal` → `dur("1 month")` is a syntax error; `grep "dur(|date_add|date_diff" src/query/` → 0 hits; no `Plus`/`Minus`/`Star` tokens in the grammar; no arithmetic ops in `CompareOp`.
 
-**The contradiction:** ticket 05 L3 + spec L77 + review §3 B17 all say "registry entries, never new operators or grammar" — and ticket 05's demo contract requires `date − date` to yield a **value** compared against a date, plus nested `dur(…)`. A predicate-only enum cannot deliver that. **Decided 2026-10-05 — option (i):** the grammar constraint is amended; spec's lock line now names the minimal value-expression surface, and stories 1–3 + 05 items 1–3 stand as written.
+**The contradiction:** ticket 05 L3 + spec L77 + review §3 B17 all say "registry
+entries, never new operators or grammar" — and ticket 05's demo contract
+requires `date − date` to yield a **value** compared against a date, plus nested
+`dur(…)`. A predicate-only enum cannot deliver that.
+**Decided 2026-10-05 — option (i):** the grammar constraint is amended; spec's
+lock line now names the minimal value-expression surface, and stories 1–3 + 05
+items 1–3 stand as written.
 
-*Scoping note:* as a **code-design candidate for duration/duration-parse**, "split parse to expose intermediates" was considered and **rejected** — there is no value-producing consumer in scope (speculative generality). X1 is carried as a **corpus contradiction**, which it is.
+*Scoping note:* as a **code-design candidate for duration/duration-parse**,
+"split parse to expose intermediates" was considered and **rejected** — there is
+no value-producing consumer in scope (speculative generality). X1 is carried as
+a **corpus contradiction**, which it is.
 
-##### X2 — (folded into U2) four spelling owners, no executable sync.
+##### X2 — (folded into U2) four spelling owners, no executable sync
 
 ##### X3 (Q1a/Q1c) — Line-cite drift is systemic; ticket 09's census is incomplete
+
 `docs-fix` · OBSERVED (git-verified)
 
-**Root cause:** ticket 04's cites were pinned in review pass `07c631ac` (Oct 4 16:03) against `bcc938b5` numbers **without re-verifying** — proven by `git show 07c631ac:src/date.rs`: symbols were already 3–10 lines off *at pin time*; now off by 92–256 (e.g. `has_time` cited :1022 → actual :922/929; `parse_iso` :343 → :87/:94; `date.rs:585` cite now collides with a `dead_code` attr). Ticket 03 followed the correct pattern (L136-139: "stale; these symbols are the current pointers").
+**Root cause:** ticket 04's cites were pinned in review pass `07c631ac` (Oct 4
+16:03) against `bcc938b5` numbers **without re-verifying** — proven by
+`git show 07c631ac:src/date.rs`: symbols were already 3–10 lines off
+*at pin time*; now off by 92–256 (e.g. `has_time` cited :1022 → actual :922/929;
+`parse_iso` :343 → :87/:94; `date.rs:585` cite now collides with a `dead_code`
+attr). Ticket 03 followed the correct pattern (L136-139: "stale; these symbols
+are the current pointers").
 
-**Ticket 09 census:** 5 of 6 named methods already deleted by 03; `duration.rs:217` → now `:353`; `to_rfc3339()` premise false (0 hits — the `…Z` channel's producer is `Serialize` at date.rs:771); the live `expect(dead_code)` set is **6 different items** (§11.2.4) of which 09 names one. Item 13's re-target mandate is already satisfied by a different route.
+**Ticket 09 census:** 5 of 6 named methods already deleted by 03;
+`duration.rs:217` → now `:353`; `to_rfc3339()` premise false (0 hits — the `…Z`
+channel's producer is `Serialize` at date.rs:771); the live `expect(dead_code)`
+set is **6 different items** (§11.2.4) of which 09 names one. Item 13's
+re-target mandate is already satisfied by a different route.
 
 ##### X4 (G4 / Q3-C7) — `From<DateValue> for DateTimeValue` silently shifts on tz failure; absent from the divergence register
-`genuinely new` · spec contradiction (resolved 2026-10-05, option (a)) · OBSERVED
 
-`date.rs:741-749`: `unwrap_or_else(|_zone_failure| midnight.and_utc())` — documented in rustdoc, but **reachable from filter equality** (`is_equal_to_literal` → `is_equal_to_date :681` → `From`), so in a broken-tz environment `Date == DateTime` compares at **UTC** midnight while every other path returns `DateError::LocalZoneLookup`. Spec D14 is absolute: "never a silent shift." Ticket 08's register (17 entries) does not include it. **Decided 2026-10-05 (option (a)):** keep `From` — spec D14 now carries a declared UTC-frame exception; 08 records a register entry (number assigned when the register is written) and rewrites the rustdoc to the spec rationale. The rustdoc's "chrono does the same" was a parity argument, not a spec argument.
+`genuinely new` · spec contradiction (resolved 2026-10-05, option (a)) ·
+OBSERVED
 
-##### X5 (G5) — folded into D6.
+`date.rs:741-749`: `unwrap_or_else(|_zone_failure| midnight.and_utc())` —
+documented in rustdoc, but **reachable from filter equality**
+(`is_equal_to_literal` → `is_equal_to_date :681` → `From`), so in a broken-tz
+environment `Date == DateTime` compares at **UTC** midnight while every other
+path returns `DateError::LocalZoneLookup`. Spec D14 is absolute: "never a silent
+shift." Ticket 08's register (17 entries) does not include it.
+**Decided 2026-10-05 (option (a)):** keep `From` — spec D14 now carries a
+declared UTC-frame exception; 08 records a register entry (number assigned when
+the register is written) and rewrites the rustdoc to the spec rationale. The
+rustdoc's "chrono does the same" was a parity argument, not a spec argument.
 
-##### X6 (G6) — folded into D1.
+##### X5 (G5) — folded into D6
+
+##### X6 (G6) — folded into D1
 
 ##### X7 (G7) — `apply`/`parts`' declared production consumer may never materialise
+
 `decided 2026-10-05 (a)` · OBSERVED
 
-03 declares the consumers (04's classify, ticket 05); but 05's checklist never mentions multi-part durations or `apply` (Dataview's `date_add(date, amount, unit)` is single-unit), and `grep "\.apply(" template/ index/ query/` finds only unrelated types. **Decided 2026-10-05 — (a):** 05 wires the multi-part path (`date_add` with compound durations routes through `DateValue::apply`/`DateTimeValue::apply` in written order), so the production consumer materialises in 05 and 09's deletion test strikes only genuinely unreached surface (spec L123, 03's AC intact).
+03 declares the consumers (04's classify, ticket 05); but 05's checklist never
+mentions multi-part durations or `apply` (Dataview's
+`date_add(date, amount, unit)` is single-unit), and
+`grep "\.apply(" template/ index/ query/` finds only unrelated types.
+**Decided 2026-10-05 — (a):** 05 wires the multi-part path (`date_add` with
+compound durations routes through `DateValue::apply`/`DateTimeValue::apply` in
+written order), so the production consumer materialises in 05 and 09's deletion
+test strikes only genuinely unreached surface (spec L123, 03's AC intact).
 
 ##### X8 (G8) — Where the `YearMonth` strftime pattern lives after 04
+
 `minor, unowned interface decision` · PREDICTED
 
-04 deletes `DatePrecision`/`format_precise` and adds a `YearMonth` arm, but neither 04 nor spec names `"%Y-%m"` or its home (presumably the hoisted `Precision`). Also: post-deletion `date_shift_unit` must recover `wall` from the value — derivable (DateValue→midnight, DateTimeValue→`local_wall()`, YearMonth→day-1 midnight) but 04 never says so, which makes the deletion look riskier than it is.
+04 deletes `DatePrecision`/`format_precise` and adds a `YearMonth` arm, but
+neither 04 nor spec names `"%Y-%m"` or its home (presumably the hoisted
+`Precision`). Also: post-deletion `date_shift_unit` must recover `wall` from the
+value — derivable (DateValue→midnight, DateTimeValue→`local_wall()`,
+YearMonth→day-1 midnight) but 04 never says so, which makes the deletion look
+riskier than it is.
 
-##### X9 — Minor, filed for completeness: `DurationUnit::parse` returns `Option` vs `FromStr` `Result` (weak, may be deliberate); `as_date`'s `DateTime` arm silently truncates to date (no register entry); `is_calendar`'s consumer tension (X11 below).
+##### X9 — Minor, filed for completeness: `DurationUnit::parse` returns `Option` vs `FromStr` `Result` (weak, may be deliberate); `as_date`'s `DateTime` arm silently truncates to date (no register entry); `is_calendar`'s consumer tension (X11 below)
 
 #### 11.4.4 Corpus internal contradictions (Q3) — consolidated
 
@@ -578,16 +1065,28 @@ Type docs assert normalization happens "at construction" and holds "everywhere" 
 
 ### 11.6 Negative findings — checked and correctly shaped
 
-1. `local_naive_to_utc`/`resolve_gap_offset` as free fns — zone policy, no natural `self`; depth-propagation test fails to justify grouping. 03 scope: unchanged.
-2. `seconds_delta`, `shift_months`, `signed_*_since` — 03's declared owners: private, single-caller, one job (with the D4 caveat about the *other* conversion).
-3. Five-site exhaustive `DurationUnit` classification — intentional (compiler as policy owner); `rg "class("` confirms no predicate exists.
-4. Engine `date_error` + `DateDiff → Value` translation — minijinja must not leak into date.rs; this *is* 03's remediation.
-5. Clock doctrine landed (no `Local::now`, 0 hits); parse funnel clean (no production `from_ymd_opt` outside date.rs).
-6. `From<NaiveDate> for DateValue` — D7 adjudicated: `NaiveDate` is already valid; surface-area, not a parse-don't-validate hole.
-7. `DateTimeFormat::parse`'s `matched` loop — verified correct (assign-before-attempt, break-on-success); D7 targets the return type only.
-8. `filter.rs` cascade, `UNIT_MAP`/ratio single-table (S2), manual `Deserialize` (N12, landed 01), `#[non_exhaustive]` (N17, landed) — verified.
-9. `is_calendar` dead-code attribute — deliberate per 03:164-169 (not a census gap — withdrawn as a finding).
-10. Duration/date cross-boundary clone count = 0 (jscpd) — the seam is not leaky.
+1. `local_naive_to_utc`/`resolve_gap_offset` as free fns — zone policy, no
+   natural `self`; depth-propagation test fails to justify grouping. 03 scope:
+   unchanged.
+2. `seconds_delta`, `shift_months`, `signed_*_since` — 03's declared owners:
+   private, single-caller, one job (with the D4 caveat about the *other*
+   conversion).
+3. Five-site exhaustive `DurationUnit` classification — intentional (compiler as
+   policy owner); `rg "class("` confirms no predicate exists.
+4. Engine `date_error` + `DateDiff → Value` translation — minijinja must not
+   leak into date.rs; this *is* 03's remediation.
+5. Clock doctrine landed (no `Local::now`, 0 hits); parse funnel clean (no
+   production `from_ymd_opt` outside date.rs).
+6. `From<NaiveDate> for DateValue` — D7 adjudicated: `NaiveDate` is already
+   valid; surface-area, not a parse-don't-validate hole.
+7. `DateTimeFormat::parse`'s `matched` loop — verified correct
+   (assign-before-attempt, break-on-success); D7 targets the return type only.
+8. `filter.rs` cascade, `UNIT_MAP`/ratio single-table (S2), manual `Deserialize`
+   (N12, landed 01), `#[non_exhaustive]` (N17, landed) — verified.
+9. `is_calendar` dead-code attribute — deliberate per 03:164-169 (not a census
+   gap — withdrawn as a finding).
+10. Duration/date cross-boundary clone count = 0 (jscpd) — the seam is not
+    leaky.
 
 ---
 
@@ -606,7 +1105,8 @@ Type docs assert normalization happens "at construction" and holds "everywhere" 
 | 9. `apply`/`apply_part` clones | **carried as D5** in narrowed form (fold extraction; frame trait rejected) |
 | 10. `LocalWall` newtype | rejected — constructor question separated into D6 |
 
-Net: 4 already decided, 4 ticket-covered, 3 genuinely new (D3/D4/D5) + the earlier "Frame trait" formulation corrected to D5.
+Net: 4 already decided, 4 ticket-covered, 3 genuinely new (D3/D4/D5) + the
+earlier "Frame trait" formulation corrected to D5.
 
 ---
 
@@ -638,13 +1138,28 @@ Net: 4 already decided, 4 ticket-covered, 3 genuinely new (D3/D4/D5) + the earli
 
 ### 11.9 Coverage gaps
 
-**date.rs review:** tests (`:1341-2388`) read diagonally, not line-by-line; engine beyond line 900 (8 `date_shift_unit` callers confirmed by CodeGraph, not individually read); `note/field.rs` outside `as_date` and `filter.rs` in full; tickets 01/02/06/07/08 bodies not read in full (**D8's `InvalidPattern` must be checked against 06 before removal**); bench impact for D3/D5 unmeasured; D5's span not line-audited.
+**date.rs review:** tests (`:1341-2388`) read diagonally, not line-by-line;
+engine beyond line 900 (8 `date_shift_unit` callers confirmed by CodeGraph, not
+individually read); `note/field.rs` outside `as_date` and `filter.rs` in full;
+tickets 01/02/06/07/08 bodies not read in full
+(**D8's `InvalidPattern` must be checked against 06 before removal**); bench
+impact for D3/D5 unmeasured; D5's span not line-audited.
 
-**duration.rs review:** messrust/clippy/coverage not re-run (citations only); no benches exist; all F1 outcomes predicted; `UNIT_MAP` table span not individually enumerated; `src/date.rs` read at apply/diff/shift sites only; serde/Display impl bodies read for structure, not line-audited.
+**duration.rs review:** messrust/clippy/coverage not re-run (citations only); no
+benches exist; all F1 outcomes predicted; `UNIT_MAP` table span not individually
+enumerated; `src/date.rs` read at apply/diff/shift sites only; serde/Display
+impl bodies read for structure, not line-audited.
 
-**corpus audit:** no dynamic verification (`mise run verify/lint` not executed); `research/` (3 prior-art files) not read; `schema/`, `index/**` spot-checked only; ticket 02 (255 L) read in part; cross-crate consumer surface not surveyed; bench-absence claim unverified; audit-brief commit `cdc3f566` does not exist (pin commit is `07c631ac`).
+**corpus audit:** no dynamic verification (`mise run verify/lint` not executed);
+`research/` (3 prior-art files) not read; `schema/`, `index/**` spot-checked
+only; ticket 02 (255 L) read in part; cross-crate consumer surface not surveyed;
+bench-absence claim unverified; audit-brief commit `cdc3f566` does not exist
+(pin commit is `07c631ac`).
 
-**Cross-cutting:** all post-change effects are predictions until implementation; the three reports are single-pass adversarial runs — conflicts *between* component findings (none found beyond ID collisions resolved here) were resolved by the consolidator, not re-adjudicated.
+**Cross-cutting:** all post-change effects are predictions until implementation;
+the three reports are single-pass adversarial runs — conflicts *between*
+component findings (none found beyond ID collisions resolved here) were resolved
+by the consolidator, not re-adjudicated.
 
 ---
 
@@ -652,43 +1167,98 @@ Net: 4 already decided, 4 ticket-covered, 3 genuinely new (D3/D4/D5) + the earli
 
 #### A. Docs-fix only (no code) — before any remaining ticket is picked up
 
-1. **Re-verify and repin every line cite in tickets 04/09 and review.md §2**, recording the verifying commit (as 03 did). *(X3 — highest mechanical leverage: every agent pickup re-derives these.)* **Fold in §13's repin list (2026-10-05):** `date.rs:212`/`:603` (error erasure + TryFrom sites), `DateTimeFormat::ALL` → `date.rs:872`, `field.rs:376`/`:386` (String↔Duration arms), `engine/date.rs:125`/`:135`/`:376-397`/`:575`/`:587`/`:602`/`:691-692` (T-new-1 sites).
-2. **Rewrite ticket 06 items 2/15, spec L102-103, review §9 S4/§10 step 6** — `format_with` is deleted; residue is engine:304 alone; re-scope 06. *(X-A)*
-3. **Rewrite ticket 09's method set** to the 6 live `expect(dead_code)` items; fix `duration.rs:217`→`353`; retire item 13's `to_rfc3339()` premise. *(X-B)*
-4. **Retense review.md §1 (rows 1-3), §9 (S1/S2/S6/S10), §10 (steps 2-3, 5-6), §4**; fix `config/model.rs:52` (08 item 14). *(X-C)*
-5. **Fix stale doc comments:** `filter.rs:217-218` "midnight UTC" → local midnight; `engine:462-463` date-only sub-day caveat. *(Q1f)*
-6. **Fix blocker headers:** 03 → `01, 02`; 05's dependency-direction note; review S9's seam column. *(X-D/E/F)*
-7. **Record the `DurationValue`-split rejection rationale** (+ F2/F6/F8-style stable IDs for D3/D4/D5) in review.md so this pass isn't repeated. *(§11.5, §11.7)*
+1. **Re-verify and repin every line cite in tickets 04/09 and review.md §2**,
+   recording the verifying commit (as 03 did).
+   *(X3 — highest mechanical leverage: every agent pickup re-derives these.)*
+   **Fold in §13's repin list (2026-10-05):** `date.rs:212`/`:603` (error
+   erasure + TryFrom sites), `DateTimeFormat::ALL` → `date.rs:872`,
+   `field.rs:376`/`:386` (String↔Duration arms),
+   `engine/date.rs:125`/`:135`/`:376-397`/`:575`/`:587`/`:602`/`:691-692`
+   (T-new-1 sites).
+2. **Rewrite ticket 06 items 2/15, spec L102-103, review §9 S4/§10 step 6** —
+   `format_with` is deleted; residue is engine:304 alone; re-scope 06. *(X-A)*
+3. **Rewrite ticket 09's method set** to the 6 live `expect(dead_code)` items;
+   fix `duration.rs:217`→`353`; retire item 13's `to_rfc3339()` premise. *(X-B)*
+4. **Retense review.md §1 (rows 1-3), §9 (S1/S2/S6/S10), §10 (steps 2-3, 5-6),
+   §4**; fix `config/model.rs:52` (08 item 14). *(X-C)*
+5. **Fix stale doc comments:** `filter.rs:217-218` "midnight UTC" → local
+   midnight; `engine:462-463` date-only sub-day caveat. *(Q1f)*
+6. **Fix blocker headers:** 03 → `01, 02`; 05's dependency-direction note;
+   review S9's seam column. *(X-D/E/F)*
+7. **Record the `DurationValue`-split rejection rationale** (+ F2/F6/F8-style
+   stable IDs for D3/D4/D5) in review.md so this pass isn't repeated.
+   *(§11.5, §11.7)*
 
 #### B. Code-work — decisions needed, not just edits
 
-1. **Decided 2026-10-05 (option (i)):** minimal value-expression surface named in spec L77; stories 1–3 verbatim — single blocking unknown for the parity half. *(X1, closed)*
-2. **D1 folded into ticket 04 — decided 2026-10-05:** the precision hoist and the shift-frame relocation are the same seam change, so 04 routes date-only through `DateValue::shift`/`DatePoint::shift` before extending the engine match for `YearMonth`, then demotes `shift_wall` to private once its sole engine caller is gone (09's `proj-pub-crate-internal` review confirms). *(D1+X6, closed)*
-3. **Amend ticket 04 before implementation:** `classify` = `parse_prefix`-backed (consumed length); add `note/field.rs:114` to item 16's gate inventory; pin the trailing-separator `raw` spelling (U6); decide `DateTimeFormat::parse`'s return shape (D7); make `DatePoint::new` take `Precision` (D6/G5). *(D2, D6, D7, U6, X3-G3)*
-4. **Decided 2026-10-05 (option (a)):** 05 wires multi-part durations through `apply`/`parts` — the production consumer materialises in 05; the `dead_code` sites are not exempt (09 verifies they're wired and deletes only genuinely unreached surface). *(X7, closed)*
-5. **Decided 2026-10-05 (option (a)):** keep `From`; spec D14 carries the declared UTC-frame exception; 08 records the register entry (number assigned at write) and rewrites the rustdoc to spec rationale. *(X4, closed)*
-6. **Give unit spellings an executable owner:** `UNIT_MAP`→`UNIT_HINT` derived test + case-list generation. *(U2)*
-7. **Compression candidates (can pair with 05/09):** D3 delegate calendar arms to `shift_wall`; D4 unify f64→TimeDelta on one owner with source-preserving error map (also fixes the `NonFiniteSeconds` mislabel); D5 fold extraction (dismiss if exhaustive matches lose legibility); U3 narrow `DurationSeconds` field to private; U5 one crate-level `normalize_zero`. *(D3, D4, D5, U3, U5)*
-8. **Land 08's owed items:** config const removal, null-ordering ADR, divergence register incl. X4, comma-precedence entry (U1), signed-zero doctrine. *(U1, U5, X4, X-C)*
-9. **Decide `is_calendar`'s fate** (09 deletion test vs 03 handoff point opposite ways). *(X-G)*
-10. **Attach to 06's gate-layering:** `field.rs:531`'s fall-through-on-Err is safe but unowned (performance knowledge). *(§11.5 last row)*
+1. **Decided 2026-10-05 (option (i)):** minimal value-expression surface named
+   in spec L77; stories 1–3 verbatim — single blocking unknown for the parity
+   half. *(X1, closed)*
+2. **D1 folded into ticket 04 — decided 2026-10-05:** the precision hoist and
+   the shift-frame relocation are the same seam change, so 04 routes date-only
+   through `DateValue::shift`/`DatePoint::shift` before extending the engine
+   match for `YearMonth`, then demotes `shift_wall` to private once its sole
+   engine caller is gone (09's `proj-pub-crate-internal` review confirms).
+   *(D1+X6, closed)*
+3. **Amend ticket 04 before implementation:** `classify` = `parse_prefix`-backed
+   (consumed length); add `note/field.rs:114` to item 16's gate inventory; pin
+   the trailing-separator `raw` spelling (U6); decide `DateTimeFormat::parse`'s
+   return shape (D7); make `DatePoint::new` take `Precision` (D6/G5).
+   *(D2, D6, D7, U6, X3-G3)*
+4. **Decided 2026-10-05 (option (a)):** 05 wires multi-part durations through
+   `apply`/`parts` — the production consumer materialises in 05; the `dead_code`
+   sites are not exempt (09 verifies they're wired and deletes only genuinely
+   unreached surface). *(X7, closed)*
+5. **Decided 2026-10-05 (option (a)):** keep `From`; spec D14 carries the
+   declared UTC-frame exception; 08 records the register entry (number assigned
+   at write) and rewrites the rustdoc to spec rationale. *(X4, closed)*
+6. **Give unit spellings an executable owner:** `UNIT_MAP`→`UNIT_HINT` derived
+   test + case-list generation. *(U2)*
+7. **Compression candidates (can pair with 05/09):** D3 delegate calendar arms
+   to `shift_wall`; D4 unify f64→TimeDelta on one owner with source-preserving
+   error map (also fixes the `NonFiniteSeconds` mislabel); D5 fold extraction
+   (dismiss if exhaustive matches lose legibility); U3 narrow `DurationSeconds`
+   field to private; U5 one crate-level `normalize_zero`. *(D3, D4, D5, U3, U5)*
+8. **Land 08's owed items:** config const removal, null-ordering ADR, divergence
+   register incl. X4, comma-precedence entry (U1), signed-zero doctrine.
+   *(U1, U5, X4, X-C)*
+9. **Decide `is_calendar`'s fate** (09 deletion test vs 03 handoff point
+   opposite ways). *(X-G)*
+10. **Attach to 06's gate-layering:** `field.rs:531`'s fall-through-on-Err is
+    safe but unowned (performance knowledge). *(§11.5 last row)*
 
 #### C. Ordering rationale
 
-D1 is the deepest structural asymmetry and cheapest dividend (a `pub(crate)` disappears, 5→1 policy statements). D2/U-04-pins outrank raw depth because they prevent in-flight tickets landing wrong — the highest-leverage intervention available to a review. X1 blocks an entire ticket. D3/D4 are pure compression with measured twins. D5 is the highest-volume duplication but the most legally fragile (dismiss on legibility, don't force).
+D1 is the deepest structural asymmetry and cheapest dividend (a `pub(crate)`
+disappears, 5→1 policy statements). D2/U-04-pins outrank raw depth because they
+prevent in-flight tickets landing wrong — the highest-leverage intervention
+available to a review. X1 blocks an entire ticket. D3/D4 are pure compression
+with measured twins. D5 is the highest-volume duplication but the most legally
+fragile (dismiss on legibility, don't force).
 
 ---
 
-*Consolidated 2026-10-05 from three component reports; all claims verified against HEAD `5b7dc748` or explicitly marked cited/predicted. Read-only: no source files were modified.*
+*Consolidated 2026-10-05 from three component reports; all claims verified
+against HEAD `5b7dc748` or explicitly marked cited/predicted. Read-only: no
+source files were modified.*
 
 ## 12. Component reports (2026-10-05 pass — integrated verbatim)
 
-The three component reviews behind §11, retained in full as evidence records. Section numbers and finding IDs are the originals, so §11's citations ("date §3", "duration §5", "audit G2", "Q1a", "G3") resolve here. **Omitted from each report:** gauge dispositions, coverage gaps, and top-5 shortlists — §11.8, §11.9, and §11.10 consolidate them. **Kept in full:** method/contract, seed verification, caller/gate censuses, the expanded finding arguments, rejected-candidate probes, negative findings, correction registers, and the corpus stale-claim audit.
+The three component reviews behind §11, retained in full as evidence records.
+Section numbers and finding IDs are the originals, so §11's citations ("date
+§3", "duration §5", "audit G2", "Q1a", "G3") resolve here.
+**Omitted from each report:** gauge dispositions, coverage gaps, and top-5
+shortlists — §11.8, §11.9, and §11.10 consolidate them. **Kept in full:**
+method/contract, seed verification, caller/gate censuses, the expanded finding
+arguments, rejected-candidate probes, negative findings, correction registers,
+and the corpus stale-claim audit.
 
 ### 12.1 Component report: `src/date.rs`
 
-**Reviewer posture:** Rust design reviewer. Research only — no edits, no fixes, no implementation. Every candidate below is an argument, not a patch.
-**HEAD:** `5b7dc748` · chrono pinned `0.4.45` · `.codegraph` present (CodeGraph v1.6.0, CLI + MCP).
+**Reviewer posture:** Rust design reviewer. Research only — no edits, no fixes,
+no implementation. Every candidate below is an argument, not a patch. **HEAD:**
+`5b7dc748` · chrono pinned `0.4.45` · `.codegraph` present (CodeGraph v1.6.0,
+CLI + MCP).
 
 ---
 
@@ -696,17 +1266,29 @@ The three component reviews behind §11, retained in full as evidence records. S
 
 ##### 0.1 Method docs used (read first)
 
-- `.claude/skills/codebase-design/SKILL.md` — vocabulary: Module / Interface / Seam / Depth / Leverage / Locality; the "two adapters = real seam" test; the depth-propagation test for whether a grouping earns a module.
-- `.agents/skills/rust-design/DISCOVERY.md` — seed questions (deep modules, misplaced fns/methods, type boundaries, seam anatomy, variant vs type).
-- `.agents/skills/rust-design/DEEPENING.md` — the two probes: **expansion** ("should a seam exist / where should this live?") and **compression** ("can two things become one?"), plus move-direction vocabulary.
+- `.claude/skills/codebase-design/SKILL.md` — vocabulary: Module / Interface /
+  Seam / Depth / Leverage / Locality; the "two adapters = real seam" test; the
+  depth-propagation test for whether a grouping earns a module.
+- `.agents/skills/rust-design/DISCOVERY.md` — seed questions (deep modules,
+  misplaced fns/methods, type boundaries, seam anatomy, variant vs type).
+- `.agents/skills/rust-design/DEEPENING.md` — the two probes: **expansion**
+  ("should a seam exist / where should this live?") and **compression** ("can
+  two things become one?"), plus move-direction vocabulary.
 
 ##### 0.2 Evidence contract (as applied)
 
-1. Every finding carries `file:line` + caller evidence (who calls it and how often, verified by grep/CodeGraph, not asserted).
-2. Every finding names which probe it came from (**expansion** / **compression**) and a **direction** (relocate / collapse / narrow / construct-behind-seam).
-3. **OBSERVED** = verified in source this session. **PREDICTED** = follows from the change; not measured unless a gauge says so.
-4. Corpus status is stated per candidate: `new` / `adjudicated` / `superseded-by-*` / `conflicts-with-*` / `unowned-by-any-ticket`.
-5. Negative findings (correctly-shaped items) are recorded with the same rigor as positives — a review that only finds problems is not adversarial, it is biased.
+1. Every finding carries `file:line` + caller evidence (who calls it and how
+   often, verified by grep/CodeGraph, not asserted).
+2. Every finding names which probe it came from (**expansion** /
+   **compression**) and a **direction** (relocate / collapse / narrow /
+   construct-behind-seam).
+3. **OBSERVED** = verified in source this session. **PREDICTED** = follows from
+   the change; not measured unless a gauge says so.
+4. Corpus status is stated per candidate: `new` / `adjudicated` /
+   `superseded-by-*` / `conflicts-with-*` / `unowned-by-any-ticket`.
+5. Negative findings (correctly-shaped items) are recorded with the same rigor
+   as positives — a review that only finds problems is not adversarial, it is
+   biased.
 
 ##### 0.3 Scope
 
@@ -726,7 +1308,9 @@ The three component reviews behind §11, retained in full as evidence records. S
 ##### 0.4 Corpus consulted
 
 - `.scratch/temporal-core/review.md`, `spec.md`
-- Issues: `03-duration-semantics-owner.md` (RESOLVED), `04-recognize-with-precision.md` (READY), `05-query-temporal-functions.md` (in flight), `09-dead-surface-cleanup.md` (checklist audited below).
+- Issues: `03-duration-semantics-owner.md` (RESOLVED),
+  `04-recognize-with-precision.md` (READY), `05-query-temporal-functions.md` (in
+  flight), `09-dead-surface-cleanup.md` (checklist audited below).
 
 **Settled decisions this review must not re-propose:**
 
@@ -744,7 +1328,9 @@ The three component reviews behind §11, retained in full as evidence records. S
 
 #### 1. Seed verification
 
-The seed inventory (questions carried into this review from the corpus and the previous session) was re-verified line-by-line this session. Tables below record what was **confirmed**, what was **corrected**, and what was **newly measured**.
+The seed inventory (questions carried into this review from the corpus and the
+previous session) was re-verified line-by-line this session. Tables below record
+what was **confirmed**, what was **corrected**, and what was **newly measured**.
 
 ##### 1.1 Seed inventory — line numbers (all confirmed)
 
@@ -822,7 +1408,9 @@ The seed inventory (questions carried into this review from the corpus and the p
 | `shift_wall` (`date.rs:1143`) | 3 references in `engine/date.rs`, `date.rs` (rg resolves to 2 call sites: engine:482, date.rs:176) |
 | `has_four_digit_year` (`date.rs:115`) | 4 callers |
 
-*Correction:* CodeGraph's reference count for `shift_wall` (3) includes the engine import line; the rg-verified **call-site** count is 2 (one external). Reporting uses rg numbers.
+*Correction:* CodeGraph's reference count for `shift_wall` (3) includes the
+engine import line; the rg-verified **call-site** count is 2 (one external).
+Reporting uses rg numbers.
 
 ##### 1.5 Corrections to seed assumptions
 
@@ -843,18 +1431,26 @@ The seed inventory (questions carried into this review from the corpus and the p
 
 #### 2. Ranked findings
 
-Ranking basis: (knowledge duplication × evidence confidence × corpus independence). C2 outranks its raw "depth" because it catches an in-flight ticket before it lands wrong.
+Ranking basis: (knowledge duplication × evidence confidence × corpus
+independence). C2 outranks its raw "depth" because it catches an in-flight
+ticket before it lands wrong.
 
 ---
 
 ##### C1 — The frame dispatch for *shifting* lives in the engine; the frame dispatch for *measuring* lives in `DatePoint`
 
-**Kind:** misplaced fn / decomposition · **Probe:** expansion · **Direction:** relocate `date_shift_unit`'s match → `DatePoint::shift(n, unit) -> Result<NaiveDateTime, DateError>`
+**Kind:** misplaced fn / decomposition · **Probe:** expansion · **Direction:**
+relocate `date_shift_unit`'s match →
+`DatePoint::shift(n, unit) -> Result<NaiveDateTime, DateError>`
 
 **OBSERVED**
 
-- `src/date.rs:965` — `DatePoint::diff` owns measurement: one typed value in, one answer out. Sole caller `engine/date.rs:640` (`from.point.diff(to.point, unit)`) only translates the error and the `DateDiff` enum (`Whole(n)`/`Exact(f)` → `Value`, engine:642-645).
-- `src/template/engine/date.rs:469-491` — shift has no such owner. The engine matches on `DatePrecision` itself:
+- `src/date.rs:965` — `DatePoint::diff` owns measurement: one typed value in,
+  one answer out. Sole caller `engine/date.rs:640`
+  (`from.point.diff(to.point, unit)`) only translates the error and the
+  `DateDiff` enum (`Whole(n)`/`Exact(f)` → `Value`, engine:642-645).
+- `src/template/engine/date.rs:469-491` — shift has no such owner. The engine
+  matches on `DatePrecision` itself:
 
   ```rust
   let wall = match precision {
@@ -868,45 +1464,77 @@ Ranking basis: (knowledge duplication × evidence confidence × corpus independe
   format_precise(wall, precision)                                                                   // :490
   ```
 
-- The calendar-vs-instant policy this match depends on is stated in **five** places:
+- The calendar-vs-instant policy this match depends on is stated in **five**
+  places:
   1. `engine/date.rs:455-466` — `date_shift_unit`'s rustdoc.
-  2. `engine/date.rs:475-479` — an inline comment 10 lines below, restating the same sentence.
-  3. `engine/date.rs:411-414` — `date_add`'s rustdoc (cross-links to `date_shift_unit`, lighter).
+  2. `engine/date.rs:475-479` — an inline comment 10 lines below, restating the
+     same sentence.
+  3. `engine/date.rs:411-414` — `date_add`'s rustdoc (cross-links to
+     `date_shift_unit`, lighter).
   4. `src/date.rs:1145-1148` — `shift_wall`'s rustdoc.
-  5. `src/date.rs:474-481` — `DateTimeValue::shift`'s rustdoc (the same doctrine from the other side).
-- `src/date.rs:1143` — `shift_wall` is `pub(crate)` **solely** for engine:482 (the only external call site; `date.rs:176` is same-module).
-- CodeGraph: `DatePoint` has exactly 1 caller (the engine); `date_shift_unit` has 8 (the shortcut filters).
-- Behavior preservation: the `DateTime` arm already **discards the shifted instant** — it returns `local_wall()` (engine:488) and formats the wall (engine:490). A `DatePoint::shift` returning the shifted wall is observationally identical for every current caller.
+  5. `src/date.rs:474-481` — `DateTimeValue::shift`'s rustdoc (the same doctrine
+     from the other side).
+- `src/date.rs:1143` — `shift_wall` is `pub(crate)` **solely** for engine:482
+  (the only external call site; `date.rs:176` is same-module).
+- CodeGraph: `DatePoint` has exactly 1 caller (the engine); `date_shift_unit`
+  has 8 (the shortcut filters).
+- Behavior preservation: the `DateTime` arm already
+  **discards the shifted instant** — it returns `local_wall()` (engine:488) and
+  formats the wall (engine:490). A `DatePoint::shift` returning the shifted wall
+  is observationally identical for every current caller.
 
 **Analysis (knowledge moved behind the seam):**
 
-"Which frame does a shift operate in?" is split across the seam: `diff`'s frame knowledge sits behind the interface (owner: `DatePoint`), `shift`'s sits in front (owner: engine). After relocation:
+"Which frame does a shift operate in?" is split across the seam: `diff`'s frame
+knowledge sits behind the interface (owner: `DatePoint`), `shift`'s sits in
+front (owner: engine). After relocation:
 
-- `date_shift_unit` shrinks from 23 lines + a 2-line precision prelude to "parse → `point.shift(n, unit)` → `format_precise`" (gauge: C1-G1, §6).
-- The `shift_wall` import (engine:47) drops; `shift_wall` narrows `pub(crate)` → private.
-- The engine stops reconstructing `DateTimeValue` from an instant it already held (the C6-R10 identity round-trip disappears with it).
+- `date_shift_unit` shrinks from 23 lines + a 2-line precision prelude to "parse
+  → `point.shift(n, unit)` → `format_precise`" (gauge: C1-G1, §6).
+- The `shift_wall` import (engine:47) drops; `shift_wall` narrows `pub(crate)` →
+  private.
+- The engine stops reconstructing `DateTimeValue` from an instant it already
+  held (the C6-R10 identity round-trip disappears with it).
 - Five doc restatements collapse to one owner + cross-links.
-- Ticket 05's "no reimplementation in the query layer" AC gets a named home to call instead of re-deriving.
+- Ticket 05's "no reimplementation in the query layer" AC gets a named home to
+  call instead of re-deriving.
 
 **Trade-offs / counter-arguments:**
 
-- Returns `NaiveDateTime`, not `DatePoint` — a `DatePoint`-returning version would re-derive an instant for date-only inputs, adding a resolver call (and a `LocalZoneLookup` failure mode) to a path that today touches no zone (`date.rs:1146` promises exactly that). The asymmetry with `diff → DateDiff` is real but each return type is what its consumer consumes.
-- The match is "only 10 lines". The finding is not the line count — it's that (a) the policy has 5 restatements, (b) `pub(crate)` visibility exists because of it, and (c) 04 is about to *extend* this match in place.
-- Preserves the 03 exhaustive-match gate: classification by unit still happens inside the owner (`shift_wall` / `DateTimeValue::shift`), unchanged.
+- Returns `NaiveDateTime`, not `DatePoint` — a `DatePoint`-returning version
+  would re-derive an instant for date-only inputs, adding a resolver call (and a
+  `LocalZoneLookup` failure mode) to a path that today touches no zone
+  (`date.rs:1146` promises exactly that). The asymmetry with `diff → DateDiff`
+  is real but each return type is what its consumer consumes.
+- The match is "only 10 lines". The finding is not the line count — it's that
+  (a) the policy has 5 restatements, (b) `pub(crate)` visibility exists because
+  of it, and (c) 04 is about to *extend* this match in place.
+- Preserves the 03 exhaustive-match gate: classification by unit still happens
+  inside the owner (`shift_wall` / `DateTimeValue::shift`), unchanged.
 
-**Corpus:** `new`, consistent with ticket 03's constraint ("the owner takes and returns typed values … never strings, never formatting").
+**Corpus:** `new`, consistent with ticket 03's constraint ("the owner takes and
+returns typed values … never strings, never formatting").
 
-> **Coordination flag (04):** ticket 04 plans to *add a `YearMonth` arm to the engine match*. C1 relocates that extension point first. Not a contradiction — an ordering decision: **do C1 before 04, or accept the match as 04's.**
+> **Coordination flag (04):** ticket 04 plans to
+> *add a `YearMonth` arm to the engine match*. C1 relocates that extension point
+> first. Not a contradiction — an ordering decision:
+> **do C1 before 04, or accept the match as 04's.**
 
 ---
 
 ##### C2 — Date-domain prefix recognition has no owner — and ticket 04 makes that worse
 
-**Kind:** decomposition + corpus contradiction · **Probe:** expansion (mirror an entry the sibling domain already has) · **Direction:** date-owned `parse_prefix(s) -> Option<(DateValue, usize)>` in `date.rs`
+**Kind:** decomposition + corpus contradiction · **Probe:** expansion (mirror an
+entry the sibling domain already has) · **Direction:** date-owned
+`parse_prefix(s) -> Option<(DateValue, usize)>` in `date.rs`
 
 **OBSERVED**
 
-Duration already solved this: `DurationValue::parse_prefix(&str) -> Option<(Self, usize)>` (`src/duration.rs:233`, docs at :221 "…and the number of consumed bytes"), exactly one prod caller — `src/note/parser/inline.rs:186` (`let (dv, consumed) = DurationValue::parse_prefix(tail)?;`).
+Duration already solved this:
+`DurationValue::parse_prefix(&str) -> Option<(Self, usize)>`
+(`src/duration.rs:233`, docs at :221 "…and the number of consumed bytes"),
+exactly one prod caller — `src/note/parser/inline.rs:186`
+(`let (dv, consumed) = DurationValue::parse_prefix(tail)?;`).
 
 Date has **four caller-side copies** of "take 10 bytes, then validate":
 
@@ -917,28 +1545,49 @@ Date has **four caller-side copies** of "take 10 bytes, then validate":
 | 3 | `src/note/field.rs:109-116` | `s.get(..10).and_then(\|prefix\| DateValue::parse_iso(prefix).ok())` | **Prefix-lenient**: no `is_atom_boundary`, so `"2026-01-01junk"` parses; locked in by test `note/field.rs:833` ("parses the leading ten bytes"). **Not in 04's inventory** (04 lists this file only as an `Option`-discard site). |
 | 4 | `src/date.rs:127-137` | `is_iso_shape`'s `len >= 10` + an inline 4-digit check at :130 that re-derives `has_four_digit_year` | The validation half of the rule, inside `date.rs`, while the *consumption* half lives at three call sites. |
 
-Guard caller inventory (for the "guards go private" claim): `has_four_digit_year` — `date.rs:89`, `date.rs:402`, `src/field.rs:830`, `src/query/sort.rs:479`; `is_iso_shape` — `lexer.rs:250`, `inline.rs:221`.
+Guard caller inventory (for the "guards go private" claim):
+`has_four_digit_year` — `date.rs:89`, `date.rs:402`, `src/field.rs:830`,
+`src/query/sort.rs:479`; `is_iso_shape` — `lexer.rs:250`, `inline.rs:221`.
 
 **The gap in ticket 04:**
 
-- `spec.md:92` — `classify(s) -> Option<Result<Value, Error>>`: **no consumed length.**
+- `spec.md:92` — `classify(s) -> Option<Result<Value, Error>>`:
+  **no consumed length.**
 - 04 item 13 — the guards become "unreachable outside their module".
-- 04 item 16 — inline must still "accept 7-byte `YYYY-MM` through classify" *and* keep its atom-boundary rule.
+- 04 item 16 — inline must still "accept 7-byte `YYYY-MM` through classify"
+  *and* keep its atom-boundary rule.
 - 04 H3 — `TextShape` becomes a caller of `classify`.
 
-These cannot all hold: if `classify` returns no length, callers must keep their own consumption knowledge (violating item 13), or item 16's boundary check loses its `end` coordinate. The duration domain got "one scanner, two wrappers"; the date domain got no equivalent. Copy #3 shows the ad-hoc sites already outnumber the inventory.
+These cannot all hold: if `classify` returns no length, callers must keep their
+own consumption knowledge (violating item 13), or item 16's boundary check loses
+its `end` coordinate. The duration domain got "one scanner, two wrappers"; the
+date domain got no equivalent. Copy #3 shows the ad-hoc sites already outnumber
+the inventory.
 
-**Analysis:** the knowledge "what is a date token's extent?" is unowned — neither the parser (it hardcodes 10) nor `date.rs` (it only validates shape) nor `field.rs` (it re-slices and re-parses). One owned entry point deletes copies #2's constant-in-the-wrong-place, #4's inline digit check (delegates to `has_four_digit_year`), and gives #1/#3 a `consumed` value instead of a literal.
+**Analysis:** the knowledge "what is a date token's extent?" is unowned —
+neither the parser (it hardcodes 10) nor `date.rs` (it only validates shape) nor
+`field.rs` (it re-slices and re-parses). One owned entry point deletes
+copies #2's constant-in-the-wrong-place, #4's inline digit check (delegates to
+`has_four_digit_year`), and gives #1/#3 a `consumed` value instead of a literal.
 
-**Trade-offs:** `is_atom_boundary` stays at the inline seam — atomness is a parser concern and must *not* move into `date.rs` (that would be the rejected combined-mega-classifier in miniature). `note/field.rs`'s leniency is test-locked; changing it is a behavior decision to be made explicitly, not silently.
+**Trade-offs:** `is_atom_boundary` stays at the inline seam — atomness is a
+parser concern and must *not* move into `date.rs` (that would be the rejected
+combined-mega-classifier in miniature). `note/field.rs`'s leniency is
+test-locked; changing it is a behavior decision to be made explicitly, not
+silently.
 
-**Corpus:** `conflicts-with-04` — underspecified, not refuted. **Recommended amendment:** date `parse_prefix` owned by `date.rs`; `classify` = `parse_prefix`-backed (mirroring duration); guards retire as 04 intends; boundary rule stays in the parser.
+**Corpus:** `conflicts-with-04` — underspecified, not refuted.
+**Recommended amendment:** date `parse_prefix` owned by `date.rs`; `classify` =
+`parse_prefix`-backed (mirroring duration); guards retire as 04 intends;
+boundary rule stays in the parser.
 
 ---
 
 ##### C3 — `DateTimeValue::shift`'s calendar arms are a second copy of `shift_wall`
 
-**Kind:** duplicated policy across impls · **Probe:** compression · **Direction:** calendar arms delegate to `shift_wall`; keep the exhaustive unit match intact
+**Kind:** duplicated policy across impls · **Probe:** compression ·
+**Direction:** calendar arms delegate to `shift_wall`; keep the exhaustive unit
+match intact
 
 **OBSERVED**
 
@@ -955,27 +1604,49 @@ Arithmetic twins (verified line-by-line):
 
 Also verified:
 
-- `DateValue::shift` **already delegates** (`date.rs:170-177`, delegation at `:176`: `shift_wall(wall, n, unit).map(|shifted| Self(shifted.date()))`) — the delegation pattern ticket 03's remediation established for exactly this shape.
-- `shift_calendar_months` / `shift_calendar_days` are `fn`-private with a single caller each (`DateTimeValue::shift`, :493/:495/:498/:500).
-- `shift_wall`'s doc (`date.rs:1145-1148`): "No zone is consulted: callers wanting DST-aware local-wall semantics route through `DateTimeValue::shift`" — describing a relationship implemented as a copy (correction R9).
+- `DateValue::shift` **already delegates** (`date.rs:170-177`, delegation at
+  `:176`: `shift_wall(wall, n, unit).map(|shifted| Self(shifted.date()))`) — the
+  delegation pattern ticket 03's remediation established for exactly this shape.
+- `shift_calendar_months` / `shift_calendar_days` are `fn`-private with a single
+  caller each (`DateTimeValue::shift`, :493/:495/:498/:500).
+- `shift_wall`'s doc (`date.rs:1145-1148`): "No zone is consulted: callers
+  wanting DST-aware local-wall semantics route through `DateTimeValue::shift`" —
+  describing a relationship implemented as a copy (correction R9).
 
-**Analysis:** `DateTimeValue::shift` ≡ *(resolve local wall → apply civil rule → re-resolve)*. Only the first and last steps are zone-specific; the middle is `shift_wall` verbatim. Delegating removes ~28 lines of twin code (`shift_calendar_*`, gauge C3-G1, §6) and makes the documented relationship true.
+**Analysis:** `DateTimeValue::shift` ≡
+*(resolve local wall → apply civil rule → re-resolve)*. Only the first and last
+steps are zone-specific; the middle is `shift_wall` verbatim. Delegating removes
+~28 lines of twin code (`shift_calendar_*`, gauge C3-G1, §6) and makes the
+documented relationship true.
 
 **Why this is NOT the rejected `DurationUnit::class()` predicate (explicit):**
 
-- The **classification** (`match unit { Year|Month => …, Week|Day => …, … }`) stays exactly where it is — at both `shift_wall` (:1147-1188 region) and `DateTimeValue::shift` (:490-526). Those exhaustive group-matches are the five-site adjudication (03/review): `is_calendar`, `shift_wall`, `DateTimeValue::shift`, both `apply_part`s, `DatePoint::diff`.
-- What moves is the arithmetic *inside* the already-grouped arms — the same delegation `DateValue::shift` performs today.
+- The **classification** (`match unit { Year|Month => …, Week|Day => …, … }`)
+  stays exactly where it is — at both `shift_wall` (:1147-1188 region) and
+  `DateTimeValue::shift` (:490-526). Those exhaustive group-matches are the
+  five-site adjudication (03/review): `is_calendar`, `shift_wall`,
+  `DateTimeValue::shift`, both `apply_part`s, `DatePoint::diff`.
+- What moves is the arithmetic *inside* the already-grouped arms — the same
+  delegation `DateValue::shift` performs today.
 - No shared predicate, no `is_calendar()`, no `class()` is introduced or needed.
 
-**Trade-offs:** one extra `local_naive_to_utc` boundary *inside* the call chain — but that boundary exists today (shift → `shift_calendar_*` → resolver); net resolver calls unchanged. `DateTimeValue::shift` becomes a 3-step wrapper: resolve → `shift_wall` → re-resolve, which is precisely what its doc claims it already is.
+**Trade-offs:** one extra `local_naive_to_utc` boundary *inside* the call chain
+— but that boundary exists today (shift → `shift_calendar_*` → resolver); net
+resolver calls unchanged. `DateTimeValue::shift` becomes a 3-step wrapper:
+resolve → `shift_wall` → re-resolve, which is precisely what its doc claims it
+already is.
 
-**Corpus:** `new`, but it edits a function ticket 03 lists among "intentional repetitions" → flag as `conflicts-with-03-in-wording` for adjudication. The rejected decision is the *predicate*; this is the *delegation* 03 itself established.
+**Corpus:** `new`, but it edits a function ticket 03 lists among "intentional
+repetitions" → flag as `conflicts-with-03-in-wording` for adjudication. The
+rejected decision is the *predicate*; this is the *delegation* 03 itself
+established.
 
 ---
 
 ##### C4 — Two independent `f64 → TimeDelta` algorithms, with different error labels
 
-**Kind:** duplicated policy / mislabeled error · **Probe:** compression · **Direction:** one conversion owner; date maps the error (keeping the source)
+**Kind:** duplicated policy / mislabeled error · **Probe:** compression ·
+**Direction:** one conversion owner; date maps the error (keeping the source)
 
 **OBSERVED**
 
@@ -987,27 +1658,62 @@ Also verified:
 | Error | `DateError::OutOfRange` | `DurationError::NonFiniteSeconds` |
 | Callers | `date.rs:259, 273, 650, 668` (both `apply_part`s) | `date.rs:212` (`DateValue::apply`), `date.rs:603` (`DateTimeValue::apply`), `duration.rs:771` (+ duration tests 1995/2001/2024/2265/2283/2295) |
 
-Verified by grep: these are the **only** two `trunc/fract` f64→duration algorithms in the crate (`src/duration.rs:1052-1053` and the six `date.rs` sites; nothing else).
+Verified by grep: these are the **only** two `trunc/fract` f64→duration
+algorithms in the crate (`src/duration.rs:1052-1053` and the six `date.rs`
+sites; nothing else).
 
 **OBSERVED problems:**
 
-1. Ticket 03's remediation declares "`seconds_delta`: the single whole/sub-second split for `DateValue::apply_part` and `DateTimeValue::apply_part`." The claim is **narrowly true, design-false**: the whole-duration path (`apply`) uses a *different* split owned by `duration.rs`.
-2. Mislabeled error at `duration.rs:1054-1057`: a finite-but-out-of-`TimeDelta`-range `f64` returns `NonFiniteSeconds` (the type doc at :1048 admits the conflation: "non-finite **or outside TimeDelta's representable range**"). The variant name lies for the range case.
-3. Both date call sites then erase the diagnosis: `.map_err(|_| DateError::OutOfRange)` (`date.rs:213`, `date.rs:604`) — against the house source-chain rule that motivated 03's engine remediation (which deliberately preserved `LocalZoneLookup` chains).
+1. Ticket 03's remediation declares "`seconds_delta`: the single
+   whole/sub-second split for `DateValue::apply_part` and
+   `DateTimeValue::apply_part`." The claim is **narrowly true, design-false**:
+   the whole-duration path (`apply`) uses a *different* split owned by
+   `duration.rs`.
+2. Mislabeled error at `duration.rs:1054-1057`: a
+   finite-but-out-of-`TimeDelta`-range `f64` returns `NonFiniteSeconds` (the
+   type doc at :1048 admits the conflation: "non-finite
+   **or outside TimeDelta's representable range**"). The variant name lies for
+   the range case.
+3. Both date call sites then erase the diagnosis:
+   `.map_err(|_| DateError::OutOfRange)` (`date.rs:213`, `date.rs:604`) —
+   against the house source-chain rule that motivated 03's engine remediation
+   (which deliberately preserved `LocalZoneLookup` chains).
 
-**Equivalence check — CORRECTED 2026-10-05 (§13 RPT-F4):** the original claim here was wrong. `TimeDelta::new(-1, 1_000_000_000)` does **not** normalize to `0` — it returns `None` — and `-1e-10` is a *divergence* case, not an equivalence. The two algorithms actually diverge: `0.9999999996` → `TryFrom` `Err(NonFiniteSeconds)` vs `seconds_delta` `+1s`; `-1e-10` → `Err` vs `0` (because `TimeDelta::new(…, 1e9)` → `None` while `TimeDelta::nanoseconds` carries). Not live today (`parts == None` reaches only via `from_seconds`, zero prod callers, plus mixed arithmetic, test-only); both go live together when 05 wires `apply`. Pin both inputs through both entries (seam-1, spec L125).
+**Equivalence check — CORRECTED 2026-10-05 (§13 RPT-F4):** the original claim
+here was wrong. `TimeDelta::new(-1, 1_000_000_000)` does **not** normalize to
+`0` — it returns `None` — and `-1e-10` is a *divergence* case, not an
+equivalence. The two algorithms actually diverge: `0.9999999996` → `TryFrom`
+`Err(NonFiniteSeconds)` vs `seconds_delta` `+1s`; `-1e-10` → `Err` vs `0`
+(because `TimeDelta::new(…, 1e9)` → `None` while `TimeDelta::nanoseconds`
+carries). Not live today (`parts == None` reaches only via `from_seconds`, zero
+prod callers, plus mixed arithmetic, test-only); both go live together when 05
+wires `apply`. Pin both inputs through both entries (seam-1, spec L125).
 
-**Analysis:** one concept ("put f64 seconds on a timeline") has two owners, two normalizations, two error vocabularies, and one documented source-erasure. Consolidation: `apply`'s fixed branch calls the same conversion the parts path uses (`seconds_delta(duration.to_seconds().0)` — `DurationSeconds.0` is `pub(crate)` and readable from `date.rs`), deleting `map_err` entirely *and* improving the source chain.
+**Analysis:** one concept ("put f64 seconds on a timeline") has two owners, two
+normalizations, two error vocabularies, and one documented source-erasure.
+Consolidation: `apply`'s fixed branch calls the same conversion the parts path
+uses (`seconds_delta(duration.to_seconds().0)` — `DurationSeconds.0` is
+`pub(crate)` and readable from `date.rs`), deleting `map_err` entirely *and*
+improving the source chain.
 
-**Trade-offs:** `duration.rs`'s `TryFrom` impl would remain for `TryFrom<DurationValue>` (`duration.rs:771`) — so "one owner" means *one algorithm*, either by having `date.rs` call the duration impl (and map `DurationError → DateError` once, preserving the source) or by having `duration.rs`'s impl call a shared helper. The `NonFiniteSeconds`-for-range mislabel in `duration.rs` is adjacent-scope: flagged here, owned by whoever does C4.
+**Trade-offs:** `duration.rs`'s `TryFrom` impl would remain for
+`TryFrom<DurationValue>` (`duration.rs:771`) — so "one owner" means
+*one algorithm*, either by having `date.rs` call the duration impl (and map
+`DurationError → DateError` once, preserving the source) or by having
+`duration.rs`'s impl call a shared helper. The `NonFiniteSeconds`-for-range
+mislabel in `duration.rs` is adjacent-scope: flagged here, owned by whoever does
+C4.
 
-**Corpus:** `conflicts-with-03` (the single-owner *intent*, not the letter — 03's wording is scoped to `apply_part`). New as a finding.
+**Corpus:** `conflicts-with-03` (the single-owner *intent*, not the letter —
+03's wording is scoped to `apply_part`). New as a finding.
 
 ---
 
 ##### C5 — `apply` / `apply_part` clone pair across the two frame impls
 
-**Kind:** duplicated policy across impls · **Probe:** compression · **Direction:** extract the **part decomposition + fold** — explicitly *not* a frame trait
+**Kind:** duplicated policy across impls · **Probe:** compression ·
+**Direction:** extract the **part decomposition + fold** — explicitly *not* a
+frame trait
 
 **OBSERVED (mirrored structure)**
 
@@ -1025,89 +1731,169 @@ Verified by grep: these are the **only** two `trunc/fract` f64→duration algori
 | `OutOfRange` on overflow | both | both |
 | frame-specific: civil midnight + `.date()` | :256-258, :271-274 | local wall + resolver + instant :654-660 |
 
-Additional intra-impl duplication: the midnight chain `self.0.and_hms_opt(0,0,0).ok_or(DateError::OutOfRange)` appears **four times** in `DateValue` alone (`:175`, `:211`, `:256-258`, `:272-274`) plus a fifth at `engine:226-229`.
+Additional intra-impl duplication: the midnight chain
+`self.0.and_hms_opt(0,0,0).ok_or(DateError::OutOfRange)` appears **four times**
+in `DateValue` alone (`:175`, `:211`, `:256-258`, `:272-274`) plus a fifth at
+`engine:226-229`.
 
-**What genuinely differs:** the frame. Civil `NaiveDate::and_hms(0,0,0)` + `.date()` vs local wall + `local_naive_to_utc` + instant. That difference is real and must stay in the two impls — two adapters per behavior is codebase-design's *real-seam* test, and the corpus rejected the public `Shift` trait (review §5.7).
+**What genuinely differs:** the frame. Civil `NaiveDate::and_hms(0,0,0)` +
+`.date()` vs local wall + `local_naive_to_utc` + instant. That difference is
+real and must stay in the two impls — two adapters per behavior is
+codebase-design's *real-seam* test, and the corpus rejected the public `Shift`
+trait (review §5.7).
 
-**Analysis:** ~40 lines of identical decomposition/fold can live in one free fn generic over `NaiveDateTime` (both frames hold a `NaiveDateTime` at that point), leaving each `apply_part` owning only resolve/unresolve. The extraction is the *same kind* as 03's `seconds_delta` — a narrow helper with today's exact surface, no trait, no `dyn`, no 4-method interface.
+**Analysis:** ~40 lines of identical decomposition/fold can live in one free fn
+generic over `NaiveDateTime` (both frames hold a `NaiveDateTime` at that point),
+leaving each `apply_part` owning only resolve/unresolve. The extraction is the
+*same kind* as 03's `seconds_delta` — a narrow helper with today's exact
+surface, no trait, no `dyn`, no 4-method interface.
 
 **Constraints (self-imposed to stay legal):**
 
-- The exhaustive unit-classification matches stay side-by-side and untouched (03's gate). The extraction must not smuggle a shared `unit` predicate behind it — if it does, it *is* the rejected `is_calendar()`.
-- The public `Shift` trait stays rejected: no trait object, no public seam, no `LocalWall` newtype.
+- The exhaustive unit-classification matches stay side-by-side and untouched
+  (03's gate). The extraction must not smuggle a shared `unit` predicate behind
+  it — if it does, it *is* the rejected `is_calendar()`.
+- The public `Shift` trait stays rejected: no trait object, no public seam, no
+  `LocalWall` newtype.
 
-**Trade-offs:** this is the candidate most at risk of collapsing back into a rejected proposal if the extraction is done greedily. If a fold helper can't be extracted while keeping both classification matches legible and exhaustive, the honest disposition is **adjudicated repetition** (dismiss), not a forced merge.
+**Trade-offs:** this is the candidate most at risk of collapsing back into a
+rejected proposal if the extraction is done greedily. If a fold helper can't be
+extracted while keeping both classification matches legible and exhaustive, the
+honest disposition is **adjudicated repetition** (dismiss), not a forced merge.
 
-**Corpus:** `new`, consciously inside the 03/review boundary; flagged for adjudication.
+**Corpus:** `new`, consciously inside the 03/review boundary; flagged for
+adjudication.
 
 ---
 
 ##### C6 — `DatePoint`'s invariant is built by its only caller, field-by-field
 
-**Kind:** representable-invalid / missing constructor · **Probe:** expansion · **Direction:** own construction from the parse result; fields go read-only
+**Kind:** representable-invalid / missing constructor · **Probe:** expansion ·
+**Direction:** own construction from the parse result; fields go read-only
 
 **OBSERVED**
 
 - `date.rs:924-929` — `pub(crate) wall`, `instant`, `has_time`.
-- `date.rs:937-947` — `DatePoint::new(wall, instant, has_time)` asserts nothing; the caller supplies the third boolean.
-- Engine supplies literals: `DatePoint::new(wall, instant, true)` (`engine:218`), `DatePoint::new(wall, instant, false)` (`engine:232`).
-- Field reads at 7+ sites: engine 214, 246, 348, 379, 395, 482-485, 640, 659, 669.
+- `date.rs:937-947` — `DatePoint::new(wall, instant, has_time)` asserts nothing;
+  the caller supplies the third boolean.
+- Engine supplies literals: `DatePoint::new(wall, instant, true)`
+  (`engine:218`), `DatePoint::new(wall, instant, false)` (`engine:232`).
+- Field reads at 7+ sites: engine 214, 246, 348, 379, 395, 482-485, 640, 659,
+  669.
 - Forced derivations the bool creates:
-  - `ParsedDate::precision()` re-derives `DatePrecision` from `has_time` (`engine:238-244`) — two names for one bit.
-  - The datetime branch recomputes its own wall through an identity round-trip: `let instant = value.into_inner(); let wall = DateTimeValue::from(instant).local_wall()` (`engine:211-216`) ≡ `value.local_wall()` (correction R10).
-- Unenforced invariants: `wall` needn't be `instant`'s local wall; `has_time == true` needn't mean `wall` carries a time-of-day.
+  - `ParsedDate::precision()` re-derives `DatePrecision` from `has_time`
+    (`engine:238-244`) — two names for one bit.
+  - The datetime branch recomputes its own wall through an identity round-trip:
+    `let instant = value.into_inner(); let wall = DateTimeValue::from(instant).local_wall()`
+    (`engine:211-216`) ≡ `value.local_wall()` (correction R10).
+- Unenforced invariants: `wall` needn't be `instant`'s local wall;
+  `has_time == true` needn't mean `wall` carries a time-of-day.
 
-**Analysis:** the triple is a *derived* representation (one parsed input + zone → three projections). Today the engine owns the derivation, which is why it can drift and why `pub(crate)` field reads are the API. Owning construction (e.g. `DatePoint::from_parts(...)` or two constructors `at_wall` / `at_instant` keyed by the recognition result) makes the projection one door, and lets fields become read-only in practice.
+**Analysis:** the triple is a *derived* representation (one parsed input + zone
+→ three projections). Today the engine owns the derivation, which is why it can
+drift and why `pub(crate)` field reads are the API. Owning construction (e.g.
+`DatePoint::from_parts(...)` or two constructors `at_wall` / `at_instant` keyed
+by the recognition result) makes the projection one door, and lets fields become
+read-only in practice.
 
-**Trade-offs:** adding constructors to a `pub(crate)`-field struct is only worth it if the fields actually go private — otherwise it's ceremony. That makes C6 a package deal: constructor **and** field encapsulation, or neither.
+**Trade-offs:** adding constructors to a `pub(crate)`-field struct is only worth
+it if the fields actually go private — otherwise it's ceremony. That makes C6 a
+package deal: constructor **and** field encapsulation, or neither.
 
-**Corpus:** partially `superseded-by-04` — 04 hoists `Precision` and makes `has_time` derive from it. **Residue 04 does not cover:** the wall/instant pairing, the literal-bool construction seam, field privacy. **PREDICTED (post-04):** the engine holds two representations of one input — the recognition result `{value, precision}` *and* the `DatePoint` — unless construction sits behind one door. Flag as a note for 04's design section, not a competing proposal.
+**Corpus:** partially `superseded-by-04` — 04 hoists `Precision` and makes
+`has_time` derive from it. **Residue 04 does not cover:** the wall/instant
+pairing, the literal-bool construction seam, field privacy.
+**PREDICTED (post-04):** the engine holds two representations of one input — the
+recognition result `{value, precision}` *and* the `DatePoint` — unless
+construction sits behind one door. Flag as a note for 04's design section, not a
+competing proposal.
 
 ---
 
 ##### C7 — `DateTimeFormat::parse` returns a value typed as an instant it didn't parse
 
-**Kind:** representable-invalid / type-lies · **Probe:** expansion · **Direction:** return a discriminated parse output (wall-or-instant), or branch on `zone()` before parsing
+**Kind:** representable-invalid / type-lies · **Probe:** expansion ·
+**Direction:** return a discriminated parse output (wall-or-instant), or branch
+on `zone()` before parsing
 
 **OBSERVED**
 
-- `date.rs:905-916` — for naive (no-offset) patterns, the chrono `NaiveDateTime` is forced through `and_utc()` into a `DateTime<Utc>` — an instant the source never declared.
+- `date.rs:905-916` — for naive (no-offset) patterns, the chrono `NaiveDateTime`
+  is forced through `and_utc()` into a `DateTime<Utc>` — an instant the source
+  never declared.
 - `date.rs:421-427` (`DateTimeValue::parse_iso`) must undo the label:
 
   ```rust
   if !matches!(matched, DateTimeFormat::Rfc3339) { … parsed.naive_utc() … }
   ```
 
-  with a comment admitting the round-trip exists only to recover the wall from the mis-typed value. `and_utc().naive_utc()` is an **identity** — correctness today rests on an inversion, not a conversion.
-- Doc at `date.rs:897-899` describes the contract without naming the placeholder.
-- `matched` tracking (`date.rs:407-416`) is correct on inspection (assigned before each attempt; breaks on first success; on total failure `matched` is unused because the `Err` propagates) — the bug is the *return type*, not the loop.
+  with a comment admitting the round-trip exists only to recover the wall from
+  the mis-typed value. `and_utc().naive_utc()` is an **identity** — correctness
+  today rests on an inversion, not a conversion.
+- Doc at `date.rs:897-899` describes the contract without naming the
+  placeholder.
+- `matched` tracking (`date.rs:407-416`) is correct on inspection (assigned
+  before each attempt; breaks on first success; on total failure `matched` is
+  unused because the `Err` propagates) — the bug is the *return type*, not the
+  loop.
 
-**Analysis:** the cascade's real output is two-valued — offset-bearing → instant, naive → wall. Encoding "always instant" pushes a recovery step onto every non-`Rfc3339` success path and makes the correct branch depend on an identity law. The clean shape is the same as C2's: return what was recognized.
+**Analysis:** the cascade's real output is two-valued — offset-bearing →
+instant, naive → wall. Encoding "always instant" pushes a recovery step onto
+every non-`Rfc3339` success path and makes the correct branch depend on an
+identity law. The clean shape is the same as C2's: return what was recognized.
 
-**Trade-offs:** small blast radius (one consumer, `DateTimeValue::parse_iso`), private representation choice, no public API movement. But it is a *correctness hinge*: any future edit to the placeholder path (e.g. a real offset) silently changes semantics.
+**Trade-offs:** small blast radius (one consumer, `DateTimeValue::parse_iso`),
+private representation choice, no public API movement. But it is a
+*correctness hinge*: any future edit to the placeholder path (e.g. a real
+offset) silently changes semantics.
 
-**Corpus:** `new` — repo-wide grep for "placeholder" hits only D12's wall-clock round-trip text; no ticket mentions it. **Coordination flag:** 04's `parse_any` inherits the question — its spec says what `classify` *accepts* but not what the datetime cascade *returns* for naive vs offset inputs. Settle inside 04 rather than after it.
+**Corpus:** `new` — repo-wide grep for "placeholder" hits only D12's wall-clock
+round-trip text; no ticket mentions it. **Coordination flag:** 04's `parse_any`
+inherits the question — its spec says what `classify` *accepts* but not what the
+datetime cascade *returns* for naive vs offset inputs. Settle inside 04 rather
+than after it.
 
 ---
 
 ##### C8 — `DateError` carries recognition-only variants into arithmetic seams; `DatePoint::diff` returns an unreachable error
 
-**Kind:** interface narrowing · **Probe:** expansion (or narrow) · **Direction:** two options, choose deliberately
+**Kind:** interface narrowing · **Probe:** expansion (or narrow) ·
+**Direction:** two options, choose deliberately
 
 **OBSERVED**
 
-- `date.rs:1309-1317` — `DateError::InvalidPattern` has **zero producers** (repo grep: declaration at :1314, match at `engine/date.rs:747`, nothing else). Corpus references it only as "we keep `InvalidPattern`" (review:89/110); no ticket owns it.
-- Engine `date_error` (`engine:730-751`) maps `Unparseable | InvalidYearDigits | InvalidPattern` → `"date arithmetic overflowed"`, with a doc line admitting they "cannot occur here" — a translation function that mostly translates *impossible* into *misleading*.
-- `DatePoint::diff` (`date.rs:960-964`): "`OutOfRange` … defensive only — no input produces it"; `engine:640` still pays `map_err(date_error)`.
+- `date.rs:1309-1317` — `DateError::InvalidPattern` has **zero producers** (repo
+  grep: declaration at :1314, match at `engine/date.rs:747`, nothing else).
+  Corpus references it only as "we keep `InvalidPattern`" (review:89/110); no
+  ticket owns it.
+- Engine `date_error` (`engine:730-751`) maps
+  `Unparseable | InvalidYearDigits | InvalidPattern` →
+  `"date arithmetic overflowed"`, with a doc line admitting they "cannot occur
+  here" — a translation function that mostly translates *impossible* into
+  *misleading*.
+- `DatePoint::diff` (`date.rs:960-964`): "`OutOfRange` … defensive only — no
+  input produces it"; `engine:640` still pays `map_err(date_error)`.
 
-**Analysis:** three *recognition* outcomes (`Unparseable`, `InvalidYearDigits`, `InvalidPattern`) ride the same enum as four *arithmetic/zone* outcomes (`OutOfRange`, `LocalZoneLookup`, …), and every arithmetic seam re-filters them. Two coherent designs:
+**Analysis:** three *recognition* outcomes (`Unparseable`, `InvalidYearDigits`,
+`InvalidPattern`) ride the same enum as four *arithmetic/zone* outcomes
+(`OutOfRange`, `LocalZoneLookup`, …), and every arithmetic seam re-filters them.
+Two coherent designs:
 
-- **(a)** Split recognition vs arithmetic errors inside `date.rs` (`DateParseError` / `DateError`) — this is **not** the rejected Date+Duration merge; it is a within-domain split, and it makes `date_error` lossless.
-- **(b)** Keep one enum and narrow the *seams* — e.g. `diff` returning a non-`Result` (or a `#[derive]`-narrow error) once its only error is provably unreachable.
+- **(a)** Split recognition vs arithmetic errors inside `date.rs`
+  (`DateParseError` / `DateError`) — this is **not** the rejected Date+Duration
+  merge; it is a within-domain split, and it makes `date_error` lossless.
+- **(b)** Keep one enum and narrow the *seams* — e.g. `diff` returning a
+  non-`Result` (or a `#[derive]`-narrow error) once its only error is provably
+  unreachable.
 
-**Trade-off:** (a) costs two public error types and two conversion points in minijinja's error path — exactly the simplification ticket 03 deliberately made. That simplification is why this ranks below C1–C5: it is a judgment call, not a defect.
+**Trade-off:** (a) costs two public error types and two conversion points in
+minijinja's error path — exactly the simplification ticket 03 deliberately made.
+That simplification is why this ranks below C1–C5: it is a judgment call, not a
+defect.
 
-**Corpus:** `new` (neither 03 nor 04 adjudicates a within-domain split). `InvalidPattern`'s liveness is `unowned-by-any-ticket` — check ticket 06 before proposing removal (coverage gap #4).
+**Corpus:** `new` (neither 03 nor 04 adjudicates a within-domain split).
+`InvalidPattern`'s liveness is `unowned-by-any-ticket` — check ticket 06 before
+proposing removal (coverage gap #4).
 
 ---
 
@@ -1122,7 +1908,12 @@ Additional intra-impl duplication: the midnight chain `self.0.and_hms_opt(0,0,0)
 | **e** | `parse_year_month` double-parses to fabricate a chrono error | `date.rs:824-848` — second pass exists only so `DateError::Unparseable.source` can hold a chrono error | compression → construct the source once | `new`; driven by the `err-source-chain` house rule — fix carefully or dismiss |
 | **f** | `DateError::InvalidPattern` dead variant | `date.rs:1314`; match `engine:747`; zero producers | compression → remove (or promote to a real parse outcome) | `unowned-by-any-ticket` (see C8) |
 
-Not carried as findings (below threshold, recorded for the audit trail): `checked_neg` repetition in `date_sub`/`date_sub_days`/`date_sub_months`/`date_sub_years` (R7); the shared `(earlier, later, sign)` ordering micro-pattern between `signed_years_since` (:1218) and `signed_months_since` (:1249) — same shape, two call sites, no policy divergence.
+Not carried as findings (below threshold, recorded for the audit trail):
+`checked_neg` repetition in
+`date_sub`/`date_sub_days`/`date_sub_months`/`date_sub_years` (R7); the shared
+`(earlier, later, sign)` ordering micro-pattern between `signed_years_since`
+(:1218) and `signed_months_since` (:1249) — same shape, two call sites, no
+policy divergence.
 
 ---
 
@@ -1157,20 +1948,44 @@ Not carried as findings (below threshold, recorded for the audit trail): `checke
 
 #### 4. Negative findings — checked and correctly shaped
 
-Recording these is part of the contract: an item that *looks* like a candidate and survives scrutiny is evidence the review actually ran the probes.
+Recording these is part of the contract: an item that *looks* like a candidate
+and survives scrutiny is evidence the review actually ran the probes.
 
-1. **`local_naive_to_utc` (`date.rs:1051`) / `resolve_gap_offset` (`:1097`) as free fns** — zone policy with no natural `self`; grouping them fails the depth-propagation test (internal callers only, interface unchanged). Correctly free.
-2. **`seconds_delta` (`:1119`), `shift_months` (`:1199`), `signed_*_since` (`:1218`/`:1249`)** — ticket 03's declared owners: private, single-caller chains, one job each. Correct as-is (with the C4 caveat about the *other* split).
-3. **`DurationUnit` exhaustive classification at 5 sites** — adjudicated intentional; C3 does not touch classification.
-4. **Dead test-only `DateValue::{shift, apply}` / `DateTimeValue::apply`** — declared production surface for ticket 05. Their `dead_code` attrs are a feature (they document the intention), not a finding.
-5. **`ParsedDate` / `DatePrecision` / `format_precise`** — look like single-purpose wrappers in isolation; 04 deletes them.
-6. **Engine `date_error` translation + `DateDiff → Value` mapping** — the correct place for minijinja concerns; owned by 03's remediation.
-7. **Clock doctrine** — verified: no `Local::now`; compares through `Utc::now()` (`engine:95-97`); `date.now()/today()/tomorrow()/yesterday()/from_timestamp()` read the local clock for display only. Landed.
-8. **Parse funnel** — verified clean: every production `NaiveDate::from_ymd_opt` outside `date.rs` is a test/doc example. The module-doc claim (`engine:19-21`) holds.
+1. **`local_naive_to_utc` (`date.rs:1051`) / `resolve_gap_offset` (`:1097`) as
+   free fns** — zone policy with no natural `self`; grouping them fails the
+   depth-propagation test (internal callers only, interface unchanged).
+   Correctly free.
+2. **`seconds_delta` (`:1119`), `shift_months` (`:1199`), `signed_*_since`
+   (`:1218`/`:1249`)** — ticket 03's declared owners: private, single-caller
+   chains, one job each. Correct as-is (with the C4 caveat about the *other*
+   split).
+3. **`DurationUnit` exhaustive classification at 5 sites** — adjudicated
+   intentional; C3 does not touch classification.
+4. **Dead test-only `DateValue::{shift, apply}` / `DateTimeValue::apply`** —
+   declared production surface for ticket 05. Their `dead_code` attrs are a
+   feature (they document the intention), not a finding.
+5. **`ParsedDate` / `DatePrecision` / `format_precise`** — look like
+   single-purpose wrappers in isolation; 04 deletes them.
+6. **Engine `date_error` translation + `DateDiff → Value` mapping** — the
+   correct place for minijinja concerns; owned by 03's remediation.
+7. **Clock doctrine** — verified: no `Local::now`; compares through `Utc::now()`
+   (`engine:95-97`);
+   `date.now()/today()/tomorrow()/yesterday()/from_timestamp()` read the local
+   clock for display only. Landed.
+8. **Parse funnel** — verified clean: every production `NaiveDate::from_ymd_opt`
+   outside `date.rs` is a test/doc example. The module-doc claim
+   (`engine:19-21`) holds.
 9. **`From<NaiveDate> for DateValue` (`:297`)** — adjudicated surface-area (D7).
-10. **`is_iso_shape` / `has_four_digit_year` reaching production from 4+2 sites** — all reachability is production; there is no test-only reachability that would let 04's privacy change hide a break.
-11. **`DateTimeFormat::parse`'s `matched` loop** — verified correct (assign-before-attempt, break-on-success, `matched` unused on failure); C7 targets the return type only.
-12. **`DateDiff`/`DatePoint`/`DateError` export shape** — `mod date` is private (`lib.rs:63`) with selective `pub(crate)`/`pub` re-exports (`lib.rs:92-93`); `FromStr::Err = DateError` is public while `parse_iso` is `pub(crate)` — coherent with N17.
+10. **`is_iso_shape` / `has_four_digit_year` reaching production from 4+2
+    sites** — all reachability is production; there is no test-only reachability
+    that would let 04's privacy change hide a break.
+11. **`DateTimeFormat::parse`'s `matched` loop** — verified correct
+    (assign-before-attempt, break-on-success, `matched` unused on failure); C7
+    targets the return type only.
+12. **`DateDiff`/`DatePoint`/`DateError` export shape** — `mod date` is private
+    (`lib.rs:63`) with selective `pub(crate)`/`pub` re-exports (`lib.rs:92-93`);
+    `FromStr::Err = DateError` is public while `parse_iso` is `pub(crate)` —
+    coherent with N17.
 
 ---
 
@@ -1197,11 +2012,13 @@ Flattened from §1.5 for grep-ability:
 
 ### 12.2 Component report: `src/duration.rs` and its callers
 
-**Review type:** adversarial design review (research only — no code changes, no fixers executed).
-**Primary scope:** `src/duration.rs` (~1230 prod lines + ~1068 test lines); production callers as needed.
-**Session date:** 2026-10-05.
-**Method authority:** `.claude/skills/codebase-design/SKILL.md`, `.agents/skills/rust-design/DISCOVERY.md`, `.agents/skills/rust-design/DEEPENING.md`.
-**Corpus authority:** `.scratch/temporal-core/review.md`, `spec.md`, `issues/01,03,04,05,09`.
+**Review type:** adversarial design review (research only — no code changes, no
+fixers executed). **Primary scope:** `src/duration.rs` (~1230 prod lines + ~1068
+test lines); production callers as needed. **Session date:** 2026-10-05.
+**Method authority:** `.claude/skills/codebase-design/SKILL.md`,
+`.agents/skills/rust-design/DISCOVERY.md`,
+`.agents/skills/rust-design/DEEPENING.md`. **Corpus authority:**
+`.scratch/temporal-core/review.md`, `spec.md`, `issues/01,03,04,05,09`.
 
 ---
 
@@ -1209,16 +2026,28 @@ Flattened from §1.5 for grep-ability:
 
 ##### 0.1 What was read
 
-- `src/duration.rs` in full for production (lines 1–1230) and the test modules that matter for the findings (`mod prefix`, `mod parts`, `mod arithmetic`, `mod regime`, `mod error`, Display/serde tests).
-- All listed caller files: `src/note/parser/inline.rs`, `src/note/parser/lexer.rs`, `src/note/field.rs`, `src/field.rs`, `src/query/sort.rs`, `src/query/grammar/filter.rs`, `src/template/engine/date.rs`, `src/date.rs`, `src/lib.rs`.
-- Corpus: `review.md`, `spec.md`, `issues/03-duration-semantics-owner.md` (full handoff incl. "Deliberate remaining state"), `issues/04-recognize-with-precision.md`, `issues/05-*`, `issues/09-dead-surface-cleanup.md`.
-- Git history probes: `git log -S "fn normalize_zero"` for the signed-zero duplication.
+- `src/duration.rs` in full for production (lines 1–1230) and the test modules
+  that matter for the findings (`mod prefix`, `mod parts`, `mod arithmetic`,
+  `mod regime`, `mod error`, Display/serde tests).
+- All listed caller files: `src/note/parser/inline.rs`,
+  `src/note/parser/lexer.rs`, `src/note/field.rs`, `src/field.rs`,
+  `src/query/sort.rs`, `src/query/grammar/filter.rs`,
+  `src/template/engine/date.rs`, `src/date.rs`, `src/lib.rs`.
+- Corpus: `review.md`, `spec.md`, `issues/03-duration-semantics-owner.md` (full
+  handoff incl. "Deliberate remaining state"),
+  `issues/04-recognize-with-precision.md`, `issues/05-*`,
+  `issues/09-dead-surface-cleanup.md`.
+- Git history probes: `git log -S "fn normalize_zero"` for the signed-zero
+  duplication.
 
 ##### 0.2 Evidence rules applied
 
-- Every finding carries `file:line` (or `rg`-verified absence), caller evidence, and a deletion/expansion probe where one applies.
-- **OBSERVED** = read directly in source this session. **PREDICTED** = traced through source by hand, not executed (no edits were allowed).
-- Each candidate is tagged: `genuinely new` / `conflicts-with-corpus-decision` / `superseded-by-ticket-04`.
+- Every finding carries `file:line` (or `rg`-verified absence), caller evidence,
+  and a deletion/expansion probe where one applies.
+- **OBSERVED** = read directly in source this session. **PREDICTED** = traced
+  through source by hand, not executed (no edits were allowed).
+- Each candidate is tagged: `genuinely new` / `conflicts-with-corpus-decision` /
+  `superseded-by-ticket-04`.
 - Negative findings (probes that failed) are recorded in §5 rather than dropped.
 
 ##### 0.3 Corpus decisions honored (do not re-propose)
@@ -1263,7 +2092,8 @@ Flattened from §1.5 for grep-ability:
 
 ##### 2.1 Complete table — all 16 no-self associated fns in `impl DurationValue` (123–752)
 
-Seed claimed 16 functions without a `self` receiver: 13 "machinery" + 3 entry points. **All 16 exist at the cited lines.**
+Seed claimed 16 functions without a `self` receiver: 13 "machinery" + 3 entry
+points. **All 16 exist at the cited lines.**
 
 | # | Function | Line (verified) | Category | Callers / notes (verified this session) | Verdict |
 | --- | --- | --- | --- | --- | --- |
@@ -1284,7 +2114,11 @@ Seed claimed 16 functions without a `self` receiver: 13 "machinery" + 3 entry po
 | 15 | `canonical_raw` | 380 | synthesis | sole caller 361 (`from_seconds`); greedy sub-year decomposition, fallback `format!("{}s", DurationSeconds(total_secs))` at 417 | ✅ seed correct |
 | 16 | `from_seconds` | 359 | constructor (synthesis) | test-only prod today; **retained by 09:12**; `Add`/`Sub` re-synthesize through it (spec:88) | ✅ seed correct |
 
-**Category roll-up of the 16:** 3 entry points + 1 ctor + 1 synthesis helper = 5 that genuinely belong to `DurationValue`'s public-ish contract; **9 scanner/cursor helpers + 2 parts-witness helpers = 11 that are foreign to the value type's namespace.** That ratio is the LCOM4=2 root cause — but see finding **F4** for why the seed's remedy (`Scanner` struct) is rejected.
+**Category roll-up of the 16:** 3 entry points + 1 ctor + 1 synthesis helper = 5
+that genuinely belong to `DurationValue`'s public-ish contract; **9
+scanner/cursor helpers + 2 parts-witness helpers = 11 that are foreign to the
+value type's namespace.** That ratio is the LCOM4=2 root cause — but see finding
+**F4** for why the seed's remedy (`Scanner` struct) is rejected.
 
 ##### 2.2 Seed claims that failed or needed correction
 
@@ -1324,21 +2158,34 @@ Seed claimed 16 functions without a `self` receiver: 13 "machinery" + 3 entry po
 | `from_seconds` | none today (09:12 retains as synthesis ctor; `Add`/`Sub` re-synthesis via spec:88) | Display/serde tests |
 | `Add`/`Sub`/`Mul` | none today — **ticket 05** is the declared consumer (query `date + duration`) | `mod arithmetic` |
 
-Absence probes: no duration benches exist in `benches/` (03:192); `UNIT_HINT` is re-exported only for `template/engine/date.rs` (`lib.rs:101`).
+Absence probes: no duration benches exist in `benches/` (03:192); `UNIT_HINT` is
+re-exported only for `template/engine/date.rs` (`lib.rs:101`).
 
 ---
 
 #### 4. Findings, ranked
 
 ##### F1 — `','` has two grammar owners; the precedence is an accident, unpinned, unregistered
-`genuinely new` · kind: duplicated policy / policy with no owner (cross-seam) · OBSERVED (collision), PREDICTED (outcomes)
+
+`genuinely new` · kind: duplicated policy / policy with no owner (cross-seam) ·
+OBSERVED (collision), PREDICTED (outcomes)
 
 **Evidence**
-- Duration claims `,` as a part separator: module doc `duration.rs:5`, `parse` docs `duration.rs:141–142` ("separated by whitespace or commas"), lookahead in both loops skips separators (`skip_separators` at 183/263, which admits `,`).
-- Note-parser claims `,` as the list delimiter: `inline.rs:67,82` (list rule), `parse_comma_list_from` at `inline.rs:91`, boundary test `treats_comma_as_atom_boundary` (mod boundary, ~375).
-- YAML assigns the same characters to list splitting *before* coercion: `note/field.rs:656` test `list: [1h, 30m]` → `List([Duration(1h), Duration(30m)])`.
 
-**What actually happens (traced through `parse_atom_at` ordering, not executed):** duration is tried before the list path, and `parse_prefix`'s continuation lookahead swallows `,` as a separator — so the first-atom priority decides everything:
+- Duration claims `,` as a part separator: module doc `duration.rs:5`, `parse`
+  docs `duration.rs:141–142` ("separated by whitespace or commas"), lookahead in
+  both loops skips separators (`skip_separators` at 183/263, which admits `,`).
+- Note-parser claims `,` as the list delimiter: `inline.rs:67,82` (list rule),
+  `parse_comma_list_from` at `inline.rs:91`, boundary test
+  `treats_comma_as_atom_boundary` (mod boundary, ~375).
+- YAML assigns the same characters to list splitting *before* coercion:
+  `note/field.rs:656` test `list: [1h, 30m]` →
+  `List([Duration(1h), Duration(30m)])`.
+
+**What actually happens (traced through `parse_atom_at` ordering, not
+executed):** duration is tried before the list path, and `parse_prefix`'s
+continuation lookahead swallows `,` as a separator — so the first-atom priority
+decides everything:
 
 | Inline input | PREDICTED result | Why |
 | --- | --- | --- |
@@ -1348,103 +2195,220 @@ Absence probes: no duration benches exist in `benches/` (03:192); `UNIT_HINT` is
 | `key:: 1h, x` | **`String("1h, x")`** | lookahead sees `x` cannot start a part → break; then list path sees `x` unparseable → fallback to string |
 | `key:: 1h,` | **`List([Duration(1h)])`** | atom consumed, comma at end → one-element list |
 
-**Analysis:** a duration-shaped first item either *eats* the inline list or *breaks* it into a raw `String`. Inline duration-first lists are effectively unusable, the YAML seam silently disagrees with the inline seam for identical characters, and — unlike `YYYY-MM` (04:16 explicitly records it) — **no divergence-register entry, ticket, or test covers this** (rg for comma/precedence across `.scratch/temporal-core/` finds nothing; spec.md:117 register list has no entry).
+**Analysis:** a duration-shaped first item either *eats* the inline list or
+*breaks* it into a raw `String`. Inline duration-first lists are effectively
+unusable, the YAML seam silently disagrees with the inline seam for identical
+characters, and — unlike `YYYY-MM` (04:16 explicitly records it) —
+**no divergence-register entry, ticket, or test covers this** (rg for
+comma/precedence across `.scratch/temporal-core/` finds nothing; spec.md:117
+register list has no entry).
 
-**Trade-offs / direction:** the fix is not in `duration.rs` alone — it is a note-parser precedence decision (keep duration-wins and pin it, or try list before duration when a `","` follows a *complete* atom with remaining content). Probe cost: 5 asserts in `inline.rs` tests + one register entry.
+**Trade-offs / direction:** the fix is not in `duration.rs` alone — it is a
+note-parser precedence decision (keep duration-wins and pin it, or try list
+before duration when a `","` follows a *complete* atom with remaining content).
+Probe cost: 5 asserts in `inline.rs` tests + one register entry.
 
-**Corpus status:** `genuinely new`; touches but is not superseded by 04 (04 owns the loop and `classify`, not list precedence).
+**Corpus status:** `genuinely new`; touches but is not superseded by 04 (04 owns
+the loop and `classify`, not list precedence).
 
 ---
 
 ##### F2 — `UNIT_HINT`↔`UNIT_MAP` sync is comment-enforced only
+
 `genuinely new` · kind: policy with no owner (no executable check) · OBSERVED
 
 **Evidence**
-- `UNIT_HINT` (`duration.rs:44–46`) with its sync contract stated in prose at `duration.rs:39–43`: "Kept beside `UNIT_MAP` as a reminder to update both when a unit or spelling family is added."
-- Consumed by the user-facing message: `template/engine/date.rs:764` inside `unknown_unit_error` (756–766), whose doc **claims** "the message cannot drift from what `unit_kwarg` actually accepts" (756–758). No test asserts that claim (rg: no test references `UNIT_HINT`).
-- Corpus precedent for this exact failure class: review **N2** — registry drift "hid weeks."
 
-**Analysis:** two representations of "what units are accepted" (table + prose list), one human-reminder sync, one doc comment asserting a guarantee nothing enforces. Unlike the settled S2 fix (ratios — now derived), the *message* copy of the registry is still hand-maintained.
+- `UNIT_HINT` (`duration.rs:44–46`) with its sync contract stated in prose at
+  `duration.rs:39–43`: "Kept beside `UNIT_MAP` as a reminder to update both when
+  a unit or spelling family is added."
+- Consumed by the user-facing message: `template/engine/date.rs:764` inside
+  `unknown_unit_error` (756–766), whose doc **claims** "the message cannot drift
+  from what `unit_kwarg` actually accepts" (756–758). No test asserts that claim
+  (rg: no test references `UNIT_HINT`).
+- Corpus precedent for this exact failure class: review **N2** — registry drift
+  "hid weeks."
 
-**Direction:** make it executable — a test that every hint spelling resolves via `DurationUnit::parse` and every `UNIT_MAP` family appears in the hint. Expansion probe: adding a unit family currently requires reading the comment to notice the second site.
+**Analysis:** two representations of "what units are accepted" (table + prose
+list), one human-reminder sync, one doc comment asserting a guarantee nothing
+enforces. Unlike the settled S2 fix (ratios — now derived), the *message* copy
+of the registry is still hand-maintained.
+
+**Direction:** make it executable — a test that every hint spelling resolves via
+`DurationUnit::parse` and every `UNIT_MAP` family appears in the hint. Expansion
+probe: adding a unit family currently requires reading the comment to notice the
+second site.
 
 **Corpus status:** `genuinely new` (distinct from S2/N18, which concern ratios).
 
 ---
 
 ##### F3 — `DurationSeconds` documents a type invariant its field visibility does not enforce
+
 `genuinely new` · kind: representable-but-invalid state · OBSERVED
 
 **Evidence**
-- Type docs assert: "A signed zero normalizes to positive zero **at construction**, so `\"-0m\"` and `\"0m\"` compare, order, and hash identically" and `normalized`'s doc: "so the type's invariant (see the type docs) holds **everywhere**, not just at parse time" (`duration.rs:1007–1014`, `1020–1021`).
-- The field is `pub(crate)`: `pub(crate) struct DurationSeconds(pub(crate) f64)` (`duration.rs:1015`). Any of duration.rs's ~50 construction sites can write the tuple and bypass both `normalized` (1022) and `TryFrom`'s finiteness check.
-- **Actual violations today: one, and it is benign.** `DurationSeconds(total_secs)` at `duration.rs:417` (the `canonical_raw` fallback when the greedy decomposition writes nothing) — benign because `canonical_raw` returns early on `total_secs == 0.0` (line 383, which is also true for `-0.0`), and upstream construction guarantees finiteness. OBSERVED.
-- **Zero external reach:** `rg "DurationSeconds\("` across `src/` matches only the definition (1015) and site 417. `query/sort.rs` constructs via `DurationSeconds::try_from` (756/758/934).
 
-**Analysis:** the invariant is a *convention inside one file*, while the type docs phrase it as a type-level fact. Narrowing the field to private (`struct DurationSeconds(f64)`) forces every site through `normalized`/`TryFrom`, makes the doc true by construction, and costs zero churn outside duration.rs (site 417 becomes `normalized(total_secs)` or stays an explicit, reviewed exception).
+- Type docs assert: "A signed zero normalizes to positive zero
+  **at construction**, so `\"-0m\"` and `\"0m\"` compare, order, and hash
+  identically" and `normalized`'s doc: "so the type's invariant (see the type
+  docs) holds **everywhere**, not just at parse time" (`duration.rs:1007–1014`,
+  `1020–1021`).
+- The field is `pub(crate)`: `pub(crate) struct DurationSeconds(pub(crate) f64)`
+  (`duration.rs:1015`). Any of duration.rs's ~50 construction sites can write
+  the tuple and bypass both `normalized` (1022) and `TryFrom`'s finiteness
+  check.
+- **Actual violations today: one, and it is benign.**
+  `DurationSeconds(total_secs)` at `duration.rs:417` (the `canonical_raw`
+  fallback when the greedy decomposition writes nothing) — benign because
+  `canonical_raw` returns early on `total_secs == 0.0` (line 383, which is also
+  true for `-0.0`), and upstream construction guarantees finiteness. OBSERVED.
+- **Zero external reach:** `rg "DurationSeconds\("` across `src/` matches only
+  the definition (1015) and site 417. `query/sort.rs` constructs via
+  `DurationSeconds::try_from` (756/758/934).
 
-**Probe:** expansion test — adding a duration source (e.g. serde path) today must *remember* the rule; after narrowing it cannot forget. Deletion test: deleting the change re-opens exactly the bypass the docs claim closed.
+**Analysis:** the invariant is a *convention inside one file*, while the type
+docs phrase it as a type-level fact. Narrowing the field to private
+(`struct DurationSeconds(f64)`) forces every site through
+`normalized`/`TryFrom`, makes the doc true by construction, and costs zero churn
+outside duration.rs (site 417 becomes `normalized(total_secs)` or stays an
+explicit, reviewed exception).
 
-**Corpus status:** `genuinely new`; complements N11/N3′ (signed-zero work) without reopening it — arithmetic paths already route through `normalized` (1123/1132/1141/1151, 728/855).
+**Probe:** expansion test — adding a duration source (e.g. serde path) today
+must *remember* the rule; after narrowing it cannot forget. Deletion test:
+deleting the change re-opens exactly the bypass the docs claim closed.
+
+**Corpus status:** `genuinely new`; complements N11/N3′ (signed-zero work)
+without reopening it — arithmetic paths already route through `normalized`
+(1123/1132/1141/1151, 728/855).
 
 ---
 
 ##### F4 — The namespace is mislabeled, but the seed's `Scanner` struct is the wrong remedy
-`genuinely new` (disposition: **reject the type, keep only an optional micro-move**) · kind: namespace abuse analyzed and downsized · OBSERVED + corpus-adjudicated
 
-**Evidence (from §2.1):** 11 of the 16 no-self fns are not `DurationValue` knowledge — 9 scanner/cursor helpers that are pure `(bytes, pos, input) → span` transforms, 2 parts-witness helpers that operate on `DurationParts`, plus `SUB_YEAR_DECOMPOSITION_UNITS` (130) and `canonical_raw` (380) that belong to the seconds→text synthesis policy. Only `parse`/`parse_prefix`/`can_start`/`from_seconds`/accessors are value-type operations. This is the structural fact behind messrust's LCOM4=2 / complexity 78 (03:171).
+`genuinely new` (disposition:
+**reject the type, keep only an optional micro-move**) · kind: namespace abuse
+analyzed and downsized · OBSERVED + corpus-adjudicated
 
-**Why a `Scanner<'a>` type is rejected (adversarial pass over the seed's own hypothesis):**
-1. The 9 scanner helpers are **stateless** — they take `(bytes, pos)` and return spans; they need no struct.
-2. The only stateful parts are the two loops' locals (`pos`, `parsed_any`, `is_negative`, `raw_parts`, `last_end`) — exactly what ticket 04 collapses into **one** parameterized `Whole | Prefix` loop (04:15).
-3. Post-04, a `Scanner` struct would wrap ~5 locals used by a single function, with no second consumer and no test interface (the interface discipline forbids exposing it). DEEPENING's second-adapter test fails: one consumer = hypothetical structure, not a seam.
-4. The corpus's own disposition is adjacent and must be engaged: 03:171–173 **already rejected the parse-machinery/value type split** ("splitting would fragment the owner without relocating knowledge"). A cursor type relocates *state*, not knowledge — and after 04 there is barely state left to relocate.
+**Evidence (from §2.1):** 11 of the 16 no-self fns are not `DurationValue`
+knowledge — 9 scanner/cursor helpers that are pure `(bytes, pos, input) → span`
+transforms, 2 parts-witness helpers that operate on `DurationParts`, plus
+`SUB_YEAR_DECOMPOSITION_UNITS` (130) and `canonical_raw` (380) that belong to
+the seconds→text synthesis policy. Only
+`parse`/`parse_prefix`/`can_start`/`from_seconds`/accessors are value-type
+operations. This is the structural fact behind messrust's LCOM4=2 / complexity
+78 (03:171).
 
-**What survives:** an optional **namespace partition** only — moving the 9 pure helpers (and possibly `apply_sign`/`fold_parts`) out of `impl DurationValue` to module-private free fns or an inline `mod scan`, so `DurationValue::` lists only value operations. Explicitly labeled **not deepening** per DEEPENING ("moving functions into one file without changing responsibility or seams is not deepening"): navigability only, zero caller change, zero test change. Verdict: do it only for free while 04 rewrites the loops; never standalone, never as a struct.
+**Why a `Scanner<'a>` type is rejected (adversarial pass over the seed's own
+hypothesis):**
 
-**Related residue that folds into 04's merge:** `apply_sign` (314) as a post-pass is removable — the sign is known when the first part is pushed (both loops call it at 209/277 after the loop; a push-with-sign deletes the pass). Marked `superseded-by-ticket-04`.
+1. The 9 scanner helpers are **stateless** — they take `(bytes, pos)` and return
+   spans; they need no struct.
+2. The only stateful parts are the two loops' locals (`pos`, `parsed_any`,
+   `is_negative`, `raw_parts`, `last_end`) — exactly what ticket 04 collapses
+   into **one** parameterized `Whole | Prefix` loop (04:15).
+3. Post-04, a `Scanner` struct would wrap ~5 locals used by a single function,
+   with no second consumer and no test interface (the interface discipline
+   forbids exposing it). DEEPENING's second-adapter test fails: one consumer =
+   hypothetical structure, not a seam.
+4. The corpus's own disposition is adjacent and must be engaged: 03:171–173
+   **already rejected the parse-machinery/value type split** ("splitting would
+   fragment the owner without relocating knowledge"). A cursor type relocates
+   *state*, not knowledge — and after 04 there is barely state left to relocate.
 
-**Corpus status:** `genuinely new` as an analysis; the *type* is rejected partly on corpus grounds (03 no-split), the micro-move is optional.
+**What survives:** an optional **namespace partition** only — moving the 9 pure
+helpers (and possibly `apply_sign`/`fold_parts`) out of `impl DurationValue` to
+module-private free fns or an inline `mod scan`, so `DurationValue::` lists only
+value operations. Explicitly labeled **not deepening** per DEEPENING ("moving
+functions into one file without changing responsibility or seams is not
+deepening"): navigability only, zero caller change, zero test change. Verdict:
+do it only for free while 04 rewrites the loops; never standalone, never as a
+struct.
+
+**Related residue that folds into 04's merge:** `apply_sign` (314) as a
+post-pass is removable — the sign is known when the first part is pushed (both
+loops call it at 209/277 after the loop; a push-with-sign deletes the pass).
+Marked `superseded-by-ticket-04`.
+
+**Corpus status:** `genuinely new` as an analysis; the *type* is rejected partly
+on corpus grounds (03 no-split), the micro-move is optional.
 
 ---
 
 ##### F5 — Signed-zero normalization has three owners; two are identical copies
+
 `genuinely new` · kind: duplicated policy across seams · OBSERVED
 
 **Evidence**
-- `fn normalize_zero` exists twice, byte-identical: `src/note/field.rs:468–474` and `src/query/sort.rs:445` (`if n == 0.0 { 0.0 } else { n }`).
-- `git log -S` shows **both** introduced by `21ae8b1d fix(query): close signed-zero drift and doc/test gaps from review` — the commit that closed drift *duplicated the policy it was closing*. A third consumer sits at `note/field.rs:263` (`NoteFieldValueRef::compare` uses `normalize_zero` for `Number` arms).
-- `DurationSeconds::normalized` (`duration.rs:1022`) is the third implementation — but it is a *construction invariant* for the newtype, a different responsibility from the raw-`f64` comparison idiom.
 
-**Analysis:** the doctrine "total_cmp distinguishes `-0.0`; the domain treats zeros equal" now lives in three places, only one of which (`DurationSeconds`) is type-owned. N3′/N11 covered durations; the raw-`f64` copies in note/query are unowned.
+- `fn normalize_zero` exists twice, byte-identical: `src/note/field.rs:468–474`
+  and `src/query/sort.rs:445` (`if n == 0.0 { 0.0 } else { n }`).
+- `git log -S` shows **both** introduced by
+  `21ae8b1d fix(query): close signed-zero drift and doc/test gaps from review` —
+  the commit that closed drift *duplicated the policy it was closing*. A third
+  consumer sits at `note/field.rs:263` (`NoteFieldValueRef::compare` uses
+  `normalize_zero` for `Number` arms).
+- `DurationSeconds::normalized` (`duration.rs:1022`) is the third implementation
+  — but it is a *construction invariant* for the newtype, a different
+  responsibility from the raw-`f64` comparison idiom.
 
-**Direction:** one crate-level `normalize_zero` (or `core` helper) for the two raw-`f64` sites; keep `DurationSeconds::normalized` (construction ≠ comparison idiom). Record the doctrine once (08's GLOSSARY/ADR surface already carries "canonical duration Eq"; this is its numeric sibling).
+**Analysis:** the doctrine "total_cmp distinguishes `-0.0`; the domain treats
+zeros equal" now lives in three places, only one of which (`DurationSeconds`) is
+type-owned. N3′/N11 covered durations; the raw-`f64` copies in note/query are
+unowned.
 
-**Trade-off:** module-local tiny helpers are a defensible style; the counter is that this exact duplication was introduced *by a drift fix*.
+**Direction:** one crate-level `normalize_zero` (or `core` helper) for the two
+raw-`f64` sites; keep `DurationSeconds::normalized` (construction ≠ comparison
+idiom). Record the doctrine once (08's GLOSSARY/ADR surface already carries
+"canonical duration Eq"; this is its numeric sibling).
 
-**Corpus status:** `genuinely new`; outside duration.rs for the two copies, in-scope because `query/sort.rs` is a listed caller.
+**Trade-off:** module-local tiny helpers are a defensible style; the counter is
+that this exact duplication was introduced *by a drift fix*.
+
+**Corpus status:** `genuinely new`; outside duration.rs for the two copies,
+in-scope because `query/sort.rs` is a listed caller.
 
 ---
 
 ##### F6 — Trailing-separator `raw` spelling diverges by entry point
+
 `genuinely new` · kind: policy with no owner (pin during 04) · OBSERVED
 
 **Evidence**
-- `parse` stores the trimmed *whole input*: `raw: trimmed.into()` at `duration.rs:214` → `parse("1h,")` ⇒ `raw = "1h,"`.
-- `parse_prefix` stores the *consumed span*, trimmed: `raw = input[..last_end].trim().into()` at `duration.rs:281` → `parse_prefix("1h,")` ⇒ `raw = "1h"`.
-- Same value, different `Display`, by constructor. Intra-`parse` asymmetry as well: trailing whitespace is stripped (`parse("1h ")` → `"1h"`, pinned by test ~1298) but trailing comma is kept.
-- The only trailing-separator test, `accepts_trailing_separator` (`duration.rs:1307–1315`), asserts seconds only — `Display`/`raw` is unpinned.
 
-**Analysis:** nobody decided what the canonical stored spelling of trailing separators is; two code paths give two answers, and since `raw` is display-only (spec:88 — witness never encoded in `raw`) nothing else constrains it. The loop merge in 04 is the moment to pick one (recommended: consumed-span, uniformly) and pin it.
+- `parse` stores the trimmed *whole input*: `raw: trimmed.into()` at
+  `duration.rs:214` → `parse("1h,")` ⇒ `raw = "1h,"`.
+- `parse_prefix` stores the *consumed span*, trimmed:
+  `raw = input[..last_end].trim().into()` at `duration.rs:281` →
+  `parse_prefix("1h,")` ⇒ `raw = "1h"`.
+- Same value, different `Display`, by constructor. Intra-`parse` asymmetry as
+  well: trailing whitespace is stripped (`parse("1h ")` → `"1h"`, pinned by test
+  ~1298) but trailing comma is kept.
+- The only trailing-separator test, `accepts_trailing_separator`
+  (`duration.rs:1307–1315`), asserts seconds only — `Display`/`raw` is unpinned.
 
-**Corpus status:** `genuinely new`; attach as a pin to ticket 04 (which owns the merge), not a redesign.
+**Analysis:** nobody decided what the canonical stored spelling of trailing
+separators is; two code paths give two answers, and since `raw` is display-only
+(spec:88 — witness never encoded in `raw`) nothing else constrains it. The loop
+merge in 04 is the moment to pick one (recommended: consumed-span, uniformly)
+and pin it.
+
+**Corpus status:** `genuinely new`; attach as a pin to ticket 04 (which owns the
+merge), not a redesign.
 
 ---
 
 ##### F7 — Guard-fn visibility
+
 `superseded-by-ticket-04` · OBSERVED
 
-`can_start` (`duration.rs:499`) and `can_start_duration_segment` (504) are `pub(crate)` with one production caller each (sort.rs:487, and the internal probe). After 04's `classify` lands, both shrink to whatever protocol remains; privacy tightening belongs in 04's residue checklist. Noted so it is not lost — and the corrected census (§2.2) means the residue is *smaller* than the seed assumed: there is exactly one guarded site, not a guard protocol spread across lexer/sort/filter.
+`can_start` (`duration.rs:499`) and `can_start_duration_segment` (504) are
+`pub(crate)` with one production caller each (sort.rs:487, and the internal
+probe). After 04's `classify` lands, both shrink to whatever protocol remains;
+privacy tightening belongs in 04's residue checklist. Noted so it is not lost —
+and the corrected census (§2.2) means the residue is *smaller* than the seed
+assumed: there is exactly one guarded site, not a guard protocol spread across
+lexer/sort/filter.
 
 ---
 
@@ -1474,33 +2438,63 @@ Absence probes: no duration benches exist in `benches/` (03:192); `UNIT_HINT` is
 #### 7. Cross-ticket notes (items this review does not own)
 
 1. **→ Ticket 04 (recognize-with-precision):**
-   - Attach **F6** (pin trailing-separator `raw` spelling) and **F7** (guard-fn privacy) to the loop merge; **R5/F4's `apply_sign` post-pass removal** rides the same rewrite.
-   - Verify **`classify` consumes `is_calendar`** (declared at 03:167–169) — if the trichotomy uses unit-kind matches instead, `is_calendar`'s status must be revisited *at that point*, not now.
-   - Post-04 residue, correctly scoped: one guarded site (sort.rs:487) plus the field-coercion performance note (field.rs:531) — not a four-seam protocol as the seed framed it.
-2. **→ Ticket 05 (query temporal functions):** declared consumer for `Add`/`Sub`/`Mul`, `apply`, `parts` — until it lands, those remain test-only (§3).
-3. **→ Ticket 09 (dead-surface cleanup):** no change requested by this review; `from_seconds` retention honored (09:12), `is_calendar` correctly absent from its removal set (see R16).
-4. **→ Ticket 08 (docs/register):** register candidates from this review — **F1** (comma precedence, if the note-parser decision chooses to record it as a divergence), **F5** (signed-zero as one cross-module doctrine).
-5. **→ Ticket 03 (done):** adjudications honored; the only clarification is that its "Deliberate remaining state" list is doing real work in this review (it killed R16 outright).
+   - Attach **F6** (pin trailing-separator `raw` spelling) and **F7** (guard-fn
+     privacy) to the loop merge; **R5/F4's `apply_sign` post-pass removal**
+     rides the same rewrite.
+   - Verify **`classify` consumes `is_calendar`** (declared at 03:167–169) — if
+     the trichotomy uses unit-kind matches instead, `is_calendar`'s status must
+     be revisited *at that point*, not now.
+   - Post-04 residue, correctly scoped: one guarded site (sort.rs:487) plus the
+     field-coercion performance note (field.rs:531) — not a four-seam protocol
+     as the seed framed it.
+2. **→ Ticket 05 (query temporal functions):** declared consumer for
+   `Add`/`Sub`/`Mul`, `apply`, `parts` — until it lands, those remain test-only
+   (§3).
+3. **→ Ticket 09 (dead-surface cleanup):** no change requested by this review;
+   `from_seconds` retention honored (09:12), `is_calendar` correctly absent from
+   its removal set (see R16).
+4. **→ Ticket 08 (docs/register):** register candidates from this review —
+   **F1** (comma precedence, if the note-parser decision chooses to record it as
+   a divergence), **F5** (signed-zero as one cross-module doctrine).
+5. **→ Ticket 03 (done):** adjudications honored; the only clarification is that
+   its "Deliberate remaining state" list is doing real work in this review (it
+   killed R16 outright).
 
 ---
 
 ### 12.3 Component report: corpus audit (`spec.md`, `review.md`, `issues/01–09`)
 
-**Type:** research-only, adversarial cross-check of the design corpus against the current code.
-**Baseline:** HEAD `5b7dc748` — `refactor(date,duration): move module consts to top`, 2026-10-04 20:16:13 +0300, clean worktree (`git status --porcelain` empty).
-**Artifacts audited:** `spec.md` (150 L), `review.md` (264 L), `issues/01-hardening-pass.md` (99 L), `02-local-zone-clock.md` (255 L), `03-duration-semantics-owner.md` (189 L), `04-recognize-with-precision.md` (207 L), `05-query-temporal-functions.md` (17 L), `06-template-format-dialects.md` (18 L), `07-remaining-parity.md` (22 L), `08-docs-and-decisions.md` (17 L), `09-dead-surface-cleanup.md` (16 L).
-**Code touched:** `src/date.rs`, `src/duration.rs`, `src/template/engine/date.rs`, `src/field.rs`, `src/query/sort.rs`, `src/query/value.rs`, `src/query/grammar/filter.rs`, `src/note/field.rs`, `src/note/parser/inline.rs`, `src/note/parser/lexer.rs`, `src/note/parser/task.rs`, `src/lib.rs`, `src/config/model.rs`.
+**Type:** research-only, adversarial cross-check of the design corpus against
+the current code. **Baseline:** HEAD `5b7dc748` —
+`refactor(date,duration): move module consts to top`, 2026-10-04 20:16:13 +0300,
+clean worktree (`git status --porcelain` empty). **Artifacts audited:**
+`spec.md` (150 L), `review.md` (264 L), `issues/01-hardening-pass.md` (99 L),
+`02-local-zone-clock.md` (255 L), `03-duration-semantics-owner.md` (189 L),
+`04-recognize-with-precision.md` (207 L), `05-query-temporal-functions.md` (17
+L), `06-template-format-dialects.md` (18 L), `07-remaining-parity.md` (22 L),
+`08-docs-and-decisions.md` (17 L), `09-dead-surface-cleanup.md` (16 L).
+**Code touched:** `src/date.rs`, `src/duration.rs`,
+`src/template/engine/date.rs`, `src/field.rs`, `src/query/sort.rs`,
+`src/query/value.rs`, `src/query/grammar/filter.rs`, `src/note/field.rs`,
+`src/note/parser/inline.rs`, `src/note/parser/lexer.rs`,
+`src/note/parser/task.rs`, `src/lib.rs`, `src/config/model.rs`.
 
 **Evidence rules honoured:**
-- Every line cite is marked **OBSERVED** (read at HEAD `5b7dc748`) or **PREDICTED**.
-- Decisions A2′, B1+local-naive, D-b, D11, D12–D14, exhaustive-match repetition, no-`DurationUnit::class()`, no-`DurationValue`-split were **not** re-litigated. None was contradicted by code, so none is promoted to a Q3 finding.
+
+- Every line cite is marked **OBSERVED** (read at HEAD `5b7dc748`) or
+  **PREDICTED**.
+- Decisions A2′, B1+local-naive, D-b, D11, D12–D14, exhaustive-match repetition,
+  no-`DurationUnit::class()`, no-`DurationValue`-split were **not**
+  re-litigated. None was contradicted by code, so none is promoted to a Q3
+  finding.
 - No file in the corpus or the codebase was modified by this audit.
 
 ---
 
 #### 0. Line-drift root cause
 
-Ticket 04's and ticket 09's line cites were **exact** at commit `bcc938b5` (2026-10-02 23:03). The drift has three stages:
+Ticket 04's and ticket 09's line cites were **exact** at commit `bcc938b5`
+(2026-10-02 23:03). The drift has three stages:
 
 | Commit      | Date                | Effect                                                                              |
 | ----------- | ------------------- | ----------------------------------------------------------------------------------- |
@@ -1511,7 +2505,8 @@ Ticket 04's and ticket 09's line cites were **exact** at commit `bcc938b5` (2026
 | `df8f99e1`  | Oct 4, 19:39        | `refactor` — bulk reorder of `date.rs`/`duration.rs`; bottom-half cites off by ~680   |
 | `5b7dc748`  | Oct 4, 20:16        | `move module consts to top` — HEAD                                                   |
 
-**Definitive proof the pin pass did not re-verify** (`git show 07c631ac:src/date.rs | grep -n …`):
+**Definitive proof the pin pass did not re-verify**
+(`git show 07c631ac:src/date.rs | grep -n …`):
 
 | Symbol                        | At `07c631ac` | Ticket 04 cite | Delta at pin time |
 | ----------------------------- | ------------- | -------------- | ----------------- |
@@ -1523,11 +2518,18 @@ Ticket 04's and ticket 09's line cites were **exact** at commit `bcc938b5` (2026
 | `DatePoint` struct            | 1006          | (has_time 1022) | ~+9              |
 | `duration.rs::from_seconds`   | 269           | (09: 217)      | −52               |
 
-So ticket 04's cites were **already 3–10 lines wrong the moment they were "pinned"**, and are now wrong by 92–256 lines (table in §Q1a). Ticket 09's `duration.rs:217` was correct at `22ee6743` (Sep 27, review era) and has never been correct since `2e4304d2`.
+So ticket 04's cites were
+**already 3–10 lines wrong the moment they were "pinned"**, and are now wrong by
+92–256 lines (table in §Q1a). Ticket 09's `duration.rs:217` was correct at
+`22ee6743` (Sep 27, review era) and has never been correct since `2e4304d2`.
 
-**Contrast:** ticket 03's own comment (03 L136–139) explicitly says *"checklist line numbers above predate the remediations and are stale; these symbols are the current pointers"*. That is the pattern tickets 04/09 and `review.md` failed to follow.
+**Contrast:** ticket 03's own comment (03 L136–139) explicitly says *"checklist
+line numbers above predate the remediations and are stale; these symbols are the
+current pointers"*. That is the pattern tickets 04/09 and `review.md` failed to
+follow.
 
-**Secondary note:** commit `cdc3f566` referenced in the audit brief does not exist — `git log --all | grep cdc3f566` exits 1.
+**Secondary note:** commit `cdc3f566` referenced in the audit brief does not
+exist — `git log --all | grep cdc3f566` exits 1.
 
 ---
 
@@ -1547,36 +2549,79 @@ So ticket 04's cites were **already 3–10 lines wrong the moment they were "pin
 
 **Ticket 04 claims that HOLD at HEAD (verified):**
 
-- `src/field.rs:825` — `DateTimeCoercion` classify cascade (body `829–837`; enum defined `field.rs:790`).
-- `src/query/sort.rs:477` — `TextShape::classify` (call to `can_start` at `sort.rs:487`).
+- `src/field.rs:825` — `DateTimeCoercion` classify cascade (body `829–837`; enum
+  defined `field.rs:790`).
+- `src/query/sort.rs:477` — `TextShape::classify` (call to `can_start` at
+  `sort.rs:487`).
 - `src/template/engine/date.rs:210` — `ParsedDate::parse`.
-- `engine:235` — chains `DateError` as source via `invalid_operation(format!("invalid date {s:?}"), datetime_source)` (`engine:235–238`); N4 closed by ticket 02, as 04 item 12 states. (`Err(_date_source)` at `engine:235` is a deliberate, comment-documented discard of the date-specific source.)
-- `engine:480` — `match precision` on `DatePrecision`, two arms, **no wildcard** ✓ (`engine:469–491`).
-- `date_add` docs `engine:399–417` — week/calendar-vs-instant clause present (observed within `405–408`) ✓.
-- `src/note/parser/inline.rs:219` — `self.source.advance(pos, 10)` ✓; `inline.rs:224` — `DateValue::parse_iso(date).ok()?` ✓; `inline.rs:221` — `DateValue::is_iso_shape(date)` (an N15 `guard && parse` site the AC covers).
-- `src/note/parser/lexer.rs:247` — `after_ws.get(..ISO_DATE_LEN)`; `ISO_DATE_LEN: usize = 10` at `lexer.rs:72`; `lexer.rs:250` `is_iso_shape`, `lexer.rs:253` `parse_iso` (another `guard && parse` site).
-- `src/note/field.rs:115` — `.and_then(|prefix| DateValue::parse_iso(prefix).ok())` ✓.
-- **Exactly 3** datetime→date coercion cascades: `field.rs:832/835`, `sort.rs:480/483`, `engine:211/224` ✓.
-- **Exactly 2** format-cascade loops: `date.rs:94`, `date.rs:407` ✓ (review §2.2 said four; 04's amendment is correct).
+- `engine:235` — chains `DateError` as source via
+  `invalid_operation(format!("invalid date {s:?}"), datetime_source)`
+  (`engine:235–238`); N4 closed by ticket 02, as 04 item 12 states.
+  (`Err(_date_source)` at `engine:235` is a deliberate, comment-documented
+  discard of the date-specific source.)
+- `engine:480` — `match precision` on `DatePrecision`, two arms, **no wildcard**
+  ✓ (`engine:469–491`).
+- `date_add` docs `engine:399–417` — week/calendar-vs-instant clause present
+  (observed within `405–408`) ✓.
+- `src/note/parser/inline.rs:219` — `self.source.advance(pos, 10)` ✓;
+  `inline.rs:224` — `DateValue::parse_iso(date).ok()?` ✓; `inline.rs:221` —
+  `DateValue::is_iso_shape(date)` (an N15 `guard && parse` site the AC covers).
+- `src/note/parser/lexer.rs:247` — `after_ws.get(..ISO_DATE_LEN)`;
+  `ISO_DATE_LEN: usize = 10` at `lexer.rs:72`; `lexer.rs:250` `is_iso_shape`,
+  `lexer.rs:253` `parse_iso` (another `guard && parse` site).
+- `src/note/field.rs:115` —
+  `.and_then(|prefix| DateValue::parse_iso(prefix).ok())` ✓.
+- **Exactly 3** datetime→date coercion cascades: `field.rs:832/835`,
+  `sort.rs:480/483`, `engine:211/224` ✓.
+- **Exactly 2** format-cascade loops: `date.rs:94`, `date.rs:407` ✓ (review §2.2
+  said four; 04's amendment is correct).
 - **Exactly 2** inline 4-digit scans: `date.rs:117`, `date.rs:130` ✓.
-- "The engine calls `parse_iso` rather than looping" ✓ — `engine:211`, `engine:224`, no `for … in …Format::ALL` in the engine.
-- `date.rs:89` / `date.rs:402` — the two cross-domain four-digit guards inside `DateValue::parse_iso` / `DateTimeValue::parse_iso`, each delegating to `DateValue::has_four_digit_year`.
+- "The engine calls `parse_iso` rather than looping" ✓ — `engine:211`,
+  `engine:224`, no `for … in …Format::ALL` in the engine.
+- `date.rs:89` / `date.rs:402` — the two cross-domain four-digit guards inside
+  `DateValue::parse_iso` / `DateTimeValue::parse_iso`, each delegating to
+  `DateValue::has_four_digit_year`.
 
-**Ticket 04 claims that are now stale:** every line cite above (items 9/14/17/18), and by implication item 21's "intra-doc links resolve after the engine deletions" is unaffected.
+**Ticket 04 claims that are now stale:** every line cite above (items
+9/14/17/18), and by implication item 21's "intra-doc links resolve after the
+engine deletions" is unaffected.
 
 ##### Q1b. Ticket 06 — premise is FALSE (highest-severity stale fact)
 
-- `DateValue::format_with` and `DateTimeValue::format_with` were **deleted** by ticket 03's `bcc938b5` remediation. Ticket 03's own comment (03 L105–108): *"Deleted the seven test-only dead methods (`DateTimeValue::{start_of_day, to_offset_string, to_time_string, to_date_string, cmp_date, format_with}`, `DateValue::format_with`) and their tests: seven `expect(dead_code)` suppressions eliminated."*
-- OBSERVED: the **only** `format_with` in the crate is the engine-private `src/template/engine/date.rs:304` (six live callers: `format_precise` `engine:335`, `date_format` `engine:365`, and the remaining filter entry points). `grep -n "fn format_with" src/date.rs` → no match.
+- `DateValue::format_with` and `DateTimeValue::format_with` were **deleted** by
+  ticket 03's `bcc938b5` remediation. Ticket 03's own comment (03 L105–108):
+  *"Deleted the seven test-only dead methods
+  (`DateTimeValue::{start_of_day, to_offset_string, to_time_string, to_date_string, cmp_date, format_with}`,
+  `DateValue::format_with`) and their tests: seven `expect(dead_code)`
+  suppressions eliminated."*
+- OBSERVED: the **only** `format_with` in the crate is the engine-private
+  `src/template/engine/date.rs:304` (six live callers: `format_precise`
+  `engine:335`, `date_format` `engine:365`, and the remaining filter entry
+  points). `grep -n "fn format_with" src/date.rs` → no match.
 - Consequences:
-  - review **N21** ("invalid-pattern detection exists 3× at `date.rs:255`, `date.rs:463`, engine `date.rs:255`") → now **1×**. (Those exact lines are confirmed deleted: at `22ee6743` they were `255` and `463` — so N21's cites *were* correct then.)
-  - ticket 06 item 2 — *"`format_with` has a live consumer (first Decision-C wiring)"* — **moot**; there is no `format_with` left to wire.
-  - ticket 06 item 15 — *"core `format_with` keeps strftime as its only grammar"* — **moot**.
-  - spec **L102** — *"each call site maps it to its own type (template vs core)"* — only the template call site remains.
-  - spec **L103** — *"Core `format_with` keeps strftime as its only grammar"* — **false today**.
-  - spec **L111** / review **§9 S4** / **§10 step 6** all name a surface that no longer exists.
-  - review **§5.6** — *"N21: private `render_pattern(display, pattern) -> Result<String, ()>` in `date.rs`; three call sites map its error to their own type"* — the deduplication was achieved by **deletion**, not by the specified shared renderer.
-- **Only live residue:** `engine/date.rs:304` is now the single invalid-pattern renderer. Ticket 06's real remaining work is `durationformat` (item 1) + the moment translator (items 15/16) + the format-binding docs (items 13–14).
+  - review **N21** ("invalid-pattern detection exists 3× at `date.rs:255`,
+    `date.rs:463`, engine `date.rs:255`") → now **1×**. (Those exact lines are
+    confirmed deleted: at `22ee6743` they were `255` and `463` — so N21's cites
+    *were* correct then.)
+  - ticket 06 item 2 —
+    *"`format_with` has a live consumer (first Decision-C wiring)"* — **moot**;
+    there is no `format_with` left to wire.
+  - ticket 06 item 15 —
+    *"core `format_with` keeps strftime as its only grammar"* — **moot**.
+  - spec **L102** —
+    *"each call site maps it to its own type (template vs core)"* — only the
+    template call site remains.
+  - spec **L103** — *"Core `format_with` keeps strftime as its only grammar"* —
+    **false today**.
+  - spec **L111** / review **§9 S4** / **§10 step 6** all name a surface that no
+    longer exists.
+  - review **§5.6** — *"N21: private
+    `render_pattern(display, pattern) -> Result<String, ()>` in `date.rs`; three
+    call sites map its error to their own type"* — the deduplication was
+    achieved by **deletion**, not by the specified shared renderer.
+- **Only live residue:** `engine/date.rs:304` is now the single invalid-pattern
+  renderer. Ticket 06's real remaining work is `durationformat` (item 1) + the
+  moment translator (items 15/16) + the format-binding docs (items 13–14).
 
 ##### Q1c. Ticket 09 — 5 of 6 named methods are already gone; census incomplete
 
@@ -1592,7 +2637,8 @@ Ticket 09 item 1's "the set" (09 L11) vs OBSERVED at HEAD:
 | `to_offset_string` (09 item 13)                     | **deleted** by 03. `grep -rn "to_rfc3339()" src/` → **0 hits**, so *"today the only `to_rfc3339()` site is inside `to_offset_string`"* is false. The `…Z` channel already has its producer: `date.rs:771` `to_rfc3339_opts(SecondsFormat::Secs, true)` inside `impl Serialize for DateTimeValue`. Item 13's *"mandatory, the only allowed outcome"* is already satisfied by a different route |
 | `from_seconds` `expect(dead_code)` at `duration.rs:217` (09 items 2, 15) | **fact holds, line stale** — attr now `duration.rs:353`, fn `duration.rs:359`. (`217` was correct at `22ee6743`)                                             |
 
-**Incomplete census.** OBSERVED `#[cfg_attr(not(test), expect(dead_code))]` in the cluster = **6**, and ticket 09 names only one of them:
+**Incomplete census.** OBSERVED `#[cfg_attr(not(test), expect(dead_code))]` in
+the cluster = **6**, and ticket 09 names only one of them:
 
 | Site            | Symbol                    | Listed in ticket 09?                                   |
 | --------------- | ------------------------- | ------------------------------------------------------ |
@@ -1605,9 +2651,16 @@ Ticket 09 item 1's "the set" (09 L11) vs OBSERVED at HEAD:
 
 (`grep -c "dead_code"` → `date.rs` 3, `duration.rs` 3, `engine/date.rs` 0.)
 
-Ticket 03's handoff (03 L162–169) declares **all six** "spec-mandated surface with tests as first consumers". Ticket 09's *"recorded decision per method, not a blanket sweep"* cannot produce a decision for a method it does not enumerate. Item 15's *"expected remainder: `from_seconds`, `to_offset_string`"* is wrong on both counts.
+Ticket 03's handoff (03 L162–169) declares **all six** "spec-mandated surface
+with tests as first consumers". Ticket 09's
+*"recorded decision per method, not a blanket sweep"* cannot produce a decision
+for a method it does not enumerate. Item 15's
+*"expected remainder: `from_seconds`, `to_offset_string`"* is wrong on both
+counts.
 
-**Also false in ticket 09:** item 13's re-target mandate (above), and by extension review §10 step 6's `to_offset_string`→serial? and `checked_add/sub`→superseded entries.
+**Also false in ticket 09:** item 13's re-target mandate (above), and by
+extension review §10 step 6's `to_offset_string`→serial? and
+`checked_add/sub`→superseded entries.
 
 ##### Q1d. `review.md` — evidence column and forward-looking sections
 
@@ -1652,28 +2705,53 @@ Ticket 03's handoff (03 L162–169) declares **all six** "spec-mandated surface 
 
 ###### §2.3 Structural / depth debt
 
-- "8 methods behind `expect(dead_code)`" → OBSERVED **6**, different composition (table in Q1c).
-- "Dead bridge: `checked_add`/`checked_sub` unusable until A2′ …" → **deleted by 03**.
-- D7 (`into_inner`/`From` demoted) — still live: `date.rs:687`, `date.rs:741`, `note/field.rs:111–112`, `engine:213/226/230`. 09 item 14 correctly re-runs the deletion test.
+- "8 methods behind `expect(dead_code)`" → OBSERVED **6**, different composition
+  (table in Q1c).
+- "Dead bridge: `checked_add`/`checked_sub` unusable until A2′ …" →
+  **deleted by 03**.
+- D7 (`into_inner`/`From` demoted) — still live: `date.rs:687`, `date.rs:741`,
+  `note/field.rs:111–112`, `engine:213/226/230`. 09 item 14 correctly re-runs
+  the deletion test.
 - H3/H4/D10 — still accurate (04 open).
 
 ###### §4 Decisions
 
-- "Also fixed (carried): `DEFAULT_DATE_FORMAT` removal from `config/model.rs:49` → substitute `crate::date::DEFAULT_DATETIME_FORMAT`" — **not done**: `src/config/model.rs:52` still holds `const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";`, used at `config/model.rs:814` and `config/model.rs:837`. (The *value-identity* claim is correct: config's const value equals `date.rs:51` `DEFAULT_DATETIME_FORMAT`, and differs from `date.rs:48` `DEFAULT_DATE_FORMAT = "%Y-%m-%d"` — three same-named/different-valued constants across two modules, which is exactly the trap story 39 describes.)
-- A2′ / B1 / D-b / D11 decision *text* — consistent with the spec; not re-litigated.
+- "Also fixed (carried): `DEFAULT_DATE_FORMAT` removal from `config/model.rs:49`
+  → substitute `crate::date::DEFAULT_DATETIME_FORMAT`" — **not done**:
+  `src/config/model.rs:52` still holds
+  `const DEFAULT_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";`, used at
+  `config/model.rs:814` and `config/model.rs:837`. (The *value-identity* claim
+  is correct: config's const value equals `date.rs:51`
+  `DEFAULT_DATETIME_FORMAT`, and differs from `date.rs:48`
+  `DEFAULT_DATE_FORMAT = "%Y-%m-%d"` — three same-named/different-valued
+  constants across two modules, which is exactly the trap story 39 describes.)
+- A2′ / B1 / D-b / D11 decision *text* — consistent with the spec; not
+  re-litigated.
 
 ###### §6 Principles audit
 
-- DRY row counts stale: "×4 cascades (D1/N20)" → **×2 loops + ×3 coercion cascades**; "×4 scans (D6)" → **×2**; "×4 ratio tables (N18)" → **1** (+ derived `fixed_seconds_i64`); "×3 format-with (N21)" → **1**; "×2 grammars (N8)" → holds; "×4 guard sites (N15)" → holds-ish.
-- Open/Closed row "❌ engine unit-match (per-unit arms + shortcuts)" — largely closed by 03: `date_shift_unit` now matches **precision** (2 arms), not units; unit dispatch lives in `shift_wall`/`DateTimeValue::shift`.
-- Law of Demeter row "chrono round-trips in `ParsedDate` — one call each after S5/S1" — still live, 04 open.
+- DRY row counts stale: "×4 cascades (D1/N20)" →
+  **×2 loops + ×3 coercion cascades**; "×4 scans (D6)" → **×2**; "×4 ratio
+  tables (N18)" → **1** (+ derived `fixed_seconds_i64`); "×3 format-with (N21)"
+  → **1**; "×2 grammars (N8)" → holds; "×4 guard sites (N15)" → holds-ish.
+- Open/Closed row "❌ engine unit-match (per-unit arms + shortcuts)" — largely
+  closed by 03: `date_shift_unit` now matches **precision** (2 arms), not units;
+  unit dispatch lives in `shift_wall`/`DateTimeValue::shift`.
+- Law of Demeter row "chrono round-trips in `ParsedDate` — one call each after
+  S5/S1" — still live, 04 open.
 
 ###### §9 Deepening plan + §10 Execution order
 
-- §9 rows **S1, S2, S6, S10** and §10 **steps 2–3, 5** read in future tense although tickets 01/02/03 are `resolved`. §10 step 6 still lists `to_time_string`, `start_of_day`, `cmp_date`, `to_offset_string`→serial?, `checked_add/sub` — all deleted.
-- §4 is headed *"Also fixed (carried)"* yet contains an item (config const) that is not fixed (08 item 14).
-- review L5 states *"No implementation performed"* — contradicted by tickets 01 (`c990f6c9`), 02 (`90696f25`), 03 (`57ea1b09` → `bcc938b5`).
-- §9 **S4** = "`durationformat` + wire `format_with` + shared `render_pattern`" → half of it has no referent (Q1b).
+- §9 rows **S1, S2, S6, S10** and §10 **steps 2–3, 5** read in future tense
+  although tickets 01/02/03 are `resolved`. §10 step 6 still lists
+  `to_time_string`, `start_of_day`, `cmp_date`, `to_offset_string`→serial?,
+  `checked_add/sub` — all deleted.
+- §4 is headed *"Also fixed (carried)"* yet contains an item (config const) that
+  is not fixed (08 item 14).
+- review L5 states *"No implementation performed"* — contradicted by tickets 01
+  (`c990f6c9`), 02 (`90696f25`), 03 (`57ea1b09` → `bcc938b5`).
+- §9 **S4** = "`durationformat` + wire `format_with` + shared `render_pattern`"
+  → half of it has no referent (Q1b).
 
 ##### Q1e. `spec.md`
 
@@ -1691,9 +2769,20 @@ Ticket 03's handoff (03 L162–169) declares **all six** "spec-mandated surface 
 
 ##### Q1f. Stale doc comments in code
 
-- **`src/query/grammar/filter.rs:217–218`** — `Eq`/`Ne` doc: *"`Eq`/`Ne` use `is_equal_to_literal`'s existing cross-kind coercion (e.g. a `Date` field against a `DateTime` literal **at midnight UTC`**.)"*. OBSERVED `DateTimeValue::is_equal_to_date` (`date.rs:681–683`) = `self.0 == Self::from(date).0`, and `From<DateValue> for DateTimeValue` (`date.rs:741–749`) resolves **local** midnight via `local_naive_to_utc(midnight)`. Stale since ticket 02.
-- **`src/template/engine/date.rs:462–463`** — *"A date-only input stays civil for every unit: a zone-free date has no instant to shift."* True for the wall frame, but sub-day units on date-only inputs render as a no-op through `%Y-%m-%d` (the D3 caveat 04 owns, spec L53/L99). Wording predates 04's planned caveat.
-- **`src/note/field.rs:505–508`** — `From<FieldValueRef>` rustdoc describes null→link→duration; consistent with code (`note/field.rs:513–536`), no issue.
+- **`src/query/grammar/filter.rs:217–218`** — `Eq`/`Ne` doc: *"`Eq`/`Ne` use
+  `is_equal_to_literal`'s existing cross-kind coercion (e.g. a `Date` field
+  against a `DateTime` literal **at midnight
+  UTC`**.)"*. OBSERVED `DateTimeValue::is_equal_to_date` (`date.rs:681–683`) = `self.0 ==
+  Self::from(date).0`, and `From<DateValue> for
+  DateTimeValue` (`date.rs:741–749`) resolves **local** midnight via `local_naive_to_utc(midnight)`.
+  Stale since ticket 02.
+- **`src/template/engine/date.rs:462–463`** — *"A date-only input stays civil
+  for every unit: a zone-free date has no instant to shift."* True for the wall
+  frame, but sub-day units on date-only inputs render as a no-op through
+  `%Y-%m-%d` (the D3 caveat 04 owns, spec L53/L99). Wording predates 04's
+  planned caveat.
+- **`src/note/field.rs:505–508`** — `From<FieldValueRef>` rustdoc describes
+  null→link→duration; consistent with code (`note/field.rs:513–536`), no issue.
 
 ##### Q1g. Ticket 05 — factual (not just logical) claims that are false today
 
@@ -1710,41 +2799,82 @@ Ticket 03's handoff (03 L162–169) declares **all six** "spec-mandated surface 
 
 #### Q2 — Design gaps not covered or adjudicated anywhere in the corpus
 
-Ranked by exposure. Each item states (a) the OBSERVED evidence, (b) why no existing ticket/S-item covers it.
+Ranked by exposure. Each item states (a) the OBSERVED evidence, (b) why no
+existing ticket/S-item covers it.
 
 ##### G1 — The filter expression grammar cannot host ticket 05; no S-item owns the extension *(highest)*
 
 OBSERVED in `src/query/grammar/filter.rs`:
 
-- `enum FilterFunction` has **exactly one** variant, `Contains { field, target }` — `filter.rs:111–120`. `FilterFunction::build` (`filter.rs:124–137`) accepts `name.eq_ignore_ascii_case("contains")` only, and the error message hard-codes the expected name: `QuerySyntaxError::unexpected_end(…, "`contains`")` at `filter.rs:346–354`.
-- `FilterAtom` = `Comparison(ComparisonExpr) | Function(FilterFunction)` — `filter.rs:96`. **Both are predicates (→ bool). There is no value-producing expression node.**
+- `enum FilterFunction` has **exactly one** variant,
+  `Contains { field, target }` — `filter.rs:111–120`. `FilterFunction::build`
+  (`filter.rs:124–137`) accepts `name.eq_ignore_ascii_case("contains")` only,
+  and the error message hard-codes the expected name:
+  `QuerySyntaxError::unexpected_end(…, "`contains`")` at `filter.rs:346–354`.
+- `FilterAtom` = `Comparison(ComparisonExpr) | Function(FilterFunction)` —
+  `filter.rs:96`.
+  **Both are predicates (→ bool). There is no value-producing expression node.**
 - `parse_comparison` (`filter.rs:358–377`) = `field_path <op> literal` only.
-- `parse_function_call` (`filter.rs:293–355`) = `name ( field_path , literal )` only — **no two-field-path args, no nested calls, no function-as-value, no optional/trailing args.**
-- `parse_literal_arg` (`filter.rs:274–290`) accepts only `FilterToken::Literal` → `dur("1 month")` is a **syntax error** today.
-- `control()` (`filter.rs:384–397`) returns `None` for `FilterToken::Op` — comparison operators are consumed *inside* an atom, never as control flow between atoms.
-- `grep -rn "Plus\|Minus\|Star\|Token::Add\|binary" src/query/grammar/` → only a test-name match for `TaskField`.
+- `parse_function_call` (`filter.rs:293–355`) = `name ( field_path , literal )`
+  only — **no two-field-path args, no nested calls, no function-as-value, no
+  optional/trailing args.**
+- `parse_literal_arg` (`filter.rs:274–290`) accepts only `FilterToken::Literal`
+  → `dur("1 month")` is a **syntax error** today.
+- `control()` (`filter.rs:384–397`) returns `None` for `FilterToken::Op` —
+  comparison operators are consumed *inside* an atom, never as control flow
+  between atoms.
+- `grep -rn "Plus\|Minus\|Star\|Token::Add\|binary" src/query/grammar/` → only a
+  test-name match for `TaskField`.
 - `CompareOp` (`filter.rs:201–214`) is `Eq/Ne/Lt/Le/Gt/Ge` — no arithmetic.
 
-**Unreachable without grammar work:** value-producing expressions (`date − date` → duration), two-field args (`date_diff(a, b)`), nested calls (`dur("…")`), function results as comparison operands (`date_add(…) > x`).
+**Unreachable without grammar work:** value-producing expressions (`date − date`
+→ duration), two-field args (`date_diff(a, b)`), nested calls (`dur("…")`),
+function results as comparison operands (`date_add(…) > x`).
 
-**Why nobody covers it:** review §3 B17 prescribes *"`FilterFunction` entries (`filter.rs:116–125`), never operators"* — but those lines are the `Contains` **predicate** variant, and a predicate enum cannot yield a duration. Review §9 S3 says *"Seam: `FilterFunction` entries only"*. Spec L77 forbids grammar. Ticket 05 inherits all three. See **C1**.
+**Why nobody covers it:** review §3 B17 prescribes
+*"`FilterFunction` entries (`filter.rs:116–125`), never operators"* — but those
+lines are the `Contains` **predicate** variant, and a predicate enum cannot
+yield a duration. Review §9 S3 says *"Seam: `FilterFunction` entries only"*.
+Spec L77 forbids grammar. Ticket 05 inherits all three. See **C1**.
 
 ##### G2 — Unit *spelling* vocabulary has four owners, none derived, none cross-pinned
 
-Review N18 / S2 covered **ratios** only ("exactly one unit-ratio table"). Spellings are a separate table class and are uncovered:
+Review N18 / S2 covered **ratios** only ("exactly one unit-ratio table").
+Spellings are a separate table class and are uncovered:
 
-1. `UNIT_MAP` — 35 keys, `duration.rs:53–89` (`phf::Map<&'static str, DurationUnit>`).
-2. `UNIT_HINT` — `duration.rs:44–46`. Its own doc (`duration.rs:41–43`) says: *"Kept beside [`UNIT_MAP`] **as a reminder to update both** when a unit or spelling family is added to the registry."* — a **prose reminder, no test**. `grep -rn "UNIT_HINT" src/` → def (`duration.rs:44`), `lib.rs:101` re-export, `engine:46`, `engine:756` (doc), `engine:764` (`format!("unknown unit {unit:?} (expected {UNIT_HINT})")`). **No test references it.**
-3. `SUB_YEAR_DECOMPOSITION_UNITS: [(DurationUnit, &str); 6]` — `duration.rs:130`, literal `&str` suffix column consumed by `canonical_raw` at `duration.rs:394`.
-4. `#[case::]` mirror in `parses_all_units_and_abbreviations` — OBSERVED **35 cases vs 35 `UNIT_MAP` keys, exact set equality** (verified programmatically: `in map not in test: []`, `in test not in map: []`) — but the case list is **hand-maintained**, not generated from `UNIT_MAP`.
+1. `UNIT_MAP` — 35 keys, `duration.rs:53–89`
+   (`phf::Map<&'static str, DurationUnit>`).
+2. `UNIT_HINT` — `duration.rs:44–46`. Its own doc (`duration.rs:41–43`) says:
+   *"Kept beside [`UNIT_MAP`] **as a reminder to update both** when a unit or
+   spelling family is added to the registry."* — a **prose reminder, no test**.
+   `grep -rn "UNIT_HINT" src/` → def (`duration.rs:44`), `lib.rs:101` re-export,
+   `engine:46`, `engine:756` (doc), `engine:764`
+   (`format!("unknown unit {unit:?} (expected {UNIT_HINT})")`).
+   **No test references it.**
+3. `SUB_YEAR_DECOMPOSITION_UNITS: [(DurationUnit, &str); 6]` —
+   `duration.rs:130`, literal `&str` suffix column consumed by `canonical_raw`
+   at `duration.rs:394`.
+4. `#[case::]` mirror in `parses_all_units_and_abbreviations` — OBSERVED
+   **35 cases vs 35 `UNIT_MAP` keys, exact set equality** (verified
+   programmatically: `in map not in test: []`, `in test not in map: []`) — but
+   the case list is **hand-maintained**, not generated from `UNIT_MAP`.
 
-**The corpus has already been bitten by this exact failure mode.** Ticket 03's remediation (03 L117–119): *"`UNIT_HINT` lives beside the unit registry and feeds the engine's unknown-unit message (**ends the drift that hid weeks**)."* The fix removed the *symptom* (one stale message), not the *class* (four unsynchronised copies).
+**The corpus has already been bitten by this exact failure mode.** Ticket 03's
+remediation (03 L117–119): *"`UNIT_HINT` lives beside the unit registry and
+feeds the engine's unknown-unit message (**ends the drift that hid weeks**)."*
+The fix removed the *symptom* (one stale message), not the *class* (four
+unsynchronised copies).
 
-**Recommendation:** a derived test asserting every `UNIT_MAP` family appears in `UNIT_HINT`, and a parse-case list iterated from `UNIT_MAP.entries()` (precedent already exists at `duration.rs:2136–2139`: `fixed_seconds_are_positive_for_all_variants` iterates `UNIT_MAP.entries()`).
+**Recommendation:** a derived test asserting every `UNIT_MAP` family appears in
+`UNIT_HINT`, and a parse-case list iterated from `UNIT_MAP.entries()` (precedent
+already exists at `duration.rs:2136–2139`:
+`fixed_seconds_are_positive_for_all_variants` iterates `UNIT_MAP.entries()`).
 
 ##### G3 — A fourth 10-byte date gate is missing from ticket 04's grammar-widening inventory
 
-Ticket 04 item 16 (04 L16) names *"the 10-byte gates `src/note/parser/inline.rs:219` (`advance(pos, 10)`) and `src/note/parser/lexer.rs:247` (`ISO_DATE_LEN`)"*.
+Ticket 04 item 16 (04 L16) names *"the 10-byte gates
+`src/note/parser/inline.rs:219` (`advance(pos, 10)`) and
+`src/note/parser/lexer.rs:247` (`ISO_DATE_LEN`)"*.
 
 OBSERVED a **third**:
 
@@ -1756,12 +2886,22 @@ src/note/field.rs:113–116
         .map(DateValue::into_inner),
 ```
 
-- Ticket 04 item 12 names `note/field.rs:115` **only as an `.ok()` discard**, not as a grammar gate; item 16 does not name it at all.
-- Production caller: `src/note/parser/task.rs:212` — `.find_map(|val| val.as_date().map(Into::into))`, i.e. **task date fields sourced from a String value**.
-- After 04 widens inline + lexer to the 7-byte `YYYY-MM` shape, this path still does `.get(..10)` on a 7-char string → `None`. Story 15 ("inline dates and YAML-deserialized dates parse through the same grammar … `YYYY-MM` accepted") is left **half-applied**.
-- It is also a hidden `guard && parse` site (the N15 idiom), which 04 item 13's AC (*"No production call site … combines a shape guard with `parse`"*) reaches only implicitly.
+- Ticket 04 item 12 names `note/field.rs:115` **only as an `.ok()` discard**,
+  not as a grammar gate; item 16 does not name it at all.
+- Production caller: `src/note/parser/task.rs:212` —
+  `.find_map(|val| val.as_date().map(Into::into))`, i.e.
+  **task date fields sourced from a String value**.
+- After 04 widens inline + lexer to the 7-byte `YYYY-MM` shape, this path still
+  does `.get(..10)` on a 7-char string → `None`. Story 15 ("inline dates and
+  YAML-deserialized dates parse through the same grammar … `YYYY-MM` accepted")
+  is left **half-applied**.
+- It is also a hidden `guard && parse` site (the N15 idiom), which 04 item 13's
+  AC (*"No production call site … combines a shape guard with `parse`"*) reaches
+  only implicitly.
 
-Note: the *frontmatter* date path is separately gated at `lexer.rs:247` (04 covers it), so the exposure is narrowed to the String→`NaiveDate` helper — but that helper is what `task.rs` uses.
+Note: the *frontmatter* date path is separately gated at `lexer.rs:247` (04
+covers it), so the exposure is narrowed to the String→`NaiveDate` helper — but
+that helper is what `task.rs` uses.
 
 ##### G4 — `From<DateValue> for DateTimeValue` silently shifts on tz failure; absent from the divergence register
 
@@ -1777,13 +2917,24 @@ impl From<DateValue> for DateTimeValue {
 }
 ```
 
-Rustdoc at `date.rs:738–740` declares it: *"A lookup failure falls back to UTC midnight (chrono does the same for a broken zone); the crate's fallible entry points surface it as [`DateError::LocalZoneLookup`] instead."*
+Rustdoc at `date.rs:738–740` declares it: *"A lookup failure falls back to UTC
+midnight (chrono does the same for a broken zone); the crate's fallible entry
+points surface it as [`DateError::LocalZoneLookup`] instead."*
 
-- **Reachable from filter equality:** `NoteFieldValueRef::is_equal_to_literal` (`note/field.rs:366`) → `DateTimeValue::is_equal_to_date` (`date.rs:681–683`) → `Self::from(date)`. So in a broken-tz environment, `Date == DateTime` compares at **UTC** midnight while every other path returns `DateError::LocalZoneLookup`.
-- Spec **L98 / story 13**: *"None caused by a tz-data/OS error surfaces as an error, **never a silent shift**"*.
-- Ticket 08's divergence register (08 item 13 = exact mirror of story 42) lists 17 entries and **does not include this**.
+- **Reachable from filter equality:** `NoteFieldValueRef::is_equal_to_literal`
+  (`note/field.rs:366`) → `DateTimeValue::is_equal_to_date` (`date.rs:681–683`)
+  → `Self::from(date)`. So in a broken-tz environment, `Date == DateTime`
+  compares at **UTC** midnight while every other path returns
+  `DateError::LocalZoneLookup`.
+- Spec **L98 / story 13**: *"None caused by a tz-data/OS error surfaces as an
+  error, **never a silent shift**"*.
+- Ticket 08's divergence register (08 item 13 = exact mirror of story 42) lists
+  17 entries and **does not include this**.
 
-**Decided 2026-10-05 (option (a)):** keep `From` — spec D14 carries a declared UTC-frame exception; 08 records a register entry (number assigned at write) and rewrites the rustdoc to the spec rationale (the *"chrono does the same"* defence was parity, not spec).
+**Decided 2026-10-05 (option (a)):** keep `From` — spec D14 carries a declared
+UTC-frame exception; 08 records a register entry (number assigned at write) and
+rewrites the rustdoc to the spec rationale (the *"chrono does the same"* defence
+was parity, not spec).
 
 ##### G5 — `DatePoint::new(wall, instant, has_time)` — ticket 03's "unrepresentable" overclaims
 
@@ -1793,144 +2944,302 @@ OBSERVED `date.rs:937–947`:
 pub(crate) const fn new(wall: NaiveDateTime, instant: DateTime<Utc>, has_time: bool) -> Self
 ```
 
-`has_time` is a free `bool` (field `date.rs:929`). A `DatePoint { wall: 10:30, instant, has_time: false }` is constructible — i.e. a **stale/inconsistent precision flag is representable**.
+`has_time` is a free `bool` (field `date.rs:929`). A
+`DatePoint { wall: 10:30, instant, has_time: false }` is constructible — i.e. a
+**stale/inconsistent precision flag is representable**.
 
-- Ticket 03's remediation (03 L97–101): *"`DatePoint` now carries `has_time` and owns the measurement (`DatePoint::diff`) … the engine's `ParsedDate` holds a `DatePoint` directly, so **a stale precision flag is unrepresentable**."*
-- Call sites: production `engine:218` (`DatePoint::new(wall, instant, true)`), `engine:232` (`DatePoint::new(wall, instant, false)`); tests `date.rs:1984`, `date.rs:2007`, `date.rs:2013`. Both production sites derive correctly — so the *invariant holds by convention*, not by construction.
-- Ticket 04 item 17 makes `has_time` **derive** from the hoisted `Precision`, and 04 L161 says *"no second precision signal remains"* — but unless `DatePoint::new` takes `Precision` (or is replaced by `from_recognized`), the constructor still accepts an independent bool and the overclaim survives 04.
-- Related: review §5.4 says *"not two bools"* — the design intent is one signal; the constructor doesn't enforce it.
+- Ticket 03's remediation (03 L97–101): *"`DatePoint` now carries `has_time` and
+  owns the measurement (`DatePoint::diff`) … the engine's `ParsedDate` holds a
+  `DatePoint` directly, so **a stale precision flag is unrepresentable**."*
+- Call sites: production `engine:218` (`DatePoint::new(wall, instant, true)`),
+  `engine:232` (`DatePoint::new(wall, instant, false)`); tests `date.rs:1984`,
+  `date.rs:2007`, `date.rs:2013`. Both production sites derive correctly — so
+  the *invariant holds by convention*, not by construction.
+- Ticket 04 item 17 makes `has_time` **derive** from the hoisted `Precision`,
+  and 04 L161 says *"no second precision signal remains"* — but unless
+  `DatePoint::new` takes `Precision` (or is replaced by `from_recognized`), the
+  constructor still accepts an independent bool and the overclaim survives 04.
+- Related: review §5.4 says *"not two bools"* — the design intent is one signal;
+  the constructor doesn't enforce it.
 
 ##### G6 — The calendar owner exposes two entry shapes; the engine bypasses the specified one
 
 OBSERVED:
 
-- `shift_wall` is `pub(crate)` with **exactly one non-self caller**: `engine:482` `shift_wall(parsed.point.wall, n, unit).map_err(date_error)?`.
-- `DateValue::shift` (`date.rs:165`) carries `expect(dead_code)` — **zero production callers**.
-- So for date-only precision the engine reaches *past* the typed value interface into the wall-level core, while the method ticket 03 actually specified ("`shift(base, n, unit)` … interface **on `DateValue`/`DateTimeValue`**", review §9 S1) is exercised only by tests.
+- `shift_wall` is `pub(crate)` with **exactly one non-self caller**:
+  `engine:482` `shift_wall(parsed.point.wall, n, unit).map_err(date_error)?`.
+- `DateValue::shift` (`date.rs:165`) carries `expect(dead_code)` —
+  **zero production callers**.
+- So for date-only precision the engine reaches *past* the typed value interface
+  into the wall-level core, while the method ticket 03 actually specified
+  ("`shift(base, n, unit)` … interface **on `DateValue`/`DateTimeValue`**",
+  review §9 S1) is exercised only by tests.
 
 This conflicts with:
 
 - review §6 target graph *"note/query/template → date.rs|duration.rs → chrono"*;
 - review §9 S1's seam column *"interface on `DateValue`/`DateTimeValue`"*;
 - review §6 Information hiding / Law of Demeter rows;
-- ticket 03's own handoff (03 L152) calling `shift_wall` *"the civil per-unit core"* without justifying its `pub(crate)` visibility.
+- ticket 03's own handoff (03 L152) calling `shift_wall`
+  *"the civil per-unit core"* without justifying its `pub(crate)` visibility.
 
-Also relevant: 03's residual-CRAP note (03 L182–184) gives `shift_wall` 15.1 — an argument for **shrinking** its caller set rather than keeping a second entry.
+Also relevant: 03's residual-CRAP note (03 L182–184) gives `shift_wall` 15.1 —
+an argument for **shrinking** its caller set rather than keeping a second entry.
 
-**Fix shape:** `DatePrecision::Date` arm calls `DateValue::shift(midnight, n, unit)`, then `.local_wall()`; `shift_wall` becomes module-private. No S-item and no ticket names this (09's `proj-pub-crate-internal` rule is not pointed at it).
+**Fix shape:** `DatePrecision::Date` arm calls
+`DateValue::shift(midnight, n, unit)`, then `.local_wall()`; `shift_wall`
+becomes module-private. No S-item and no ticket names this (09's
+`proj-pub-crate-internal` rule is not pointed at it).
 
 ##### G7 — Ticket 03's `apply` / `parts` production consumer may never materialise
 
-- 03 handoff (03 L164–169) declares the declared consumers: *"the query temporal functions (ticket 04's `classify`, **index-query#05**) are the declared production consumers"* for `DurationValue::parts`, `is_calendar`, `from_seconds`, `DateValue::shift`/`apply`, `DateTimeValue::apply`.
-- Ticket 05's checklist (items 1–6) **never mentions multi-part durations or `apply`**; Dataview's headline `date_add(date, amount, unit)` is single-unit.
-- The template engine never calls `apply`: `grep -rn "\.apply(" src/template/ src/index/ src/query/` → only `index/service.rs` (`pending.apply(dimensions)`) and `query/plan.rs` (`op.apply(rows)`), both unrelated types.
-- If 05 lands single-unit only, `DateValue::apply` (`date.rs:192`) and `DateTimeValue::apply` (`date.rs:585`) stay dead and **ticket 09's deletion test will strike spec-mandated surface that ticket 03's AC (`apply` applies parts L→R, spec L123) pins**.
+- 03 handoff (03 L164–169) declares the declared consumers: *"the query temporal
+  functions (ticket 04's `classify`, **index-query#05**) are the declared
+  production consumers"* for `DurationValue::parts`, `is_calendar`,
+  `from_seconds`, `DateValue::shift`/`apply`, `DateTimeValue::apply`.
+- Ticket 05's checklist (items 1–6)
+  **never mentions multi-part durations or `apply`**; Dataview's headline
+  `date_add(date, amount, unit)` is single-unit.
+- The template engine never calls `apply`:
+  `grep -rn "\.apply(" src/template/ src/index/ src/query/` → only
+  `index/service.rs` (`pending.apply(dimensions)`) and `query/plan.rs`
+  (`op.apply(rows)`), both unrelated types.
+- If 05 lands single-unit only, `DateValue::apply` (`date.rs:192`) and
+  `DateTimeValue::apply` (`date.rs:585`) stay dead and **ticket 09's deletion
+  test will strike spec-mandated surface that ticket 03's AC (`apply` applies
+  parts L→R, spec L123) pins**.
 
-**Needs a decision before 09, not during it:** either 05 wires a multi-part duration path (`date_add(due, "1d 1h")`-shaped), or 09 is told explicitly that `apply`/`parts`/`is_calendar` are exempt, or the ACs are amended.
+**Needs a decision before 09, not during it:** either 05 wires a multi-part
+duration path (`date_add(due, "1d 1h")`-shaped), or 09 is told explicitly that
+`apply`/`parts`/`is_calendar` are exempt, or the ACs are amended.
 
 ##### G8 — Minor: where the `YearMonth` strftime pattern lives after 04
 
-- `DatePrecision::format()` (`engine:176–181`) returns `DEFAULT_DATE_FORMAT` (`%Y-%m-%d`, `date.rs:48`) or `DEFAULT_DATETIME_FORMAT` (`%Y-%m-%dT%H:%M:%S`, `date.rs:51`).
-- 04 item 17 deletes `DatePrecision`/`ParsedDate`/`format_precise` and adds a `YearMonth` arm to `match precision` (`engine:480`).
+- `DatePrecision::format()` (`engine:176–181`) returns `DEFAULT_DATE_FORMAT`
+  (`%Y-%m-%d`, `date.rs:48`) or `DEFAULT_DATETIME_FORMAT` (`%Y-%m-%dT%H:%M:%S`,
+  `date.rs:51`).
+- 04 item 17 deletes `DatePrecision`/`ParsedDate`/`format_precise` and adds a
+  `YearMonth` arm to `match precision` (`engine:480`).
 - **Neither 04 nor the spec names `"%Y-%m"` or where that pattern lives.**
-- PREDICTED: it belongs on the hoisted `Precision` (an unstated interface decision); and once `ParsedDate` is deleted, `date_shift_unit` must recover `wall` from the value — which *is* derivable (`DateValue` → midnight; `DateTimeValue` → `local_wall()`; `YearMonth` → day-1 midnight) but 04 never says so, which is why the deletion looks riskier than it is.
+- PREDICTED: it belongs on the hoisted `Precision` (an unstated interface
+  decision); and once `ParsedDate` is deleted, `date_shift_unit` must recover
+  `wall` from the value — which *is* derivable (`DateValue` → midnight;
+  `DateTimeValue` → `local_wall()`; `YearMonth` → day-1 midnight) but 04 never
+  says so, which is why the deletion looks riskier than it is.
 
 ##### G9 — Smaller, filed for completeness
 
-- **`DurationUnit::parse` returns `Option`** (`duration.rs:946`) while `DurationValue: FromStr` returns `Result` — two error idioms on adjacent types; `conv-tryfrom-fallible` is named in the corpus but not pointed here. *(weak; may be deliberate)*
-- **`is_calendar()` has no declared production consumer that 03's own handoff sanctions** — see C9.
-- **`as_date`'s `DateTime` arm** (`note/field.rs:112`) silently truncates to a date — no divergence-register entry, though story 42 is exhaustive about other coercions. *(weak)*
+- **`DurationUnit::parse` returns `Option`** (`duration.rs:946`) while
+  `DurationValue: FromStr` returns `Result` — two error idioms on adjacent
+  types; `conv-tryfrom-fallible` is named in the corpus but not pointed here.
+  *(weak; may be deliberate)*
+- **`is_calendar()` has no declared production consumer that 03's own handoff
+  sanctions** — see C9.
+- **`as_date`'s `DateTime` arm** (`note/field.rs:112`) silently truncates to a
+  date — no divergence-register entry, though story 42 is exhaustive about other
+  coercions. *(weak)*
 
 **Considered and rejected as Q2 items (already covered or adjudicated):**
+
 - mega-classifier — review §5.3 explicitly rejected, spec L78;
-- `Clock`/`TimeZone`/`Dialect` traits, typestate builders, merged error enums, `Cow<'a, str>` — spec L78 / review §5.7;
+- `Clock`/`TimeZone`/`Dialect` traits, typestate builders, merged error enums,
+  `Cow<'a, str>` — spec L78 / review §5.7;
 - `date/` directory split — spec L135 (revisit only if size pushes it);
-- null ordering, strictness-by-seam, ISO Monday, DST policy — decided (spec L148);
+- null ordering, strictness-by-seam, ISO Monday, DST policy — decided (spec
+  L148);
 - `UNIT_HINT` being a *second ratio table* — it isn't (spellings only);
-- `DurationSeconds` `Display` dialect (N19) and `from_seconds` lying (N14) — fixed by 01.
+- `DurationSeconds` `Display` dialect (N19) and `from_seconds` lying (N14) —
+  fixed by 01.
 
 ---
 
 #### Q3 — Internal contradictions
 
 **C1 (highest). Ticket 05 ↔ review §3 B17 ↔ spec L77 ↔ the grammar.**
-- Ticket 05 L3: *"all as registry entries, **no new operators or grammar**"*; demo contract: *"a filter expression that adds `dur(\"1 month\")` to a note's date and compares the result against another date returns the same answer as the template engine would."*
-- Spec L77: *"Query temporal features are `FilterFunction` registry entries only — never new operators or grammar."*
-- Review §3: *"**B17** query `date ± duration`, `date − date` (their headline idiom L13501/L4807) → `FilterFunction` entries (`filter.rs:116–125`), never operators."*
-- **Reality (G1):** `FilterFunction` is a one-variant *predicate* enum with a literal-only argument parser; `dur("…")` does not parse; `date − date` must yield a **value**; a function result cannot be compared.
-- **Unresolved:** either the grammar constraint is violated (needs a spec/review amendment naming the minimal expression surface), or stories 1–3 and ticket 05 items 1–3 are undeliverable as written. Not adjudicated anywhere in the corpus.
+
+- Ticket 05 L3: *"all as registry entries, **no new operators or grammar**"*;
+  demo contract: *"a filter expression that adds `dur(\"1 month\")` to a note's
+  date and compares the result against another date returns the same answer as
+  the template engine would."*
+- Spec L77: *"Query temporal features are `FilterFunction` registry entries only
+  — never new operators or grammar."*
+- Review §3: *"**B17** query `date ± duration`, `date − date` (their headline
+  idiom L13501/L4807) → `FilterFunction` entries (`filter.rs:116–125`), never
+  operators."*
+- **Reality (G1):** `FilterFunction` is a one-variant *predicate* enum with a
+  literal-only argument parser; `dur("…")` does not parse; `date − date` must
+  yield a **value**; a function result cannot be compared.
+- **Unresolved:** either the grammar constraint is violated (needs a spec/review
+  amendment naming the minimal expression surface), or stories 1–3 and ticket 05
+  items 1–3 are undeliverable as written. Not adjudicated anywhere in the
+  corpus.
 
 **C2. Spec L103/L102/L111 ↔ review §9 S4 + §10 step 6 ↔ ticket 06 ↔ ticket 03.**
-Spec mandates *"Core `format_with` keeps strftime as its only grammar"* (L103), Decision-C *"`format_with` gets a real consumer (S4)"* (L111), and §5.6's shared `render_pattern`; ticket 06 items 2 and 15 repeat both; **ticket 03 deleted `DateValue::format_with` and `DateTimeValue::format_with` and counted the seven suppression deletions as a remediation win** (03 L105–108). Three artifacts promise a surface the fourth removed.
+Spec mandates *"Core `format_with` keeps strftime as its only grammar"* (L103),
+Decision-C *"`format_with` gets a real consumer (S4)"* (L111), and §5.6's shared
+`render_pattern`; ticket 06 items 2 and 15 repeat both; **ticket 03 deleted
+`DateValue::format_with` and `DateTimeValue::format_with` and counted the seven
+suppression deletions as a remediation win** (03 L105–108). Three artifacts
+promise a surface the fourth removed.
 
-**C3. Ticket 09 ↔ spec L111 ↔ review §2.3/§10 step 6 ↔ HEAD.**
-Four enumerations that disagree: ticket 09's six-method set (five already gone), review's *"8 methods"*, review §10 step 6's six named deletions (four gone), and OBSERVED six *different* live items (Q1c). Plus 09's `duration.rs:217` (now 353) and its `to_rfc3339()` premise (0 hits).
+**C3. Ticket 09 ↔ spec L111 ↔ review §2.3/§10 step 6 ↔ HEAD.** Four enumerations
+that disagree: ticket 09's six-method set (five already gone), review's
+*"8 methods"*, review §10 step 6's six named deletions (four gone), and OBSERVED
+six *different* live items (Q1c). Plus 09's `duration.rs:217` (now 353) and its
+`to_rfc3339()` premise (0 hits).
 
 **C4. `review.md` §10 + §9 + §4 vs the resolved tickets.**
-- §10 step 2 *"**Correctness:** S10 (N1, N4, N3′, N14, N19, D9, local-naive + DST policy, pinning tests) + S6 (N12/N17)"* — all of it landed via 01/02.
-- §10 step 3 *"**Load-bearing seam:** S2 → S1 → S5 → S7"* — S2 and S1 landed via 03.
+
+- §10 step 2 *"**Correctness:** S10 (N1, N4, N3′, N14, N19, D9, local-naive +
+  DST policy, pinning tests) + S6 (N12/N17)"* — all of it landed via 01/02.
+- §10 step 3 *"**Load-bearing seam:** S2 → S1 → S5 → S7"* — S2 and S1 landed via
+  03.
 - §9 rows S1/S2/S6/S10 in future tense.
 - §10 step 6 lists four deleted methods.
-- §4 headed *"Also fixed (carried)"* while its `DEFAULT_DATE_FORMAT` bullet is still open (08 item 14, `config/model.rs:52` live).
-- review L5 *"No implementation performed"* — contradicted by `c990f6c9`, `90696f25`, `57ea1b09`→`bcc938b5`.
+- §4 headed *"Also fixed (carried)"* while its `DEFAULT_DATE_FORMAT` bullet is
+  still open (08 item 14, `config/model.rs:52` live).
+- review L5 *"No implementation performed"* — contradicted by `c990f6c9`,
+  `90696f25`, `57ea1b09`→`bcc938b5`.
 
 **C5. Ticket 03's blocker declaration vs spec's encoding rule.**
-- Spec L141: *"Execution order (**tickets will encode these blocking edges**)"*; L142 puts correctness (01/02 scope) **before** the seam chain (03/04): *"1. Correctness: N1, N4, N3′, N14, N19, D9, local-naive parse + DST policy … + serde repair (N12, N17). 2. Load-bearing seam chain: parts/registry (S2) → calendar owner (S1) → classify (S5) → precision hoist (S7) — strictly in this order."*
+
+- Spec L141: *"Execution order (**tickets will encode these blocking edges**)"*;
+  L142 puts correctness (01/02 scope) **before** the seam chain (03/04): *"1.
+  Correctness: N1, N4, N3′, N14, N19, D9, local-naive parse + DST policy … +
+  serde repair (N12, N17). 2. Load-bearing seam chain: parts/registry (S2) →
+  calendar owner (S1) → classify (S5) → precision hoist (S7) — strictly in this
+  order."*
 - Ticket 03 L5: *"**Blocked by:** None (01 and 02 merged)."*
-- Ticket 01's own comment (01 L37 and 01 L97): *"**ticket 03 (`Blocked by: 01`)** … can proceed once this lands."*
+- Ticket 01's own comment (01 L37 and 01 L97):
+  *"**ticket 03 (`Blocked by: 01`)** … can proceed once this lands."*
 - Two artifacts disagree about an edge the spec says the tickets own.
 
-**C6. Ticket 05's blocker note misstates dependency direction.**
-05 L5: *"**Blocked by:** 04 (needs the calendar owner behind a stable recognition/classification interface; **the calendar owner is 03, reached via 04**)."* The calendar owner is reached directly from 03; 04 is a recognition/precision ticket. Correct statement: 05 needs *both* the calendar owner (03) and the recognition interface (04), and the chain is 03 → 04 → 05.
+**C6. Ticket 05's blocker note misstates dependency direction.** 05 L5:
+*"**Blocked by:** 04 (needs the calendar owner behind a stable
+recognition/classification interface; **the calendar owner is 03, reached via
+04**)."* The calendar owner is reached directly from 03; 04 is a
+recognition/precision ticket. Correct statement: 05 needs *both* the calendar
+owner (03) and the recognition interface (04), and the chain is 03 → 04 → 05.
 
 **C7. Spec D14 / story 13 vs `From<DateValue> for DateTimeValue`.**
-- Spec L98: *"None caused by a tz-data/OS error surfaces as an error, **never a silent shift** (gap verified by probing adjacent local times)."*
+
+- Spec L98: *"None caused by a tz-data/OS error surfaces as an error, **never a
+  silent shift** (gap verified by probing adjacent local times)."*
 - Spec L39 (story 13): *"…only a tz-data/OS lookup failure does [fail]."*
-- `date.rs:738–747`: silent UTC-midnight fallback, documented in rustdoc, reachable from `==`/`!=` filters via `is_equal_to_date`.
-- And absent from ticket 08's divergence register (08 item 13 / spec L117). *(full detail in G4)*
+- `date.rs:738–747`: silent UTC-midnight fallback, documented in rustdoc,
+  reachable from `==`/`!=` filters via `is_equal_to_date`.
+- And absent from ticket 08's divergence register (08 item 13 / spec L117).
+  *(full detail in G4)*
 
 **C8. Review §9 S9 vs the ticket 05/07 split.**
-- §9 S9: *"Shorthands `sow/eow/soy/eoy`, `weekday`, ISO-8601 offset translation | seam: **engine adapters over S1** | parity: **B11**, T1, T3."*
-- Ticket 05 item 4: *"bucketing helpers … are ticket 07's deliverable per spec story 4, not claimed here."*
-- Ticket 07 items 11–12: bucketing on **both** seams — *"as query `FilterFunction` registry entries … and as template shorthands — ticket 07 owns both seams per spec story 4 (05 defers them here)."*
-- So S9's seam column names only the engine side while the delivery ticket owns the query registry side too. Minor, but the S-table is what an implementer reads for seam scope.
+
+- §9 S9: *"Shorthands `sow/eow/soy/eoy`, `weekday`, ISO-8601 offset translation |
+  seam: **engine adapters over S1** | parity: **B11**, T1, T3."*
+- Ticket 05 item 4: *"bucketing helpers … are ticket 07's deliverable per spec
+  story 4, not claimed here."*
+- Ticket 07 items 11–12: bucketing on **both** seams — *"as query
+  `FilterFunction` registry entries … and as template shorthands — ticket 07
+  owns both seams per spec story 4 (05 defers them here)."*
+- So S9's seam column names only the engine side while the delivery ticket owns
+  the query registry side too. Minor, but the S-table is what an implementer
+  reads for seam scope.
 
 **C9 (minor). Ticket 03's internal tension around `is_calendar`.**
-- 03 handoff L175–181: *"Do not replace the matches with a shared `is_calendar()` predicate — that would bypass the exhaustiveness gate."*
-- 03 handoff L164–169: declares `DurationValue::is_calendar()` (a predicate) **spec-mandated surface** whose consumer is *"future classify/temporal callers"*.
-- OBSERVED `duration.rs:461–473`: it **is** an exhaustive match (no wildcard: `Day|Week|Month|Year => true`, `Millisecond|Second|Minute|Hour => false`), so no bypass occurs today.
-- The tension is that a predicate 03 warns against *using as the shared implementation* is simultaneously declared keepable surface with a speculative consumer. Ticket 09 does not list it, so no deletion test will resolve it.
 
-**C10 (minor). Ticket 04's inventory is internally consistent but externally incomplete.**
-- Item 16 names two 10-byte gates; item 12 names `note/field.rs:115` as a *discard*; item 13's AC (*no production call site combines a shape guard with `parse`*) will reach it only implicitly. `note/field.rs:114` is simultaneously a **grammar gate** (story 15) and a **guard site** (N15) and is classified as neither. *(full detail in G3)*
+- 03 handoff L175–181: *"Do not replace the matches with a shared
+  `is_calendar()` predicate — that would bypass the exhaustiveness gate."*
+- 03 handoff L164–169: declares `DurationValue::is_calendar()` (a predicate)
+  **spec-mandated surface** whose consumer is
+  *"future classify/temporal callers"*.
+- OBSERVED `duration.rs:461–473`: it **is** an exhaustive match (no wildcard:
+  `Day|Week|Month|Year => true`, `Millisecond|Second|Minute|Hour => false`), so
+  no bypass occurs today.
+- The tension is that a predicate 03 warns against
+  *using as the shared implementation* is simultaneously declared keepable
+  surface with a speculative consumer. Ticket 09 does not list it, so no
+  deletion test will resolve it.
 
-**C11 (minor, factual-inventory flavour). Ticket 04's own stated amendment record vs what was verifiable at pin time.**
-04 L30–35: *"Seven factual amendments applied in place … stale `.ok()` claim, cascade/scan counts, `DatePoint::has_time` single-source …"* — the *counts* were corrected, but the *line numbers* were not re-derived, so the amendment pass certified stale numbers (see §0 table). This is a process contradiction (a "review and pin" commit that did not verify), not a content one.
+**C10 (minor). Ticket 04's inventory is internally consistent but externally
+incomplete.**
+
+- Item 16 names two 10-byte gates; item 12 names `note/field.rs:115` as a
+  *discard*; item 13's AC
+  (*no production call site combines a shape guard with `parse`*) will reach it
+  only implicitly. `note/field.rs:114` is simultaneously a **grammar gate**
+  (story 15) and a **guard site** (N15) and is classified as neither.
+  *(full detail in G3)*
+
+**C11 (minor, factual-inventory flavour). Ticket 04's own stated amendment
+record vs what was verifiable at pin time.** 04 L30–35: *"Seven factual
+amendments applied in place … stale `.ok()` claim, cascade/scan counts,
+`DatePoint::has_time` single-source …"* — the *counts* were corrected, but the
+*line numbers* were not re-derived, so the amendment pass certified stale
+numbers (see §0 table). This is a process contradiction (a "review and pin"
+commit that did not verify), not a content one.
 
 ---
 
 ## External prior art (post-v4)
 
-- `research/sql-temporal-conventions.md` — SQL engines' temporal conventions (PG/MySQL/SQLite/DuckDB/Trino/BigQuery); backs: UTC-storage precedent, DST gap-forward + PG-later-vs-earlier overlap divergence, magnitude interval equality, ISO Monday in PG `date_trunc`, null-ordering disagreement among engines.
-- `research/general-temporal-libraries.md` — Temporal/Luxon/Java/Python/standards; backs: DST `compatible`/earlier consensus, dual civil-vs-zoned timelines, magnitude duration equality, strict-parse norm, CLDR locale-data weeks.
-- `research/rust-temporal-ecosystem.md` — chrono/time/jiff/Arrow/DataFusion; backs: `MappedLocalTime` semantics + gap/error conflation, chrono `Days`/`Months` vs `TimeDelta` regime split, Arrow Duration-vs-Interval, chrono strftime as the de-facto Rust dialect, known chrono critiques (RUSTSEC, serde history).
+- `research/sql-temporal-conventions.md` — SQL engines' temporal conventions
+  (PG/MySQL/SQLite/DuckDB/Trino/BigQuery); backs: UTC-storage precedent, DST
+  gap-forward + PG-later-vs-earlier overlap divergence, magnitude interval
+  equality, ISO Monday in PG `date_trunc`, null-ordering disagreement among
+  engines.
+- `research/general-temporal-libraries.md` —
+  Temporal/Luxon/Java/Python/standards; backs: DST `compatible`/earlier
+  consensus, dual civil-vs-zoned timelines, magnitude duration equality,
+  strict-parse norm, CLDR locale-data weeks.
+- `research/rust-temporal-ecosystem.md` — chrono/time/jiff/Arrow/DataFusion;
+  backs: `MappedLocalTime` semantics + gap/error conflation, chrono
+  `Days`/`Months` vs `TimeDelta` regime split, Arrow Duration-vs-Interval,
+  chrono strftime as the de-facto Rust dialect, known chrono critiques (RUSTSEC,
+  serde history).
 
-**Post-v4 evolution:** the DST-ambiguity policy (the one open item below) is now **settled** — ambiguous → earliest by the resolver's own `local_minus_utc()` comparison (§4 B1; mechanism note added 2026-10-05 per §13 RPT-F1 — the earlier "→ `.earliest()`" gloss named chrono's API, which is platform-dependent and must not be used), nonexistent → shift forward — and null ordering is **decided** (keep current behavior + ADR, §3). ~~Everything else is decided.~~ **(2026-10-05 correction: no longer true — four maintainer decisions are open and recorded as such: §11 X1 query grammar, X4 `From<DateValue>` fallback, U1 comma precedence, X7 multi-part `apply` consumer; plus sequencing questions D1-vs-04 and X8. Spec and tickets carry the questions inline.)** Post-v4: external prior-art research (`research/`) and the chrono-API audit added the local-wall-clock calendar frame, day-as-calendar, the gap-verified resolver, and the chrono format/week delegation mandates (spec 'Implementation Decisions').
+**Post-v4 evolution:** the DST-ambiguity policy (the one open item below) is now
+**settled** — ambiguous → earliest by the resolver's own `local_minus_utc()`
+comparison (§4 B1; mechanism note added 2026-10-05 per §13 RPT-F1 — the earlier
+"→ `.earliest()`" gloss named chrono's API, which is platform-dependent and must
+not be used), nonexistent → shift forward — and null ordering is **decided**
+(keep current behavior + ADR, §3). ~~Everything else is decided.~~ **(2026-10-05
+correction: no longer true — four maintainer decisions are open and recorded as
+such: §11 X1 query grammar, X4 `From<DateValue>` fallback, U1 comma precedence,
+X7 multi-part `apply` consumer; plus sequencing questions D1-vs-04 and X8. Spec
+and tickets carry the questions inline.)** Post-v4: external prior-art research
+(`research/`) and the chrono-API audit added the local-wall-clock calendar
+frame, day-as-calendar, the gap-verified resolver, and the chrono format/week
+delegation mandates (spec 'Implementation Decisions').
 
 **Post-v4 decisions (defined in `spec.md`):**
-- **D12** — calendar frame = local wall clock: day/week/month/year application round-trips `DateTime<Utc>` → local naive → UTC through the resolver; sub-day units remain exact on the instant.
-- **D13** — day is a calendar application unit; identity stays seconds-based (`1d == 24h` as values, may shift differently across DST).
-- **D14** — gap-verified `MappedLocalTime` resolver: ambiguous → earliest, true gap → shift forward, tz-data/OS `None` → error. (Mechanism: the manual `local_minus_utc()` comparison at `src/date.rs:1064-1076` — "earliest" is the policy, not chrono's `.earliest()` API; see §13 RPT-F1.)
-- **Serde channel** — `Serialize` emits explicit RFC3339 `…Z` via `to_rfc3339_opts(SecondsFormat::Secs, use_z=true)`; human `Display` remains local-naive. The local→UTC rule therefore applies only to naive user-authored input, while serialized instants round-trip exactly.
+
+- **D12** — calendar frame = local wall clock: day/week/month/year application
+  round-trips `DateTime<Utc>` → local naive → UTC through the resolver; sub-day
+  units remain exact on the instant.
+- **D13** — day is a calendar application unit; identity stays seconds-based
+  (`1d == 24h` as values, may shift differently across DST).
+- **D14** — gap-verified `MappedLocalTime` resolver: ambiguous → earliest, true
+  gap → shift forward, tz-data/OS `None` → error. (Mechanism: the manual
+  `local_minus_utc()` comparison at `src/date.rs:1064-1076` — "earliest" is the
+  policy, not chrono's `.earliest()` API; see §13 RPT-F1.)
+- **Serde channel** — `Serialize` emits explicit RFC3339 `…Z` via
+  `to_rfc3339_opts(SecondsFormat::Secs, use_z=true)`; human `Display` remains
+  local-naive. The local→UTC rule therefore applies only to naive user-authored
+  input, while serialized instants round-trip exactly.
 
 ---
 
 ## 13. 2026-10-05 second pass — stress-test, bloat audit, blast radius
 
-**Type:** focused review + audit (research only — no code changes, no tests run; every claim is source-derived, predictions marked).
-**Method:** five passes — (1) chrono-usage audit via rust-docs-mcp @ chrono 0.4.45; (2) adversarial design review; (3) codegraph/source bloat audit (`T#`); (4) adversarial **stress-test** of passes 1–2; (5) blast-radius mapping (`P#`). Chrono claims re-verified against `~/.cargo/registry/.../chrono-0.4.45` source, not memory.
-**ID namespace (see §11 ID warning #2):** `RPT-F#` = chrono-audit report findings; `NU#`/`ND#` = new design findings; `T#` = bloat audit; `P#` = proposals. Bare `F#` elsewhere means §12.2.
-**Verdict legend:** ✅ confirmed · ✅+ sharpened · ❌ refuted · ⚠️ already decided/ticketed.
+**Type:** focused review + audit (research only — no code changes, no tests run;
+every claim is source-derived, predictions marked). **Method:** five passes —
+(1) chrono-usage audit via rust-docs-mcp @ chrono 0.4.45; (2) adversarial design
+review; (3) codegraph/source bloat audit (`T#`); (4) adversarial **stress-test**
+of passes 1–2; (5) blast-radius mapping (`P#`). Chrono claims re-verified
+against `~/.cargo/registry/.../chrono-0.4.45` source, not memory.
+**ID namespace (see §11 ID warning #2):** `RPT-F#` = chrono-audit report
+findings; `NU#`/`ND#` = new design findings; `T#` = bloat audit; `P#` =
+proposals. Bare `F#` elsewhere means §12.2. **Verdict legend:** ✅ confirmed ·
+✅+ sharpened · ❌ refuted · ⚠️ already decided/ticketed.
 
 ### 13.1 Verdicts on the original chrono-audit report (RPT-F1–F8)
 
@@ -1969,31 +3278,78 @@ Four enumerations that disagree: ticket 09's six-method set (five already gone),
 
 ### 13.4 Bloat-audit findings (T-series, new — not in any prior report)
 
-1. **T-new-1 (MED-HIGH) — engine performs calendar arithmetic outside the "calendar owner".** `succ_opt()`/`pred_opt()` (`engine/date.rs:125/:135`), `with_day(1)` (`:575`), `with_day(num_days_in_month)` (`:587`), `weekday()` (`:602`), `leap_year()` (`:691-692`), plus `shift_date(closure)` (`:376-397`) beside `date_shift_unit`. `date.rs:26-33` claims single ownership; 3 of the 4 named methods are `expect(dead_code)` (`:165/:192/:585`). Ticket **07 will add more** on this pattern (bucketing, sow/eow). Corpus's bypass check grepped constructors, not operations. → amended into 05's AC + 07 guard.
-2. **T-new-2 (MED) — trait-impl stratum invisible to the dead-code census.** Six impls with zero production callers: `FromStr` ×3 (`duration.rs:754`, `date.rs:313/:752`), `From<NaiveDate> for DateValue` (`date.rs:297`), `TryFrom<DurationValue> for TimeDelta` (`duration.rs:763`), `TryFrom<DurationSeconds> for TimeDelta` (`duration.rs:1043`, reaches only through dead `apply`). `spec.md:113` / 09's census grep `dead_code` and **under-count**. F4's divergence lives in code no queued ticket touches until 05 wires `apply`. → spec `:113` + 09 amended.
-3. **T-new-3 (MED) — String↔Duration filter equality is direction-dependent.** `note/field.rs:376` (String arm matches any `as_str`) ⇒ `string_field == Duration("1h")` **true**; `:386-389` (Duration arm needs a Duration literal) ⇒ `duration_field == String("1h")` **false**. Ordering disagrees too (`rank()`: Duration=3 < Text=5). Corpus covered only Date↔DateTime. → 04 decide keep-and-pin or fix.
-4. **T-new-4 (MED) — grammar verdict matrix** = ND-1's matrix above (both agents derived it independently).
-5. **T-new-5 (LOW) — census-blind micro-dead-code:** `DateTimeValue::now()` `#[cfg(test)]` (`date.rs:377-385`) validates `std`, not the module; dead `.ok_or` (`date.rs:990`); phantom `DateDiff` Result. → 09 census extended.
+1. **T-new-1 (MED-HIGH) — engine performs calendar arithmetic outside the
+   "calendar owner".** `succ_opt()`/`pred_opt()` (`engine/date.rs:125/:135`),
+   `with_day(1)` (`:575`), `with_day(num_days_in_month)` (`:587`), `weekday()`
+   (`:602`), `leap_year()` (`:691-692`), plus `shift_date(closure)` (`:376-397`)
+   beside `date_shift_unit`. `date.rs:26-33` claims single ownership; 3 of the 4
+   named methods are `expect(dead_code)` (`:165/:192/:585`). Ticket
+   **07 will add more** on this pattern (bucketing, sow/eow). Corpus's bypass
+   check grepped constructors, not operations. → amended into 05's AC + 07
+   guard.
+2. **T-new-2 (MED) — trait-impl stratum invisible to the dead-code census.** Six
+   impls with zero production callers: `FromStr` ×3 (`duration.rs:754`,
+   `date.rs:313/:752`), `From<NaiveDate> for DateValue` (`date.rs:297`),
+   `TryFrom<DurationValue> for TimeDelta` (`duration.rs:763`),
+   `TryFrom<DurationSeconds> for TimeDelta` (`duration.rs:1043`, reaches only
+   through dead `apply`). `spec.md:113` / 09's census grep `dead_code` and
+   **under-count**. F4's divergence lives in code no queued ticket touches until
+   05 wires `apply`. → spec `:113` + 09 amended.
+3. **T-new-3 (MED) — String↔Duration filter equality is direction-dependent.**
+   `note/field.rs:376` (String arm matches any `as_str`) ⇒
+   `string_field == Duration("1h")` **true**; `:386-389` (Duration arm needs a
+   Duration literal) ⇒ `duration_field == String("1h")` **false**. Ordering
+   disagrees too (`rank()`: Duration=3 < Text=5). Corpus covered only
+   Date↔DateTime. → 04 decide keep-and-pin or fix.
+4. **T-new-4 (MED) — grammar verdict matrix** = ND-1's matrix above (both agents
+   derived it independently).
+5. **T-new-5 (LOW) — census-blind micro-dead-code:** `DateTimeValue::now()`
+   `#[cfg(test)]` (`date.rs:377-385`) validates `std`, not the module; dead
+   `.ok_or` (`date.rs:990`); phantom `DateDiff` Result. → 09 census extended.
 
 ### 13.5 Free-fn ↔ method verdicts (the explicit ask)
 
-- `shift_calendar_months/days` → **wrong shape (D3)**: should *call* `shift_wall`; a fold, not a new type. → 04.
-- `seconds_delta` vs `TryFrom<DurationSeconds> for TimeDelta` → **two shapes, one op, one buggy (D4)**: consolidate on one correct `TryFrom` (`DurationSeconds` is the lawful home — orphan rules forbid `TryFrom<f64> for TimeDelta`); keep the `DateError::OutOfRange` mapping but stop erasing `.source()`. → 05.
-- `local_naive_to_utc`, `resolve_gap_offset`, `shift_months` → **free fns correct** (foreign receivers); keep — **and keep the manual ambiguity comparison (RPT-F1)**.
-- `signed_years_since`/`signed_months_since` → free fn correct; `NaiveDateExt` trait = marginal gain, **not recommended**.
-- 11 duration scanner associated fns → **namespace-mismatched, not method-worthy** (9 stateless scanner + 2 witness helpers; `combine` is consuming). Private `mod scan` grouping = navigability only; **rides 04's loop rewrite, never standalone**; breaks exactly 3 test paths (`duration.rs:1489/:1498`, `:1833/:1894/:1957`).
-- `DateTimeFormat`/`DateFormat` cascades; guards → missing `parse_any`, wrongly-attached guards — both owned by 04 (N20/D1, N15).
-- `shift_wall` → not "free to keep": 04's D1 fold demotes it to private; 09 verifies post-04.
+- `shift_calendar_months/days` → **wrong shape (D3)**: should *call*
+  `shift_wall`; a fold, not a new type. → 04.
+- `seconds_delta` vs `TryFrom<DurationSeconds> for TimeDelta` →
+  **two shapes, one op, one buggy (D4)**: consolidate on one correct `TryFrom`
+  (`DurationSeconds` is the lawful home — orphan rules forbid
+  `TryFrom<f64> for TimeDelta`); keep the `DateError::OutOfRange` mapping but
+  stop erasing `.source()`. → 05.
+- `local_naive_to_utc`, `resolve_gap_offset`, `shift_months` →
+  **free fns correct** (foreign receivers); keep —
+  **and keep the manual ambiguity comparison (RPT-F1)**.
+- `signed_years_since`/`signed_months_since` → free fn correct; `NaiveDateExt`
+  trait = marginal gain, **not recommended**.
+- 11 duration scanner associated fns →
+  **namespace-mismatched, not method-worthy** (9 stateless scanner + 2 witness
+  helpers; `combine` is consuming). Private `mod scan` grouping = navigability
+  only; **rides 04's loop rewrite, never standalone**; breaks exactly 3 test
+  paths (`duration.rs:1489/:1498`, `:1833/:1894/:1957`).
+- `DateTimeFormat`/`DateFormat` cascades; guards → missing `parse_any`,
+  wrongly-attached guards — both owned by 04 (N20/D1, N15).
+- `shift_wall` → not "free to keep": 04's D1 fold demotes it to private; 09
+  verifies post-04.
 
-Net: no missed method conversions of consequence; wrong shapes = D3, D4, scanner namespace.
+Net: no missed method conversions of consequence; wrong shapes = D3, D4, scanner
+namespace.
 
 ### 13.6 `src/date/` split — HOLD (final answer)
 
-**HOLD; re-measure after 04 + 05.** Corroborated three ways: spec `:137` explicitly holds it; §11.5 lists it corpus-settled; the count is **non-monotonic** post-04 (classify + precision + `YearMonth` move *in*; D1 relocation + D3 twins move ~28 ln *out*). Freeze criteria: prod >~1.3k **and** ≥2 independently-changing regions. Natural split if triggered: `date/value.rs` (values + shift/apply) / `date/recognize.rs` (formats + classify + precision). Do **not** carve across `apply ↔ apply_part ↔ seconds_delta`. Import churn small (2 files: `lib.rs:63-101`, `engine/date.rs:44-48`) but `pub(crate)` widening collides with 04's demotion + 09's visibility review. `duration.rs`: only the optional `mod scan`; no directory split.
+**HOLD; re-measure after 04 + 05.** Corroborated three ways: spec `:137`
+explicitly holds it; §11.5 lists it corpus-settled; the count is
+**non-monotonic** post-04 (classify + precision + `YearMonth` move *in*; D1
+relocation + D3 twins move ~28 ln *out*). Freeze criteria: prod >~1.3k **and**
+≥2 independently-changing regions. Natural split if triggered: `date/value.rs`
+(values + shift/apply) / `date/recognize.rs` (formats + classify + precision).
+Do **not** carve across `apply ↔ apply_part ↔ seconds_delta`. Import churn small
+(2 files: `lib.rs:63-101`, `engine/date.rs:44-48`) but `pub(crate)` widening
+collides with 04's demotion + 09's visibility review. `duration.rs`: only the
+optional `mod scan`; no directory split.
 
 ### 13.7 Blast-radius dependency graph (P1–P11)
 
-```
+```text
 P3 (classify grammar direction) ──┬─> P6 (DateTimeFormat::parse shape)  [04 co-schedules both — D7 already there]
                                   ├─> P9/NU-2 (space-fractional entry)  [same enum + cascade; verify %.f first]
                                   └─> mod scan grouping                 [guards/scanner die with classify]
@@ -2006,30 +3362,62 @@ P8/ND-2 ─> superseded by X4(a) (08); residual = citation addendum (engine:230)
 P10 (date/ split) ─> strictly AFTER 04 + 05 + parse_with — last (spec:137 hold + freeze criteria)
 ```
 
-**Ticket-ownership matrix:** RPT-F1 (04 comment + corpus fix done), RPT-F3 (01 erratum done; decision → 08), NU-1/NU-4/ND-2-citation (08), NU-2/ND-1 grammar/T-new-3/D3-twins/comment (04), D4/ND-3/T-new-1-AC (05), T-new-2/T-new-5 (09), D7/X4/F6 (already in 04/08).
+**Ticket-ownership matrix:** RPT-F1 (04 comment + corpus fix done), RPT-F3 (01
+erratum done; decision → 08), NU-1/NU-4/ND-2-citation (08), NU-2/ND-1
+grammar/T-new-3/D3-twins/comment (04), D4/ND-3/T-new-1-AC (05), T-new-2/T-new-5
+(09), D7/X4/F6 (already in 04/08).
 
 ### 13.8 Test-coverage gaps (no pinning test today)
 
-1. **RPT-F1** — nothing distinguishes "earliest by our comparison" from "chrono's first field"; only outcome pin `date.rs:1371-1381`.
-2. **D4** — no test hits rounded nanos at exactly `1e9`; pins `0.9999999996`, `-1e-10` through both entries (nearest existing `duration.rs:2276`).
-3. **RPT-F3** — no test serializes a sub-second `DateTimeValue` (all serde tests whole-second: `date.rs:2284/:2293`, `field.rs:1776`).
-4. **NU-1** — no test pins Display/Serialize of a *computed* duration (`duration.rs:1667` covers parse only).
-5. **NU-2** — no test asserts accept *or* reject of space+fractional (gap is unknown, not merely unpinned).
-6. **RPT-F7** — the placeholder itself (`…00Z` before the undo at `:424-427`) unpinned.
-7. **ND-1** — `field.rs:833` pins leniency, but nothing pins `classify`'s `Some(Err)` × `field.rs:531` unguarded parse (spec `:116` perf rule).
-8. **ND-2** — UTC-fallback path unreproducible without fault injection; X4(a) registered, not executable.
-9. **D3** — engine shift tests don't assert *which* path ran; delegation verifiable only by line audit.
+1. **RPT-F1** — nothing distinguishes "earliest by our comparison" from
+   "chrono's first field"; only outcome pin `date.rs:1371-1381`.
+2. **D4** — no test hits rounded nanos at exactly `1e9`; pins `0.9999999996`,
+   `-1e-10` through both entries (nearest existing `duration.rs:2276`).
+3. **RPT-F3** — no test serializes a sub-second `DateTimeValue` (all serde tests
+   whole-second: `date.rs:2284/:2293`, `field.rs:1776`).
+4. **NU-1** — no test pins Display/Serialize of a *computed* duration
+   (`duration.rs:1667` covers parse only).
+5. **NU-2** — no test asserts accept *or* reject of space+fractional (gap is
+   unknown, not merely unpinned).
+6. **RPT-F7** — the placeholder itself (`…00Z` before the undo at `:424-427`)
+   unpinned.
+7. **ND-1** — `field.rs:833` pins leniency, but nothing pins `classify`'s
+   `Some(Err)` × `field.rs:531` unguarded parse (spec `:116` perf rule).
+8. **ND-2** — UTC-fallback path unreproducible without fault injection; X4(a)
+   registered, not executable.
+9. **D3** — engine shift tests don't assert *which* path ran; delegation
+   verifiable only by line audit.
 
 → All nine folded into spec `:125` (seam-1 list) and the relevant tickets.
 
 ### 13.9 Explicit do-NOTs (stress-test-confirmed negatives)
 
-Do **not**: collapse the `Ambiguous` arm or adopt `.earliest()`; re-open NU-1 as a 05 design change; split `date/` now; add `NaiveDateExt`; re-propose D7; create a `Scanner` type; touch `SecondsFormat` without the spec+AC chain; re-litigate settled rejections (DurationValue split, Clock/TimeZone/Frame traits, merged errors, `DurationUnit::class()`, mega-classifier, `LocalWall`, public `Shift` trait, test-only `dead_code` surface).
+Do **not**: collapse the `Ambiguous` arm or adopt `.earliest()`; re-open NU-1 as
+a 05 design change; split `date/` now; add `NaiveDateExt`; re-propose D7; create
+a `Scanner` type; touch `SecondsFormat` without the spec+AC chain; re-litigate
+settled rejections (DurationValue split, Clock/TimeZone/Frame traits, merged
+errors, `DurationUnit::class()`, mega-classifier, `LocalWall`, public `Shift`
+trait, test-only `dead_code` surface).
 
 ### 13.10 Coverage gaps (§11.9 addendum)
 
-No dynamic verification (`mise run verify`/tests not run — research-only; minimum pre-implementation checks: the two D4 pins, NU-2's `%.f` optionality, RPT-F3's `AutoSi` output). Chrono claims verified against registry source, not executed. `review.md` §12.2/§12.3 and several tickets read by grep, not in full. Production reach of `DateTimeValue`'s Serialize on CLI/query output paths not exhaustively traced (index persistence ruled out). Type-inferred `.into()` users of `From<DateValue> for NaiveDate` / `From<DateTimeValue> for DateTime<Utc>` not exhaustively chased. `resolve_gap_offset`'s 25-hour probe not traced against a real tzfile; no benches exist (deferred by 03).
+No dynamic verification (`mise run verify`/tests not run — research-only;
+minimum pre-implementation checks: the two D4 pins, NU-2's `%.f` optionality,
+RPT-F3's `AutoSi` output). Chrono claims verified against registry source, not
+executed. `review.md` §12.2/§12.3 and several tickets read by grep, not in full.
+Production reach of `DateTimeValue`'s Serialize on CLI/query output paths not
+exhaustively traced (index persistence ruled out). Type-inferred `.into()` users
+of `From<DateValue> for NaiveDate` / `From<DateTimeValue> for DateTime<Utc>` not
+exhaustively chased. `resolve_gap_offset`'s 25-hour probe not traced against a
+real tzfile; no benches exist (deferred by 03).
 
-**Bottom line:** the earlier report's highest-severity item (F1 → RPT-F1) was refuted — its fix would have broken DST handling; the durable finds are RPT-F3 (spec+AC erratum, not a patch), D4 with concrete divergence values plus a corrected corpus proof, ND-1's three-grammar matrix, T-new-1 engine off-owner arithmetic, T-new-2 census blind spot, and T-new-3 equality asymmetry — sequenced into existing tickets 04/05/08/09; only this §13 + Phase-0 corpus hygiene was fresh work.
+**Bottom line:** the earlier report's highest-severity item (F1 → RPT-F1) was
+refuted — its fix would have broken DST handling; the durable finds are RPT-F3
+(spec+AC erratum, not a patch), D4 with concrete divergence values plus a
+corrected corpus proof, ND-1's three-grammar matrix, T-new-1 engine off-owner
+arithmetic, T-new-2 census blind spot, and T-new-3 equality asymmetry —
+sequenced into existing tickets 04/05/08/09; only this §13 + Phase-0 corpus
+hygiene was fresh work.
 
-*Consolidated 2026-10-05 (second pass). Read-only pass: only `.scratch/temporal-core/` docs were modified; no source files were changed.*
+*Consolidated 2026-10-05 (second pass). Read-only pass: only
+`.scratch/temporal-core/` docs were modified; no source files were changed.*

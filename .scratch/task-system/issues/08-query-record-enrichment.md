@@ -36,7 +36,8 @@ values as borrowed references directly from the in-memory `Note` in
 - [x] Implement tri-state completion on `list.completed`: `Some(true)` (Done),
   `Some(false)` (Incomplete: Todo, In Progress, On Hold), `None` (Cancelled and
   non-task items).
-- [x] Add `FileField::Tags` (`file.tags`) to access note-level tags on list rows.
+- [x] Add `FileField::Tags` (`file.tags`) to access note-level tags on list
+      rows.
 - [x] Implement metadata precedence in `QueryRow::resolve_ref`: check item
   inline fields before note frontmatter.
 - [x] Unit tests for all universal and task field paths on list rows.

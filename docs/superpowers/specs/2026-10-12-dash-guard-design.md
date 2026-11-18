@@ -1,7 +1,7 @@
 # Design: dash-guard plugin (prose dash asides)
 
-Date: 2026-10-12
-Status: implemented (inline, per user's speed preference — same architecture as the reviewed rust-guard/py-guard)
+Date: 2026-10-12 Status: implemented (inline, per user's speed preference — same
+architecture as the reviewed rust-guard/py-guard)
 
 ## Context
 

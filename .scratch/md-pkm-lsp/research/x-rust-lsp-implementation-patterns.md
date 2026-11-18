@@ -1,6 +1,7 @@
 # Rust LSP Implementation Patterns: Source Code Analysis
 
-Concrete patterns from production Rust LSPs. Sources: Biome, rust-analyzer, taplo, oxc, Harper, and others.
+Concrete patterns from production Rust LSPs. Sources: Biome, rust-analyzer,
+taplo, oxc, Harper, and others.
 
 ---
 
@@ -18,7 +19,9 @@ Concrete patterns from production Rust LSPs. Sources: Biome, rust-analyzer, tapl
 | **ast-grep** | `tower-lsp-server` | tokio async | Sync analysis |
 | **Veryl** | `tower-lsp-server` | tokio async | Sync analysis |
 
-**Key finding:** `tower-lsp-server` (community fork of `tower-lsp`) is the dominant framework. The only significant alternative is rust-analyzer's hand-rolled `lsp-server` + crossbeam-channel approach.
+**Key finding:** `tower-lsp-server` (community fork of `tower-lsp`) is the
+dominant framework. The only significant alternative is rust-analyzer's
+hand-rolled `lsp-server` + crossbeam-channel approach.
 
 ---
 
@@ -97,9 +100,11 @@ macro_rules! workspace_method {
 ```
 
 **This is the most important pattern in the file.** Every workspace method:
+
 1. Gets wrapped in `spawn_blocking` (moves off tokio runtime)
 2. Calls `catch_lsp_operation` (catches salsa panics + cancellation)
-3. Uses `workspace_for_request()` (non-retrying, returns ContentModified on staleness)
+3. Uses `workspace_for_request()` (non-retrying, returns ContentModified on
+   staleness)
 4. Returns a 4-layer nested Result that's unwound in the match
 
 ### 2.3 Biome's Two Workspace Accessors
@@ -122,7 +127,8 @@ impl Session {
 }
 ```
 
-**Critical distinction:** Notifications retry (editor won't re-send), requests don't (positions become stale).
+**Critical distinction:** Notifications retry (editor won't re-send), requests
+don't (positions become stale).
 
 ### 2.4 Biome's Panic Handling
 
@@ -139,11 +145,13 @@ where
 }
 ```
 
-Two layers of catch: inner catches salsa cancellation, outer catches panics. Both are converted to LSP errors.
+Two layers of catch: inner catches salsa cancellation, outer catches panics.
+Both are converted to LSP errors.
 
 ### 2.5 Biome's Standard LSP Handlers
 
-For built-in LSP methods (not custom workspace methods), Biome implements the `LanguageServer` trait:
+For built-in LSP methods (not custom workspace methods), Biome implements the
+`LanguageServer` trait:
 
 ```rust
 impl LanguageServer for LSPServer {
@@ -158,7 +166,11 @@ impl LanguageServer for LSPServer {
 }
 ```
 
-Same pattern: `catch_lsp_operation` → match on nested Result. But note: these run on the **tokio runtime** (not `spawn_blocking`) because they're trait methods, not custom methods. This is a subtle difference — Biome's custom workspace methods get `spawn_blocking` but its `LanguageServer` trait methods run async on tokio.
+Same pattern: `catch_lsp_operation` → match on nested Result. But note: these
+run on the **tokio runtime** (not `spawn_blocking`) because they're trait
+methods, not custom methods. This is a subtle difference — Biome's custom
+workspace methods get `spawn_blocking` but its `LanguageServer` trait methods
+run async on tokio.
 
 ### 2.6 Biome's Diagnostics Debouncing
 
@@ -262,7 +274,9 @@ fn next_event(&mut self, inbox: &Receiver<lsp_server::Message>) -> Result<Option
 }
 ```
 
-**The `try_recv` before `select!` is the key trick** — formatting results are checked first so they never wait behind other events. This is what prevents editor freezing on format-on-type.
+**The `try_recv` before `select!` is the key trick** — formatting results are
+checked first so they never wait behind other events. This is what prevents
+editor freezing on format-on-type.
 
 ### 3.3 Event Coalescing
 
@@ -301,7 +315,8 @@ fn handle_event(&mut self, event: Event) {
 }
 ```
 
-**50ms coalescing window** applied to all non-LSP events. LSP messages are never coalesced (they need immediate response).
+**50ms coalescing window** applied to all non-LSP events. LSP messages are never
+coalesced (they need immediate response).
 
 ### 3.4 Request Dispatching
 
@@ -367,10 +382,12 @@ impl RequestDispatcher<'_> {
 ```
 
 **Three dispatch tiers:**
+
 1. `on_sync_mut` → main thread, mutable (workspace symbol, shutdown)
 2. `on_sync` → main thread, snapshot (inlay hints, join lines)
 3. `on` → worker pool (most requests)
-4. `on_latency_sensitive` → latency-sensitive pool (completion, hover, highlight)
+4. `on_latency_sensitive` → latency-sensitive pool (completion, hover,
+   highlight)
 5. `on_fmt_thread` → dedicated formatting pool (never blocked by workers)
 
 ### 3.5 Salsa Cancellation → Retry
@@ -399,7 +416,9 @@ fn result_to_response<R>(id, result) -> Result<Response, HandlerCancelledError> 
 }
 ```
 
-When `ALLOW_RETRYING = true` and salsa cancels, the request is re-queued as `Task::Retry(req)`. When `ALLOW_RETRYING = false`, it returns `ContentModified` error to the editor.
+When `ALLOW_RETRYING = true` and salsa cancels, the request is re-queued as
+`Task::Retry(req)`. When `ALLOW_RETRYING = false`, it returns `ContentModified`
+error to the editor.
 
 ---
 
@@ -407,7 +426,9 @@ When `ALLOW_RETRYING = true` and salsa cancels, the request is re-queued as `Tas
 
 ### 4.1 Oxc
 
-Uses `tower-lsp-server` like Biome. From `oxc/crates/oxc_language_server/README.md`:
+Uses `tower-lsp-server` like Biome. From
+`oxc/crates/oxc_language_server/README.md`:
+
 - Text Document Sync: FULL
 - Workspace folders: true
 - Diagnostic mode: pull (preferred) or push
@@ -418,9 +439,12 @@ Architecture follows Biome's pattern: async trait methods + sync analysis core.
 ### 4.2 Taplo
 
 Uses `lsp-async-stub` (its own framework). From taplo docs:
-> "The taplo-lsp crate exposes a language server implementation that uses lsp-async-stub, it is generic over its environment so it is possible to embed it in your own software."
+> "The taplo-lsp crate exposes a language server implementation that uses
+> lsp-async-stub, it is generic over its environment so it is possible to embed
+> it in your own software."
 
-`lsp-async-stub` is a lower-level async LSP framework that gives more control than tower-lsp but requires more boilerplate.
+`lsp-async-stub` is a lower-level async LSP framework that gives more control
+than tower-lsp but requires more boilerplate.
 
 ### 4.3 Harper
 
@@ -433,7 +457,11 @@ Uses `tower-lsp-server`. Known for being fast and lightweight.
 
 ### 4.5 iwe/iwes
 
-Shipped PKM-domain markdown LSP (~1.8k stars). Fully synchronous: `lsp_server::Connection::stdio()` transport, single-threaded `crossbeam` `select!` loop over messages and file-watch events, no async runtime, per-message `catch_unwind` panic isolation (amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 1).
+Shipped PKM-domain markdown LSP (~1.8k stars). Fully synchronous:
+`lsp_server::Connection::stdio()` transport, single-threaded `crossbeam`
+`select!` loop over messages and file-watch events, no async runtime,
+per-message `catch_unwind` panic isolation (amended 2026-10-21 by iwe/fileclass
+research, [tool-iwe](tool-iwe.md) Part 1).
 
 ---
 
@@ -441,22 +469,29 @@ Shipped PKM-domain markdown LSP (~1.8k stars). Fully synchronous: `lsp_server::C
 
 ### 5.1 The Async Transport + Sync Core Bridge
 
-Every production Rust LSP uses this pattern (amended 2026-10-21 by iwe/fileclass research: qualified; iwe/iwes is a counterexample, with sync transport + sync core and file-watch I/O via a crossbeam `select!` loop, no async layer at all ([tool-iwe](tool-iwe.md) Part 1)):
+Every production Rust LSP uses this pattern (amended 2026-10-21 by iwe/fileclass
+research: qualified; iwe/iwes is a counterexample, with sync transport + sync
+core and file-watch I/O via a crossbeam `select!` loop, no async layer at all
+([tool-iwe](tool-iwe.md) Part 1)):
 
-```
+```text
 Editor ←→ [async I/O layer] ←→ [sync analysis core]
               tower-lsp-server        WorkspaceServer
               or lsp-server            + salsa DB
 ```
 
 **The bridge happens via:**
+
 1. `spawn_blocking` (Biome) — moves sync work off tokio runtime
-2. Snapshot + thread pool spawn (rust-analyzer) — takes immutable snapshot, sends to thread pool
+2. Snapshot + thread pool spawn (rust-analyzer) — takes immutable snapshot,
+   sends to thread pool
 3. Both catch panics and salsa cancellation at the boundary
 
 ### 5.2 Request Cancellation
 
-No LSP implements `$/cancelRequest` handling at the server level (now double-sourced: iwe plus the prior four; amended 2026-10-21 by iwe/fileclass research, [tool-iwe](tool-iwe.md) Part 1). Instead:
+No LSP implements `$/cancelRequest` handling at the server level (now
+double-sourced: iwe plus the prior four; amended 2026-10-21 by iwe/fileclass
+research, [tool-iwe](tool-iwe.md) Part 1). Instead:
 
 | Strategy | How | Used by |
 |----------|-----|---------|
@@ -465,7 +500,9 @@ No LSP implements `$/cancelRequest` handling at the server level (now double-sou
 | Stale result discarding | Complete old request, client ignores stale response | Most tower-lsp servers |
 | `ContentModified` | Return error code -32801 when document changed | rust-analyzer (when ALLOW_RETRYING=false) |
 
-**The practical approach:** Don't try to cancel in-flight requests. Instead, detect staleness and either:
+**The practical approach:** Don't try to cancel in-flight requests. Instead,
+detect staleness and either:
+
 - Return `ContentModified` (editor re-sends)
 - Retry with fresh state (if request is idempotent)
 - Discard (if result is naturally stale)
@@ -473,11 +510,15 @@ No LSP implements `$/cancelRequest` handling at the server level (now double-sou
 ### 5.3 Diagnostics Refresh
 
 Two models:
-1. **Push:** Server publishes diagnostics after every change (Biome's `update_diagnostics`)
-2. **Pull:** Editor requests diagnostics (rust-analyzer's `textDocument/diagnostic`, Biome supports both)
+
+1. **Push:** Server publishes diagnostics after every change (Biome's
+   `update_diagnostics`)
+2. **Pull:** Editor requests diagnostics (rust-analyzer's
+   `textDocument/diagnostic`, Biome supports both)
 
 Biome uses push with 250ms debounce + at-most-one-computation-per-file.
-rust-analyzer uses push with generation-based invalidation (only publish if generation matches).
+rust-analyzer uses push with generation-based invalidation (only publish if
+generation matches).
 
 ### 5.4 Snapshot Pattern
 
@@ -493,11 +534,14 @@ let session = server.session.clone();
 spawn_blocking(move || session.workspace_for_request().$method(params))
 ```
 
-The snapshot is `Send + 'static` — it can be moved to a thread pool. The analysis core operates on the snapshot, not mutable state. This is what makes concurrent request handling safe.
+The snapshot is `Send + 'static` — it can be moved to a thread pool. The
+analysis core operates on the snapshot, not mutable state. This is what makes
+concurrent request handling safe.
 
 ### 5.5 Event Coalescing
 
 Applied to non-request events (VFS changes, diagnostics, background tasks):
+
 - rust-analyzer: 50ms window
 - Biome: 250ms debounce for diagnostics
 - CIRCT: Configurable debounce (min/max quiet time)
@@ -524,18 +568,25 @@ Applied to non-request events (VFS changes, diagnostics, background tasks):
 
 Based on the patterns above:
 
-1. **Use `tower-lsp-server`** unless you need fine-grained control over the event loop (in which case use `lsp-server` + crossbeam like rust-analyzer).
+1. **Use `tower-lsp-server`** unless you need fine-grained control over the
+   event loop (in which case use `lsp-server` + crossbeam like rust-analyzer).
 
-2. **Wrap sync analysis in `spawn_blocking`** (Biome pattern) for the simplest async/sync bridge.
+2. **Wrap sync analysis in `spawn_blocking`** (Biome pattern) for the simplest
+   async/sync bridge.
 
-3. **Implement `catch_lsp_operation`** to catch both panics and salsa cancellation at the sync/async boundary.
+3. **Implement `catch_lsp_operation`** to catch both panics and salsa
+   cancellation at the sync/async boundary.
 
-4. **Use `workspace_for_request()` vs `workspace()`** distinction — requests should not retry (positions become stale), notifications should.
+4. **Use `workspace_for_request()` vs `workspace()`** distinction — requests
+   should not retry (positions become stale), notifications should.
 
 5. **Debounce diagnostics** with 250ms delay + at-most-one-running-per-file.
 
-6. **Don't implement `$/cancelRequest`** — instead, detect staleness and return `ContentModified`.
+6. **Don't implement `$/cancelRequest`** — instead, detect staleness and return
+   `ContentModified`.
 
-7. **Snapshot your state** for thread pool work — never share `&mut` across threads.
+7. **Snapshot your state** for thread pool work — never share `&mut` across
+   threads.
 
-8. **Consider a separate formatting pool** if formatting is latency-sensitive (rust-analyzer's `fmt_pool` trick).
+8. **Consider a separate formatting pool** if formatting is latency-sensitive
+   (rust-analyzer's `fmt_pool` trick).

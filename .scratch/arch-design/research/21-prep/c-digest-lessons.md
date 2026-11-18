@@ -1,28 +1,29 @@
 # Digest lessons: ambient state in comparable note tools
 
-**Summary.** [V] The strongest date-query counterexample to a startup-frozen clock is
-Obsidian Tasks: it resolves relative dates when constructing a query and **reconstructs
-the query after midnight** ([Tasks source
-digest](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):19364-19388).
-Dataview instead obtains local time while parsing date shorthand but refreshes rendered
-results only on index revision; midnight alone does not satisfy that refresh predicate
-([Dataview source
-digest](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):7642-7653,7950-7954,11993-12009).
-[H] A process-lifetime frozen `now` would therefore break a long-lived host, while
-unconstrained leaf reads could disagree within one evaluation. These digests are
-snapshots, not proof about later upstream releases. `—` in the table means **not
-established by the inspected digest**, not that the feature does not exist. [V] For the
-earlier Cargo/jj/gitoxide/Ruff/ripgrep/uv/Jiff/Templater survey, see
-[execution-context precedent](../04-execution-context-precedent.md) ; Templater is
-revisited only where its on-demand date behavior sharpens the comparison.
+**Summary.** [V] The strongest date-query counterexample to a startup-frozen
+clock is Obsidian Tasks: it resolves relative dates when constructing a query
+and **reconstructs the query after midnight**
+([Tasks source digest](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):19364-19388).
+Dataview instead obtains local time while parsing date shorthand but refreshes
+rendered results only on index revision; midnight alone does not satisfy that
+refresh predicate
+([Dataview source digest](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):7642-7653,7950-7954,11993-12009).
+[H] A process-lifetime frozen `now` would therefore break a long-lived host,
+while unconstrained leaf reads could disagree within one evaluation. These
+digests are snapshots, not proof about later upstream releases. `—` in the table
+means **not established by the inspected digest**, not that the feature does not
+exist. [V] For the earlier Cargo/jj/gitoxide/Ruff/ripgrep/uv/Jiff/Templater
+survey, see
+[execution-context precedent](../04-execution-context-precedent.md) ; Templater
+is revisited only where its on-demand date behavior sharpens the comparison.
 
 ## 1. Per-project findings
 
-Citations point to the numbered lines of the **digest file**, not upstream line numbers.
-Each abbreviated filename below is under `docs/digests/` ; [V] denotes a source excerpt
-inspected, [H] an inference from it, [P] an option, not a decision. `D` /`T`/`I`/`Z` below
-abbreviate the linked Dataview, Tasks, IWE and zk *source* digests respectively; all other
-files are named in full in the rows.
+Citations point to the numbered lines of the **digest file**, not upstream line
+numbers. Each abbreviated filename below is under `docs/digests/` ; [V] denotes
+a source excerpt inspected, [H] an inference from it, [P] an option, not a
+decision. `D` /`T`/`I`/`Z` below abbreviate the linked Dataview, Tasks, IWE and
+zk *source* digests respectively; all other files are named in full in the rows.
 
 | Project | `now` / `today` / zone | Dirs and env | CWD / workspace root | Test determinism | Long-lived behavior | Context / breadth |
 |---|---|---|---|---|---|---|
@@ -44,120 +45,132 @@ files are named in full in the rows.
 
 ## 2. Recurring patterns and failure modes
 
-1. **A time value's lifetime matters more than a `Clock` interface.** [V] IWE note
-   creation reads once for a single output; Tasks operation accepts one `today` for status
-   and recurrence; zk exposes both live and frozen providers
+1. **A time value's lifetime matters more than a `Clock` interface.** [V] IWE
+   note creation reads once for a single output; Tasks operation accepts one
+   `today` for status and recurrence; zk exposes both live and frozen providers
    ([I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):13821-13833;
    [T](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):25485-25520 ;
-   [Z](../../../../docs/digests/zk-src-digest.txt):19565-19592 ). [H] The useful invariant
-   is *one `(now, zone)` per evaluation*, sampled anew for each request; it does not
-   require a process-lifetime clock snapshot or polymorphic clock unless a real consumer
-   needs one.
-2. **Parsing relative operands early makes midnight a cache-invalidation problem.** [V]
-   Tasks explicitly reparses query source after local midnight; Dataview date shorthand is
-   evaluated by the parser but its shown refresh gate requires an index revision
+   [Z](../../../../docs/digests/zk-src-digest.txt):19565-19592 ). [H] The useful
+   invariant is *one `(now, zone)` per evaluation*, sampled anew for each
+   request; it does not require a process-lifetime clock snapshot or polymorphic
+   clock unless a real consumer needs one.
+2. **Parsing relative operands early makes midnight a cache-invalidation
+   problem.** [V] Tasks explicitly reparses query source after local midnight;
+   Dataview date shorthand is evaluated by the parser but its shown refresh gate
+   requires an index revision
    ([T](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):19364-19388;
-   [D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):7950-7954,12002-12009
-   ). [H] If a long-lived Traces host caches parsed relative-date operands, a fresh
-   context alone cannot fix stale literals: rebind relative operands for each evaluation
-   or explicitly invalidate cached bound queries. A query renderer also needs an actual
-   refresh event, not merely a new value available when called.
-3. **Global-mutation test costs are observable, but not universal.** [V] Tasks relies on
-   fake system timers and a Chrono spy; zk changes `ZK_NOTEBOOK_DIR` during container
-   construction; obx pins paths in `OnceLock` ([full Tasks
-   digest](../../../../docs/digests/obsidian_obsidian-tasks-digest.txt):53572-53577,108326-108331;
+   [D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):7950-7954,12002-12009 ).
+   [H] If a long-lived Traces host caches parsed relative-date operands, a fresh
+   context alone cannot fix stale literals: rebind relative operands for each
+   evaluation or explicitly invalidate cached bound queries. A query renderer
+   also needs an actual refresh event, not merely a new value available when
+   called.
+3. **Global-mutation test costs are observable, but not universal.** [V] Tasks
+   relies on fake system timers and a Chrono spy; zk changes `ZK_NOTEBOOK_DIR`
+   during container construction; obx pins paths in `OnceLock`
+   ([full Tasks digest](../../../../docs/digests/obsidian_obsidian-tasks-digest.txt):53572-53577,108326-108331;
    [Z](../../../../docs/digests/zk-src-digest.txt):12551-12559 ;
-   [obx digest](../../../../docs/digests/rust_mcky-obsidian-cli-digest.txt):241-252 ). [H]
-   These approaches make concurrent same-process test isolation or live reconfiguration
-   harder, but a short-lived CLI may reasonably prefer simple process defaults.
-   Separately, zk's `Provider` does **not** eliminate ambient reads in `TimeFromNatural`
-   ([Z](../../../../docs/digests/zk-src-digest.txt):19594-19626): injecting one clock is
-   insufficient if other leaves still read the system.
-4. **LSP root is a protocol input, not necessarily cwd.** [V] Marksman accepts all
-   workspace folders, markdown-oxide picks one root/first folder then cwd, and IWE uses
-   cwd even after parsing initialize params ([Marksman
-   digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):11027-11050;
-   [markdown-oxide digest](../../../../docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt):1953-1982
-   ; [I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):38803-38822 ). [H] One
-   `HostEnvironment.cwd` cannot represent multiple roots. Marksman additionally
-   demonstrates dynamic folder changes and per-folder config; adopting multi-root only if
-   required avoids needless complexity, but using cwd as silent LSP authority bakes in the
-   wrong boundary.
-5. **Config path policy and config freshness are separate.** [V] rumdl has layered
-   env/CLI/config precedence and an LSP config reload/cache invalidation path; Marksman
-   loads user config at initialize and folder config on folder add; zk reads global env
-   during construction yet exposes env callbacks downstream ([rumdl
-   digest](../../../../docs/digests/lsp_rvben-rumdl-src-digest.txt):461-481,36206-36209,36327-36350;
-   [Marksman digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):11514-11525,12209-12229
-   ; [Z](../../../../docs/digests/zk-src-digest.txt):12539-12559,12618-12621 ). [H]
-   Snapshotting host env does not determine whether changes to *files*, editor settings or
-   system zone should be observed during a session; document each lifetime separately.
-6. **The god-object warning is supported, not a ban on any context.** [V] Dataview's
-   evaluator context holds query-specific handlers and variables without a clock; zk's
-   broad CLI `Container` projects only FS/notebooks/loader/logging into `ServerOpts` ;
-   Marksman separates `State` /`Workspace`/folders
+   [obx digest](../../../../docs/digests/rust_mcky-obsidian-cli-digest.txt):241-252 ).
+   [H] These approaches make concurrent same-process test isolation or live
+   reconfiguration harder, but a short-lived CLI may reasonably prefer simple
+   process defaults. Separately, zk's `Provider` does **not** eliminate ambient
+   reads in `TimeFromNatural`
+   ([Z](../../../../docs/digests/zk-src-digest.txt):19594-19626): injecting one
+   clock is insufficient if other leaves still read the system.
+4. **LSP root is a protocol input, not necessarily cwd.** [V] Marksman accepts
+   all workspace folders, markdown-oxide picks one root/first folder then cwd,
+   and IWE uses cwd even after parsing initialize params
+   ([Marksman digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):11027-11050;
+   [markdown-oxide digest](../../../../docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt):1953-1982 ;
+   [I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):38803-38822 ). [H]
+   One `HostEnvironment.cwd` cannot represent multiple roots. Marksman
+   additionally demonstrates dynamic folder changes and per-folder config;
+   adopting multi-root only if required avoids needless complexity, but using
+   cwd as silent LSP authority bakes in the wrong boundary.
+5. **Config path policy and config freshness are separate.** [V] rumdl has
+   layered env/CLI/config precedence and an LSP config reload/cache invalidation
+   path; Marksman loads user config at initialize and folder config on folder
+   add; zk reads global env during construction yet exposes env callbacks
+   downstream
+   ([rumdl digest](../../../../docs/digests/lsp_rvben-rumdl-src-digest.txt):461-481,36206-36209,36327-36350;
+   [Marksman digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):11514-11525,12209-12229 ;
+   [Z](../../../../docs/digests/zk-src-digest.txt):12539-12559,12618-12621 ).
+   [H] Snapshotting host env does not determine whether changes to *files*,
+   editor settings or system zone should be observed during a session; document
+   each lifetime separately.
+6. **The god-object warning is supported, not a ban on any context.** [V]
+   Dataview's evaluator context holds query-specific handlers and variables
+   without a clock; zk's broad CLI `Container` projects only
+   FS/notebooks/loader/logging into `ServerOpts` ; Marksman separates `State`
+   /`Workspace`/folders
    ([D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):6239-6254;
    [Z](../../../../docs/digests/zk-src-digest.txt):12506-12518,4187-4223 ;
-   [Marksman digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):12227-12239
-   ). [H] A composition-root aggregate can be broad if it is *not* passed through every
-   leaf; typed projections are a choice, not a universal rule.
-7. **Explicit failures contradict an easy 'GUI ambient is good enough' story.** [V] Tasks
-   had to add midnight query reparsing yet still reports the flatpickr stale-Today bug;
-   Dataview's index-revision gate supplies no midnight trigger in cited source
+   [Marksman digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):12227-12239 ).
+   [H] A composition-root aggregate can be broad if it is *not* passed through
+   every leaf; typed projections are a choice, not a universal rule.
+7. **Explicit failures contradict an easy 'GUI ambient is good enough' story.**
+   [V] Tasks had to add midnight query reparsing yet still reports the flatpickr
+   stale-Today bug; Dataview's index-revision gate supplies no midnight trigger
+   in cited source
    ([T](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):19364-19388,29277-29281;
-   [D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):11993-12009
-   ). [H] Per-leaf time reads risk inconsistent `today` in a query straddling midnight,
-   while pinning `now` at server initialization guarantees staleness. Neither is the full
-   long-lived-host answer.
+   [D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):11993-12009 ).
+   [H] Per-leaf time reads risk inconsistent `today` in a query straddling
+   midnight, while pinning `now` at server initialization guarantees staleness.
+   Neither is the full long-lived-host answer.
 
 ## What this means for the grilling questions
 
-1. **What must be explicit?** [P] At minimum, pass an evaluation-scoped temporal value
-   (one instant plus one chosen zone) to relative-date resolution, sort-key/operand
-   building and template rendering. Align with
+1. **What must be explicit?** [P] At minimum, pass an evaluation-scoped temporal
+   value (one instant plus one chosen zone) to relative-date resolution,
+   sort-key/operand building and template rendering. Align with
    [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md) :
-   no clock or system-zone reads in comparison. Decide separately whether filesystem
-   roots/env policy need a named process-level object; the digest evidence does not
-   require *one* omnipresent `ExecutionContext` .
-2. **Who samples and when?** [P] CLI entry or the host request boundary chooses a zone and
-   samples `now` immediately before an evaluation, then all rows share it; a subsequent
-   LSP/MCP request samples again. For cached query plans, preserve source-relative
-   expressions and bind against this snapshot each time, or explicitly reparse on an
-   invalidation contract. [V] Tasks' midnight reparse makes the choice observable
+   no clock or system-zone reads in comparison. Decide separately whether
+   filesystem roots/env policy need a named process-level object; the digest
+   evidence does not require *one* omnipresent `ExecutionContext` .
+2. **Who samples and when?** [P] CLI entry or the host request boundary chooses
+   a zone and samples `now` immediately before an evaluation, then all rows
+   share it; a subsequent LSP/MCP request samples again. For cached query plans,
+   preserve source-relative expressions and bind against this snapshot each
+   time, or explicitly reparse on an invalidation contract. [V] Tasks' midnight
+   reparse makes the choice observable
    ([T](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):19364-19388).
-3. **Which default zone?** [P] Ask whether absent configuration means host-local (matches
-   IWE/Tasks/Dataview) or a deterministic UTC default. [V] The comparables use local by
-   default in date-visible tools
+3. **Which default zone?** [P] Ask whether absent configuration means host-local
+   (matches IWE/Tasks/Dataview) or a deterministic UTC default. [V] The
+   comparables use local by default in date-visible tools
    ([I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):13821-13833;
    [T](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):4934-4944 ;
-   [D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):7642-7666
-   ). [H] This is compatibility evidence, not a proof for UTC or local in Traces. Decide
-   what system-zone change during a session means (per request rediscovery, startup pin,
-   explicit host notification); Jiff's discovery cache caveat was already covered in
+   [D](../../../../docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt):7642-7666 ).
+   [H] This is compatibility evidence, not a proof for UTC or local in Traces.
+   Decide what system-zone change during a session means (per request
+   rediscovery, startup pin, explicit host notification); Jiff's discovery cache
+   caveat was already covered in
    [execution-context precedent](../04-execution-context-precedent.md) .
-4. **Which roots?** [P] Separate process cwd (CLI resolution/fallback), a validated
-   workspace root (per LSP workspace folder if multi-root is committed), user config/state
-   homes (process policy), and vault-local configuration. Do not silently infer an LSP
-   root solely from cwd if initialization supplied roots. [V] The LSP comparables
-   implement mutually incompatible policies ([Marksman
-   digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):11027-11050;
-   [markdown-oxide digest](../../../../docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt):1953-1982
-   ; [I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):38803-38822 ).
-5. **Keep-as-is, seriously?** [P] For a CLI-only, single-root, short-lived invocation,
-   keeping existing guarded cwd and existing ambient directory defaults avoids propagating
-   unused parameters. IWE's single `Local::now()` for each note creation supports a
-   narrower fix than a giant context
-   ([I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):13818-13833). [H] The
-   counterweight is the committed LSP and likely MCP: global env/cwd or process-frozen
-   time cannot represent simultaneous roots/zones, and current test-global guards remain
-   the cost. Evaluate **split temporal boundary + retained audited cwd boundary** as a
-   genuine intermediate option, rather than rejecting keep-as-is wholesale.
-6. **Tests and freshness contract?** [P] Test midnight rollover with two evaluations of
-   the same cached query and a query crossing midnight internally; test distinct
-   zones/workspaces concurrently without setting process globals. If refreshable rendered
-   output is promised, test the triggering mechanism independently of time injection. [V]
-   Tasks' query refresh and modal bug show both halves are needed
+4. **Which roots?** [P] Separate process cwd (CLI resolution/fallback), a
+   validated workspace root (per LSP workspace folder if multi-root is
+   committed), user config/state homes (process policy), and vault-local
+   configuration. Do not silently infer an LSP root solely from cwd if
+   initialization supplied roots. [V] The LSP comparables implement mutually
+   incompatible policies
+   ([Marksman digest](../../../../docs/digests/lsp_artempyanykh-marksman-digest.txt):11027-11050;
+   [markdown-oxide digest](../../../../docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt):1953-1982 ;
+   [I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):38803-38822 ).
+5. **Keep-as-is, seriously?** [P] For a CLI-only, single-root, short-lived
+   invocation, keeping existing guarded cwd and existing ambient directory
+   defaults avoids propagating unused parameters. IWE's single `Local::now()`
+   for each note creation supports a narrower fix than a giant context
+   ([I](../../../../docs/digests/iwe-org-iwe-src-digest.txt):13818-13833). [H]
+   The counterweight is the committed LSP and likely MCP: global env/cwd or
+   process-frozen time cannot represent simultaneous roots/zones, and current
+   test-global guards remain the cost. Evaluate
+   **split temporal boundary + retained audited cwd boundary** as a genuine
+   intermediate option, rather than rejecting keep-as-is wholesale.
+6. **Tests and freshness contract?** [P] Test midnight rollover with two
+   evaluations of the same cached query and a query crossing midnight
+   internally; test distinct zones/workspaces concurrently without setting
+   process globals. If refreshable rendered output is promised, test the
+   triggering mechanism independently of time injection. [V] Tasks' query
+   refresh and modal bug show both halves are needed
    ([T](../../../../docs/digests/obsidian_obsidian-tasks-src-digest.txt):19364-19388,29277-29281).
-   Configuration-file change, system-zone change, environment-variable change and
-   workspace-folder change deserve **different** policies, not one vague 'dynamic
-   environment' flag.
+   Configuration-file change, system-zone change, environment-variable change
+   and workspace-folder change deserve **different** policies, not one vague
+   'dynamic environment' flag.

@@ -58,7 +58,8 @@ impl Frontmatter {
 ### Backwards Compatibility
 
 - `#[serde(skip)]` on `spans` — postcard roundtrip unchanged.
-- All existing API methods (`new`, `fields`, `get`, `get_values`, etc.) unchanged.
+- All existing API methods (`new`, `fields`, `get`, `get_values`, etc.)
+  unchanged.
 - Zero existing call sites require modification.
 
 ---
@@ -175,32 +176,47 @@ not semantic identity.
 
 ## Section 5: Stress Test Validation
 
-Designs validated against codebase (codegraph), prior research, and LSP conventions.
+Designs validated against codebase (codegraph), prior research, and LSP
+conventions.
 
 ### Frontmatter Spans — validated
 
 - Zero callers of `fields()`, `get()`, `get_values()`, `Note::fields()` break.
-- `#[serde(skip)]` on `spans` preserves postcard roundtrip (positional format, field omitted).
-- `BytePos` wraps `usize` at `src/position.rs:33` — `Range<BytePos>` is 16 bytes.
-- **Blocking gap:** `serde_yaml` does not expose per-field byte positions. Phase 1 ships
-  stub `from_with_spans` (empty spans). Phase 2 uses post-parse line-offset re-scan.
-- Manual `PartialEq` required — derived `PartialEq` compares all fields including `spans`.
+- `#[serde(skip)]` on `spans` preserves postcard roundtrip (positional format,
+  field omitted).
+- `BytePos` wraps `usize` at `src/position.rs:33` — `Range<BytePos>` is 16
+  bytes.
+- **Blocking gap:** `serde_yaml` does not expose per-field byte positions. Phase
+  1 ships stub `from_with_spans` (empty spans). Phase 2 uses post-parse
+  line-offset re-scan.
+- Manual `PartialEq` required — derived `PartialEq` compares all fields
+  including `spans`.
 - Memory: ~800 bytes/note (20 fields), ~16MB for 20K notes (3.2% of 500MB cap).
 
 ### Origin Field — validated
 
-- Stamping at `resolve_own_fields` (after `build()`) is clean — one line, no signature changes.
-- `SchemaFieldDef::clone()` copies all fields including `origin` — inherited fields preserve ancestor origin.
-- `for_test()` callers: 2 sites in 1 file (`model.rs`). Manual `PartialEq` makes them unaffected.
-- `$ref` semantics: origin = "declared by current schema" (not "defined by target"). Correct for go-to-definition.
+- Stamping at `resolve_own_fields` (after `build()`) is clean — one line, no
+  signature changes.
+- `SchemaFieldDef::clone()` copies all fields including `origin` — inherited
+  fields preserve ancestor origin.
+- `for_test()` callers: 2 sites in 1 file (`model.rs`). Manual `PartialEq` makes
+  them unaffected.
+- `$ref` semantics: origin = "declared by current schema" (not "defined by
+  target"). Correct for go-to-definition.
 - `Schema` is not serialized (in-memory only) — no postcard concern.
-- `SchemaName` wraps `String` — `Option<SchemaName>` is 24 bytes (niche-optimized). Negligible.
+- `SchemaName` wraps `String` — `Option<SchemaName>` is 24 bytes
+  (niche-optimized). Negligible.
 
 ### Description Field — validated
 
-- Must be on both `SchemaFieldDef` (resolved) and `RawSchemaFieldDef` (TOML deserialization).
+- Must be on both `SchemaFieldDef` (resolved) and `RawSchemaFieldDef` (TOML
+  deserialization).
 - Add `"description"` to `ALLOWED_OPTION_KEYS` in `src/schema/raw.rs`.
-- Handle alongside `required`/`multi` in visitor (field-level attribute, not type-specific).
-- Inheritance: same pattern as `required`/`multi` — `raw.description.or_else(|| base.and_then(...))`.
-- Manual `PartialEq` excludes `description` alongside `origin` — metadata, not semantic identity.
-- Metadata Menu lacks descriptions — this is a value-add, not a compatibility requirement.
+- Handle alongside `required`/`multi` in visitor (field-level attribute, not
+  type-specific).
+- Inheritance: same pattern as `required`/`multi` —
+  `raw.description.or_else(|| base.and_then(...))`.
+- Manual `PartialEq` excludes `description` alongside `origin` — metadata, not
+  semantic identity.
+- Metadata Menu lacks descriptions — this is a value-add, not a compatibility
+  requirement.

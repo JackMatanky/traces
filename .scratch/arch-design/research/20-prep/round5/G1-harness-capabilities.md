@@ -47,10 +47,12 @@ Ticket 20 recorded the hypothesis [H]:
 Legend:
 
 - **Hooks**: Lifecycle pre/post tool hooks supported? Can pre-tool block?
-- **Payload**: Content passed to pre-tool hook (`Instruction` vs `Resulting file`).
+- **Payload**: Content passed to pre-tool hook (`Instruction` vs
+  `Resulting file`).
 - **MCP**: Supports Model Context Protocol clients?
 - **Force MCP**: Can built-in file/bash write tools be disabled to force MCP?
-- **Inst. File**: Discovers markdown instruction files (`AGENTS.md`, `CLAUDE.md`).
+- **Inst. File**: Discovers markdown instruction files (`AGENTS.md`,
+  `CLAUDE.md`).
 - **Sandbox**: Has filesystem permissions / OS sandbox (Seatbelt / bubblewrap).
 - **LSP Diag**: Surfaces LSP / compiler diagnostics back to model after edits.
 - **Post Run**: Built-in post-edit linter/test auto-run feature.
@@ -79,11 +81,10 @@ Legend:
 
 Capabilities ranked by prevalence across the 14 harnesses:
 
-1. **Instruction Files (14 / 14, 100%):**
-   Every harness supports soft guidance injected from files such as `AGENTS.md`,
-   `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `.clinerules`, or `.goosehints`.
-   *Implication:* Schema rules and guidance can always be delivered in-context
-   as soft guidance.
+1. **Instruction Files (14 / 14, 100%):** Every harness supports soft guidance
+   injected from files such as `AGENTS.md`, `CLAUDE.md`, `.cursorrules`,
+   `.windsurfrules`, `.clinerules`, or `.goosehints`. *Implication:* Schema
+   rules and guidance can always be delivered in-context as soft guidance.
 2. **MCP Client Support (13 / 14, 93%):**
    Supported everywhere except Aider.
    *Implication:* An MCP server tool (`traces_edit_note`) can be deployed for
@@ -119,17 +120,20 @@ Capabilities ranked by prevalence across the 14 harnesses:
 ### 4.1 Claude Code (Anthropic)
 
 - **(a) Lifecycle hooks:** [V] Configured in `settings.json` or plugin
-  `hooks/hooks.json`. Supports `PreToolUse`, `PostToolUse`, `PostToolUseFailure`,
-  `Stop`, `SessionStart` (<https://code.claude.com/docs/en/hooks>).
+  `hooks/hooks.json`. Supports `PreToolUse`, `PostToolUse`,
+  `PostToolUseFailure`, `Stop`, `SessionStart`
+  (<https://code.claude.com/docs/en/hooks>).
   - Pre-tool payload: Receives `tool_name`, `tool_input`, `tool_use_id` on
     stdin. For `Edit`, `tool_input` contains `file_path`, `old_string`,
-    `new_string` (<https://code.claude.com/docs/en/tools-reference#edit-tool-behavior>).
-    It receives the **instruction**, NOT the resulting file.
+    `new_string`
+    (<https://code.claude.com/docs/en/tools-reference#edit-tool-behavior>). It
+    receives the **instruction**, NOT the resulting file.
   - Can block: [V] YES. Returning JSON with `permissionDecision: "deny"`
     inside `hookSpecificOutput` or exit code 2 blocks the call
     (<https://code.claude.com/docs/en/hooks#pretooluse-decision-control>).
   - Post-tool payload: `PostToolUse` receives `tool_input` and `tool_response`.
-    Can return `updatedToolOutput`, but the file edit has already landed on disk.
+    Can return `updatedToolOutput`, but the file edit has already landed on
+    disk.
 - **(b) MCP client support:** [V] Configured via `~/.claude.json` and
   `.claude/mcp.json` (<https://code.claude.com/docs/en/mcp>).
   - Forcing MCP: [V] YES. Claude Code provides `--disallowedTools` and
@@ -147,15 +151,17 @@ Capabilities ranked by prevalence across the 14 harnesses:
   without a separate build step"
   (<https://code.claude.com/docs/en/tools-reference#lsp-tool-behavior>).
 - **(f) Post-edit commands:** [V] `PostToolUse` hooks matching `Edit|Write` can
-  run shell linters; exit code 2 or `updatedToolOutput` feeds feedback to Claude.
+  run shell linters; exit code 2 or `updatedToolOutput` feeds feedback to
+  Claude.
 - **(g) ACP support:** [V] NO native ACP support. GitHub Issue #6686 was closed
   as not planned (<https://github.com/anthropics/claude-code/issues/6686>).
   Third-party adapters exist (`@zed-industries/claude-code-acp`).
 
 ### 4.2 omp / oh-my-pi
 
-- **(a) Lifecycle hooks:** [V] Hook factories in `<cwd>/.omp/hooks/{pre,post}/*.ts`
-  or extension modules (`omp://hooks.md:82-86`).
+- **(a) Lifecycle hooks:** [V] Hook factories in
+  `<cwd>/.omp/hooks/{pre,post}/*.ts` or extension modules
+  (`omp://hooks.md:82-86`).
   - Pre-tool payload: `tool_call` receives `event.toolName`, `event.input`.
     Input is the execution parameters (instruction), NOT the resulting file.
   - Can block: [V] YES. Returning `{ block: true, reason: string }` aborts the
@@ -163,14 +169,17 @@ Capabilities ranked by prevalence across the 14 harnesses:
   - Post-tool payload: `tool_result` receives `event.content`, `event.details`,
     `event.isError`.
 - **(b) MCP client support:** [V] Discovered via `.omp/mcp.json`,
-  `~/.omp/agent/mcp.json`, and imported tool files (`omp://mcp-config.md:19-21`).
+  `~/.omp/agent/mcp.json`, and imported tool files
+  (`omp://mcp-config.md:19-21`).
   - Forcing MCP: [V] YES. `--no-tools` disables all built-in tools
-    (`omp://cli-reference.md:142`), allowing MCP tools to handle all file writes.
-- **(c) Instruction files:** [V] `.omp/AGENTS.md` (user/project), `.omp/RULES.md`
-  (sticky), plus compatibility with `CLAUDE.md`, `GEMINI.md`, etc.
-  (`omp://context-files.md:69-81`).
+    (`omp://cli-reference.md:142`), allowing MCP tools to handle all file
+    writes.
+- **(c) Instruction files:** [V] `.omp/AGENTS.md` (user/project),
+  `.omp/RULES.md` (sticky), plus compatibility with `CLAUDE.md`, `GEMINI.md`,
+  etc. (`omp://context-files.md:69-81`).
 - **(d) Sandbox / permissions:** [V] `approvalMode` (`always-ask`, `write`,
-  `yolo`), per-tool policies, bash pattern matching (`omp://approval-mode.md:145`).
+  `yolo`), per-tool policies, bash pattern matching
+  (`omp://approval-mode.md:145`).
 - **(e) LSP diagnostics:** [V] `lsp.diagnosticsOnWrite: true`,
   `lsp.diagnosticsOnEdit: false` (`omp://settings.md:672-673`). `xd://lsp`
   reconciles disk files and reports diagnostics (`omp://tools/lsp.md:73-88`).
@@ -185,31 +194,37 @@ Capabilities ranked by prevalence across the 14 harnesses:
   `[[hooks.*]]` (<https://learn.chatgpt.com/docs/hooks.md:60-70>).
   - Pre-tool payload: Receives `tool_name` (`Bash`, `apply_patch`, MCP),
     `tool_input`. For `apply_patch`, `tool_input.command` is the patch diff
-    instruction, NOT the resulting file (<https://learn.chatgpt.com/docs/hooks.md:774>).
+    instruction, NOT the resulting file
+    (<https://learn.chatgpt.com/docs/hooks.md:774>).
   - Can block: [V] YES. Returning `permissionDecision: "deny"` or exit code 2
     blocks tool execution (<https://learn.chatgpt.com/docs/hooks.md:781-801>).
   - Post-tool payload: `PostToolUse` receives `tool_name`, `tool_input`.
 - **(b) MCP client support:** [V] Configured in `config.toml` under
-  `[mcp_servers.<name>]` (<https://learn.chatgpt.com/docs/developer-commands:1020>).
+  `[mcp_servers.<name>]`
+  (<https://learn.chatgpt.com/docs/developer-commands:1020>).
   - Forcing MCP: [H] No built-in flag disables `apply_patch` while allowing MCP,
     though `PreToolUse` hooks can deny `apply_patch`.
 - **(c) Instruction files:** [V] `AGENTS.md` (root, project, user), configurable
-  via `project_doc_fallback_filenames` (<https://learn.chatgpt.com/docs/config-file/config-reference>).
+  via `project_doc_fallback_filenames`
+  (<https://learn.chatgpt.com/docs/config-file/config-reference>).
 - **(d) Sandbox / permissions:** [V] `sandbox_mode` (`read-only`,
   `workspace-write`, `danger-full-access`), `approval_policy` (`on-request`,
-  `never`). OS sandbox via Seatbelt/bubblewrap (<https://learn.chatgpt.com/docs/sandboxing.md>).
+  `never`). OS sandbox via Seatbelt/bubblewrap
+  (<https://learn.chatgpt.com/docs/sandboxing.md>).
 - **(e) LSP diagnostics:** [V] NO native LSP client or post-edit diagnostic
   feedback (unreachable/absent from Codex documentation).
 - **(f) Post-edit commands:** [V] `PostToolUse` hooks can run custom scripts,
   but no native `--lint-cmd` auto-repair loop exists.
 - **(g) ACP support:** [V] NO native ACP support (uses proprietary
-  `codex app-server` protocol; <https://learn.chatgpt.com/docs/developer-commands:160>).
+  `codex app-server` protocol;
+  <https://learn.chatgpt.com/docs/developer-commands:160>).
 
 ### 4.4 Gemini CLI (Google)
 
 - **(a) Lifecycle hooks:** [V] Configured in `.gemini/settings.json` or
   `~/.gemini/settings.json`. Supports `BeforeTool`, `AfterTool`,
-  `BeforeToolSelection`, etc. (<https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/index.md>).
+  `BeforeToolSelection`, etc.
+  (<https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/index.md>).
   - Pre-tool payload: `BeforeTool` receives `tool_name`, `tool_input` (raw
     arguments instruction), NOT the resulting file
     (<https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md>).
@@ -218,21 +233,25 @@ Capabilities ranked by prevalence across the 14 harnesses:
   - Post-tool payload: `AfterTool` receives `tool_name`, `tool_input`,
     `tool_response`.
 - **(b) MCP client support:** [V] Supported in `settings.json` (`mcpServers`)
-  and via ACP connection (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md>).
+  and via ACP connection
+  (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md>).
   - Forcing MCP: [V] YES. `BeforeToolSelection` hook can set
     `toolConfig.allowedFunctionNames` to allow only MCP tools and disable native
-    write tools (<https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md#beforetoolselection>).
+    write tools
+    (<https://github.com/google-gemini/gemini-cli/blob/main/docs/hooks/reference.md#beforetoolselection>).
 - **(c) Instruction files:** [V] `GEMINI.md`, `~/.gemini/GEMINI.md`,
   configurable via `context.fileName` to include `AGENTS.md`
   (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/gemini-md.md>).
-- **(d) Sandbox / permissions:** [V] Approval policies, auto-approve modes,
-  and proxied filesystem under ACP (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md>).
+- **(d) Sandbox / permissions:** [V] Approval policies, auto-approve modes, and
+  proxied filesystem under ACP
+  (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md>).
 - **(e) LSP diagnostics:** [V] NO native LSP client in standalone CLI; relies
   on editor host in ACP mode.
 - **(f) Post-edit commands:** [V] `AfterTool` hooks can execute scripts and
   append context or trigger tail tool calls.
 - **(g) ACP support:** [V] YES, native! `gemini --acp` starts Gemini CLI in
-  Agent Client Protocol mode over stdio (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md>).
+  Agent Client Protocol mode over stdio
+  (<https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/acp-mode.md>).
 
 ### 4.5 Cursor (Anysphere)
 
@@ -240,9 +259,11 @@ Capabilities ranked by prevalence across the 14 harnesses:
   `~/.cursor/hooks.json`. Supports `preToolUse`, `postToolUse`, `afterFileEdit`,
   `beforeShellExecution`, etc. (<https://cursor.com/docs/hooks.md>).
   - Pre-tool payload: `preToolUse` receives `tool_name`, `tool_input` (diff /
-    parameters instruction), NOT the resulting file (<https://cursor.com/docs/hooks.md:857-871>).
+    parameters instruction), NOT the resulting file
+    (<https://cursor.com/docs/hooks.md:857-871>).
   - Can block: [V] YES. Returning `permission: "deny"`, `agent_message: "..."`
-    or exit code 2 blocks the action (<https://cursor.com/docs/hooks.md:874-888>).
+    or exit code 2 blocks the action
+    (<https://cursor.com/docs/hooks.md:874-888>).
   - Post-tool payload: `afterFileEdit` receives `file_path` and
     `edits: [{ old_string, new_string }]`
     (<https://cursor.com/docs/hooks.md:1143-1146>).
@@ -253,7 +274,8 @@ Capabilities ranked by prevalence across the 14 harnesses:
 - **(c) Instruction files:** [V] `.cursorrules`, `.cursor/rules/*.mdc`,
   `AGENTS.md` (<https://cursor.com/docs/rules>).
 - **(d) Sandbox / permissions:** [V] Terminal command sandbox, tool permission
-  prompts, file access control via `beforeReadFile` (<https://cursor.com/docs/hooks.md:1149>).
+  prompts, file access control via `beforeReadFile`
+  (<https://cursor.com/docs/hooks.md:1149>).
 - **(e) LSP diagnostics:** [V] YES. As a VS Code fork, Cursor automatically
   surfaces language server diagnostics to the Composer Agent after edits.
 - **(f) Post-edit commands:** [V] `afterFileEdit` hook executes shell
@@ -265,7 +287,8 @@ Capabilities ranked by prevalence across the 14 harnesses:
 
 - **(a) Lifecycle hooks:** [V] Cascade Hooks in `.devin/hooks.json` or
   `~/.codeium/windsurf/hooks.json`. Supports `pre_read_code`, `pre_write_code`,
-  `post_write_code`, `pre_run_command`, etc. (<https://docs.devin.ai/desktop/cascade/hooks.md>).
+  `post_write_code`, `pre_run_command`, etc.
+  (<https://docs.devin.ai/desktop/cascade/hooks.md>).
   - Pre-tool payload: `pre_write_code` receives `file_path` and
     `edits: [{ old_string, new_string }]`
     (<https://docs.devin.ai/desktop/cascade/hooks.md:195-210>). Receives patch
@@ -284,7 +307,8 @@ Capabilities ranked by prevalence across the 14 harnesses:
 - **(e) LSP diagnostics:** [V] YES. Based on VS Code fork; Cascade Agent reads
   editor language server diagnostics.
 - **(f) Post-edit commands:** [V] `post_write_code` runs linters/formatters
-  after code modifications (<https://docs.devin.ai/desktop/cascade/hooks.md:215>).
+  after code modifications
+  (<https://docs.devin.ai/desktop/cascade/hooks.md:215>).
 - **(g) ACP support:** [V] YES (preview). Devin Desktop / Windsurf supports
   running third-party agents via ACP in Agent Command Center
   (<https://docs.devin.ai/desktop/acp.md>).
@@ -293,13 +317,15 @@ Capabilities ranked by prevalence across the 14 harnesses:
 
 - **(a) Lifecycle hooks:** [V] Executable scripts in `.clinerules/hooks/` or
   `~/Documents/Cline/Hooks/`. Supports `PreToolUse`, `PostToolUse`, `TaskStart`,
-  `UserPromptSubmit` (<https://github.com/cline/cline/blob/main/.clinerules/hooks/README.md>).
+  `UserPromptSubmit`
+  (<https://github.com/cline/cline/blob/main/.clinerules/hooks/README.md>).
   - Pre-tool payload: `PreToolUse` receives `toolName`, `parameters`
     (instruction). Does NOT receive resulting file.
   - Can block: [V] YES. Output `{"cancel": true, "errorMessage": "..."}` blocks
-    tool execution (<https://github.com/cline/cline/blob/main/.clinerules/hooks/README.md:200-210>).
-  - Post-tool payload: `PostToolUse` receives `toolName`, `parameters`, `result`,
-    `success`.
+    tool execution
+    (<https://github.com/cline/cline/blob/main/.clinerules/hooks/README.md:200-210>).
+  - Post-tool payload: `PostToolUse` receives `toolName`, `parameters`,
+    `result`, `success`.
 - **(b) MCP client support:** [V] Supported via `cline_mcp_settings.json`
   (<https://github.com/cline/cline/blob/main/docs/mcp/mcp-overview.mdx>).
   - Forcing MCP: [V] Partial. `PreToolUse` can cancel native `write_to_file`
@@ -316,8 +342,9 @@ Capabilities ranked by prevalence across the 14 harnesses:
 
 ### 4.8 Aider
 
-- **(a) Lifecycle hooks:** [V] NO lifecycle pre/post tool hooks (<https://aider.chat/docs/>).
-  Only git pre-commit hooks (`--git-commit-verify`) can abort commits.
+- **(a) Lifecycle hooks:** [V] NO lifecycle pre/post tool hooks
+  (<https://aider.chat/docs/>). Only git pre-commit hooks
+  (`--git-commit-verify`) can abort commits.
   - Pre-tool payload: N/A.
   - Can block: Only via git pre-commit hook during commit.
 - **(b) MCP client support:** [V] NO native MCP client support (Issue #3314
@@ -339,25 +366,30 @@ Capabilities ranked by prevalence across the 14 harnesses:
 ### 4.9 GitHub Copilot (Agent Mode / Coding Agent)
 
 - **(a) Lifecycle hooks:** [V] Configured in `.github/hooks/*.json`,
-  `~/.copilot/hooks/`, or policy directory. Supports `preToolUse`, `postToolUse`,
-  `permissionRequest`, `agentStop` (<https://docs.github.com/en/copilot/reference/hooks-reference>).
+  `~/.copilot/hooks/`, or policy directory. Supports `preToolUse`,
+  `postToolUse`, `permissionRequest`, `agentStop`
+  (<https://docs.github.com/en/copilot/reference/hooks-reference>).
   - Pre-tool payload: `preToolUse` receives `tool_name` (`edit`, `create`,
     `bash`), `tool_input` (instruction/diff), NOT the resulting file
     (<https://docs.github.com/en/copilot/reference/hooks-reference:450-466>).
   - Can block: [V] YES. Returning `permissionDecision: "deny"` or exit code 2
-    blocks tool call (<https://docs.github.com/en/copilot/reference/hooks-reference:493-495>).
+    blocks tool call
+    (<https://docs.github.com/en/copilot/reference/hooks-reference:493-495>).
   - Post-tool payload: `postToolUse` receives `tool_name`, `tool_result`.
 - **(b) MCP client support:** [V] Supported in VS Code via `.vscode/mcp.json`
-  and hosted MCP server (<https://docs.github.com/en/copilot/concepts/context/mcp>).
+  and hosted MCP server
+  (<https://docs.github.com/en/copilot/concepts/context/mcp>).
   - Forcing MCP: [H] Hooks can deny `create`/`edit` while allowing MCP.
 - **(c) Instruction files:** [V] `.github/copilot-instructions.md`,
-  `.github/instructions/**/*.instructions.md` (<https://docs.github.com/en/copilot/concepts/context/copilot-instructions>).
+  `.github/instructions/**/*.instructions.md`
+  (<https://docs.github.com/en/copilot/concepts/context/copilot-instructions>).
 - **(d) Sandbox / permissions:** [V] Cloud agent runs in ephemeral Linux
-  sandbox; CLI has `sandbox.userPolicy` (<https://docs.github.com/en/copilot/reference/hooks-reference#sandboxed-sessions>).
+  sandbox; CLI has `sandbox.userPolicy`
+  (<https://docs.github.com/en/copilot/reference/hooks-reference#sandboxed-sessions>).
 - **(e) LSP diagnostics:** [V] YES. In VS Code agent mode, Copilot reads VS Code
   Problems (LSP diagnostics) and prompts self-repair on error.
-- **(f) Post-edit commands:** [V] `postToolUse` hooks run custom scripts; VS Code
-  agent mode triggers configured test tasks.
+- **(f) Post-edit commands:** [V] `postToolUse` hooks run custom scripts; VS
+  Code agent mode triggers configured test tasks.
 - **(g) ACP support:** [V] NO native ACP support (UNREACHABLE/absent).
 
 ### 4.10 OpenCode (`anomalyco/opencode`)
@@ -378,7 +410,8 @@ Capabilities ranked by prevalence across the 14 harnesses:
   (<https://github.com/anomalyco/opencode/issues/711>).
 - **(f) Post-edit commands:** [V] LSP diagnostics auto-run; shell hooks.
 - **(g) ACP support:** [V] YES, native! `packages/opencode/src/acp/` implements
-  the Agent Client Protocol (<https://github.com/anomalyco/opencode/issues/53793>).
+  the Agent Client Protocol
+  (<https://github.com/anomalyco/opencode/issues/53793>).
 
 ### 4.11 Zed Agent (Zed Editor)
 
@@ -396,7 +429,8 @@ Capabilities ranked by prevalence across the 14 harnesses:
 - **(c) Instruction files:** [V] `.zed/rules.md`, `AGENTS.md`, and Skills
   (<https://zed.dev/docs/ai/skills.md>).
 - **(d) Sandbox / permissions:** [V] `tool_permissions` (`allow`, `deny`,
-  `confirm`), OS sandbox for terminal (<https://zed.dev/docs/ai/sandboxing.html>).
+  `confirm`), OS sandbox for terminal
+  (<https://zed.dev/docs/ai/sandboxing.html>).
 - **(e) LSP diagnostics:** [V] YES. Zed provides a native `diagnostics` tool
   that returns language server diagnostics for files or the workspace
   (<https://zed.dev/docs/ai/tools.md#diagnostics>).
@@ -452,7 +486,8 @@ Capabilities ranked by prevalence across the 14 harnesses:
 ### 4.14 Amp (`ampcode.com`)
 
 - **(a) Lifecycle hooks:** [V] Plugin API supports `tool.call` (pre-tool) and
-  `tool.result` (post-tool) events (<https://ampcode.com/docs/customize/plugins>).
+  `tool.result` (post-tool) events
+  (<https://ampcode.com/docs/customize/plugins>).
   - Pre-tool payload: `tool.call` receives `event.tool`, `event.input`. Sees the
     **instruction/parameters**, NOT the resulting file.
   - Can block: [V] YES. Returning action `'reject-and-continue'` with
@@ -470,10 +505,10 @@ Capabilities ranked by prevalence across the 14 harnesses:
   tool approval confirmations (`ctx.ui.confirm`).
 - **(e) LSP diagnostics:** [V] YES. Integrates code intelligence and diagnostics
   when connected to IDEs/orbs.
-- **(f) Post-edit commands:** [V] `tool.result` hooks or `agent.end` continuation
-  triggers custom workflows.
-- **(g) ACP support:** [V] YES! Amp includes an Agent Client Protocol server mode
-  (<https://ampcode.com/threads/T-388afb33-958d-425a-939c-1b489c38908e>).
+- **(f) Post-edit commands:** [V] `tool.result` hooks or `agent.end`
+  continuation triggers custom workflows.
+- **(g) ACP support:** [V] YES! Amp includes an Agent Client Protocol server
+  mode (<https://ampcode.com/threads/T-388afb33-958d-425a-939c-1b489c38908e>).
 
 ---
 

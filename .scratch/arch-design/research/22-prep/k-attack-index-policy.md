@@ -2,7 +2,13 @@
 
 ## 1. Executive Summary & Verdict
 
-Design **C6** proposes deleting `ConfigDigests`, `Config::hash`, and the five discarded config path digests, replacing them with a consumer-owned `IndexPolicy` defined in `index`. `IndexerService` takes `IndexPolicy` and never `&Config`. `IndexPolicy::fingerprint()` becomes the sole index fingerprint generator. We evaluate C6 adversarially against **C2** (minimal dead-surface pruning keeping config-owned digests) and **C7** (config-owned `IndexView` coupling digest and consumption).
+Design **C6** proposes deleting `ConfigDigests`, `Config::hash`, and the five
+discarded config path digests, replacing them with a consumer-owned
+`IndexPolicy` defined in `index`. `IndexerService` takes `IndexPolicy` and never
+`&Config`. `IndexPolicy::fingerprint()` becomes the sole index fingerprint
+generator. We evaluate C6 adversarially against **C2** (minimal dead-surface
+pruning keeping config-owned digests) and **C7** (config-owned `IndexView`
+coupling digest and consumption).
 
 | Design | Core Proposition | Verdict | Key Failure Mode / Rationale |
 |---|---|---|---|
@@ -10,13 +16,23 @@ Design **C6** proposes deleting `ConfigDigests`, `Config::hash`, and the five di
 | **C6** | `index` owns `IndexPolicy`; `IndexerService` consumes only `IndexPolicy`; single-point `fingerprint()`; leaf types encode themselves; deletes `ConfigDigests`. | **HOLDS WITH CHANGE** | Fails to detect new config settings at compile time unless projection is exhaustively bound [H]; breaks if `title`/`aliases`/`date` keys are dropped before tickets 23/24 land [V]. |
 | **C7** | `config` owns `IndexView`; `Config` exhaustively projects to `IndexView`; `IndexerService` consumes `IndexView`. | **Strong Alternative** | Inverts dependency direction: couples `config` to indexer consumption needs; complicates ticket 33 crate split [H]. |
 
-**Final Verdict**: **C6 Holds with Change**. C6 solves the fundamental flaw of the current architecture—that `IndexerService` receives the full `&Config` and can arbitrarily read fields not tracked in `IndexFingerprint`—while deleting ~436 LoC and eliminating the heavy `syn` dev-dependency. However, C6 must be amended to: (1) retain the metadata role keys (`title`, `aliases`, `date_created`, `date_modified`) in the policy to prevent silent staleness when tickets 23/24 land; (2) use an exhaustive destructure pattern in `IndexPolicy::from_config` to preserve compile-time breakages when `Config` fields are added; and (3) enforce a strict module boundary prohibiting `Config` imports inside `src/index/**`.
+**Final Verdict**: **C6 Holds with Change**. C6 solves the fundamental flaw of
+the current architecture—that `IndexerService` receives the full `&Config` and
+can arbitrarily read fields not tracked in `IndexFingerprint`—while deleting
+~436 LoC and eliminating the heavy `syn` dev-dependency. However, C6 must be
+amended to: (1) retain the metadata role keys (`title`, `aliases`,
+`date_created`, `date_modified`) in the policy to prevent silent staleness when
+tickets 23/24 land; (2) use an exhaustive destructure pattern in
+`IndexPolicy::from_config` to preserve compile-time breakages when `Config`
+fields are added; and (3) enforce a strict module boundary prohibiting `Config`
+imports inside `src/index/**`.
 
 ---
 
 ## 2. Inventory: All Config Reads Across Index, Query, Template, and CLI
 
-Every read of `Config`, `TaskConfig`, `FrontmatterConfig`, `SchemasConfig`, and `TemplateConfig` across the system was traced:
+Every read of `Config`, `TaskConfig`, `FrontmatterConfig`, `SchemasConfig`, and
+`TemplateConfig` across the system was traced:
 
 | Module / Call Site | Setting Read | In Fingerprint Today? | Affects Persisted Rows? | Analysis & Channel |
 |---|---|---|---|---|
@@ -40,11 +56,17 @@ Every read of `Config`, `TaskConfig`, `FrontmatterConfig`, `SchemasConfig`, and 
 
 ### Assessment of Channel Isolation
 
-Query, template, and CLI never mutate or persist index rows directly [V]. `IndexerService` is the **sole orchestrator** of note parsing and redb persistence [V]. `QueryService` reads `PATHS_BY_FILE_CLASS` which depends on `class_field`, but `QueryService` receives `class_field` as a normalized string argument (`query/service.rs:68-75`), never via `&Config` [V].
+Query, template, and CLI never mutate or persist index rows directly [V].
+`IndexerService` is the **sole orchestrator** of note parsing and redb
+persistence [V]. `QueryService` reads `PATHS_BY_FILE_CLASS` which depends on
+`class_field`, but `QueryService` receives `class_field` as a normalized string
+argument (`query/service.rs:68-75`), never via `&Config` [V].
 
-Therefore, `IndexPolicy` **can be the sole channel** shaping index persistence, provided it carries:
+Therefore, `IndexPolicy` **can be the sole channel** shaping index persistence,
+provided it carries:
 
-1. Note parsing inputs (`NoteParserConfig`: statuses, tag filters, tags name) [V].
+1. Note parsing inputs (`NoteParserConfig`: statuses, tag filters, tags name)
+   [V].
 2. Index dimension inputs (`class_field`) [V].
 3. File walking inputs (`IgnorePolicy`, `root`) [V].
 4. Date parsing inputs (`PeriodParsePolicy` per ticket 27) [V].
@@ -66,35 +88,58 @@ Therefore, `IndexPolicy` **can be the sole channel** shaping index persistence, 
 
 An exhaustive search across the entire repository confirms:
 
-- `FrontmatterConfig::title_name()` has **0 production callers** (only in test assertions in `src/config/builder.rs:516` and `src/note/parser/input.rs:119`) [V].
-- `FrontmatterConfig::aliases_name()` has **0 production callers** (only in test assertions in `src/config/builder.rs:517`) [V].
-- `FrontmatterConfig::date_created()` and `date_modified()` have **0 production callers** (only in test assertions in `src/config/builder.rs:519-522`) [V].
-- `DateFieldConfig::name()` and `DateFieldConfig::format()` have **0 production callers** [V].
-- In `src/note/parser.rs:381`, the only frontmatter method called is `tags_name()` [V].
+- `FrontmatterConfig::title_name()` has **0 production callers** (only in test
+  assertions in `src/config/builder.rs:516` and `src/note/parser/input.rs:119`)
+  [V].
+- `FrontmatterConfig::aliases_name()` has **0 production callers** (only in test
+  assertions in `src/config/builder.rs:517`) [V].
+- `FrontmatterConfig::date_created()` and `date_modified()` have
+  **0 production callers** (only in test assertions in
+  `src/config/builder.rs:519-522`) [V].
+- `DateFieldConfig::name()` and `DateFieldConfig::format()` have
+  **0 production callers** [V].
+- In `src/note/parser.rs:381`, the only frontmatter method called is
+  `tags_name()` [V].
 
 ### The Danger for C6's "Exact by Construction"
 
 C6 asserts that `IndexPolicy` contains *only* what index-time code reads today.
 
-1. If C6 strips `title`, `aliases`, `date_created`, and `date_modified` from `IndexPolicy`:
+1. If C6 strips `title`, `aliases`, `date_created`, and `date_modified` from
+   `IndexPolicy`:
    - Today, index behavior is identical because nothing reads them [V].
-   - **However**, tickets 23 (`Note::title()`, `Note::aliases()`) and 24 (`file_meta.date_created`, `file_meta.date_modified` in redb) are scheduled to read these exact fields.
-   - If C6 removes them now, tickets 23 and 24 must remember to re-introduce them to `IndexPolicy`. If either ticket forgets, editing `[frontmatter] title` will **silently fail to invalidate the index**, serving stale rows [H].
+   - **However**, tickets 23 (`Note::title()`, `Note::aliases()`) and 24
+     (`file_meta.date_created`, `file_meta.date_modified` in redb) are scheduled
+     to read these exact fields.
+   - If C6 removes them now, tickets 23 and 24 must remember to re-introduce
+     them to `IndexPolicy`. If either ticket forgets, editing
+     `[frontmatter] title` will **silently fail to invalidate the index**,
+     serving stale rows [H].
 2. If C6 retains them in `IndexPolicy`:
-   - The policy is not strictly "exact by what `IndexerService` parses today", but it is exact with respect to the **persisted metadata contract** planned for tickets 23/24 [H].
-   - Preserves compatibility with existing tests expecting `IndexSetting::Title`, `IndexSetting::Aliases`, etc. [V].
+   - The policy is not strictly "exact by what `IndexerService` parses today",
+     but it is exact with respect to the **persisted metadata contract** planned
+     for tickets 23/24 [H].
+   - Preserves compatibility with existing tests expecting
+     `IndexSetting::Title`, `IndexSetting::Aliases`, etc. [V].
 
-**Conclusion**: C6 must include `title`, `aliases`, `date_created` (name/format), and `date_modified` (name/format) in `IndexPolicy` as metadata role settings, OR explicitly bind ticket 23/24 to update `IndexPolicy` [P]. Retaining them now is safer and avoids churn [H].
+**Conclusion**: C6 must include `title`, `aliases`, `date_created`
+(name/format), and `date_modified` (name/format) in `IndexPolicy` as metadata
+role settings, OR explicitly bind ticket 23/24 to update `IndexPolicy` [P].
+Retaining them now is safer and avoids churn [H].
 
 ---
 
 ## 4. Compile-Time Guarantee Comparison (C6 vs C2 vs C7)
 
-A central claim of C2 and the existing codebase is that exhaustive destructuring of `ConfigDigests` guarantees at compile time that no newly added config setting can silently escape index drift detection [V: `digest.rs:8-15`, `fingerprint.rs:12-18`].
+A central claim of C2 and the existing codebase is that exhaustive destructuring
+of `ConfigDigests` guarantees at compile time that no newly added config setting
+can silently escape index drift detection [V: `digest.rs:8-15`,
+`fingerprint.rs:12-18`].
 
 ### Scenario Analysis: Adding a Config Field
 
-Suppose a developer adds `[frontmatter] author = "author"` or `[markdown] enable_tables = true` to `Config`:
+Suppose a developer adds `[frontmatter] author = "author"` or
+`[markdown] enable_tables = true` to `Config`:
 
 | Architecture | Compile-Time Behavior | Risk of Silent Stale Cache |
 |---|---|---|
@@ -105,14 +150,25 @@ Suppose a developer adds `[frontmatter] author = "author"` or `[markdown] enable
 
 ### Enforcing Module Boundaries in C6
 
-If `IndexerService` can access `Config`, a developer could write `self.config.some_new_setting()` inside `IndexerService`, bypassing `IndexPolicy` entirely.
+If `IndexerService` can access `Config`, a developer could write
+`self.config.some_new_setting()` inside `IndexerService`, bypassing
+`IndexPolicy` entirely.
 
 To prevent this:
 
-1. **Module Rule**: `src/index/**` must NEVER import `crate::Config` or `crate::config::Config`, except strictly within `src/index/policy.rs` (the projection seam) [P].
+1. **Module Rule**: `src/index/**` must NEVER import `crate::Config` or
+   `crate::config::Config`, except strictly within `src/index/policy.rs` (the
+   projection seam) [P].
 2. **Enforcement Mechanisms**:
-   - *Clippy `disallowed-types`*: Configured in `clippy.toml`. In Rust, `disallowed-types` is crate-wide, which would require `#[expect(clippy::disallowed_types)]` at all legitimate `Config` call sites in `cli/`, `template/`, etc. (too noisy) [H].
-   - *Architecture AST/Import-Scan Test*: A 25-line unit test in `src/index/policy.rs` or `tests/architecture.rs` that reads files under `src/index/` and asserts that none (except `policy.rs`) contain `use crate::Config` or `use crate::config::Config` [P]. This provides 100% automated enforcement with zero compile overhead.
+   - *Clippy `disallowed-types`*: Configured in `clippy.toml`. In Rust,
+     `disallowed-types` is crate-wide, which would require
+     `#[expect(clippy::disallowed_types)]` at all legitimate `Config` call sites
+     in `cli/`, `template/`, etc. (too noisy) [H].
+   - *Architecture AST/Import-Scan Test*: A 25-line unit test in
+     `src/index/policy.rs` or `tests/architecture.rs` that reads files under
+     `src/index/` and asserts that none (except `policy.rs`) contain
+     `use crate::Config` or `use crate::config::Config` [P]. This provides 100%
+     automated enforcement with zero compile overhead.
 
 ---
 
@@ -122,14 +178,23 @@ To prevent this:
 
 The repo contains exactly two `syn`-based scan tests:
 
-1. `src/config/model/digest.rs:180-294` (115 lines): Scans 6 files via `include_str!` to verify no `..` (`PatRest`) exists in `digests`, `feed_into`, or `compose` [V].
-2. `src/index/fingerprint.rs:505-552` (48 lines): Scans `fingerprint.rs` to verify no `..` exists in `IndexFingerprint::new` [V].
+1. `src/config/model/digest.rs:180-294` (115 lines): Scans 6 files via
+   `include_str!` to verify no `..` (`PatRest`) exists in `digests`,
+   `feed_into`, or `compose` [V].
+2. `src/index/fingerprint.rs:505-552` (48 lines): Scans `fingerprint.rs` to
+   verify no `..` exists in `IndexFingerprint::new` [V].
 
-These two tests are the **only reason** `syn = { version = "2.0.119", features = ["full", "visit"] }` exists in `Cargo.toml:162` [V: verified by grepping `syn::` across the entire workspace].
+These two tests are the **only reason**
+`syn = { version = "2.0.119", features = ["full", "visit"] }` exists in
+`Cargo.toml:162` [V: verified by grepping `syn::` across the entire workspace].
 
 ### Is `syn` Necessary to Prevent `..`?
 
-No. Writing `let Self { a, b } = self;` in standard Rust already fails to compile if a field is added to `Self` (`error[E0027]: pattern does not mention field...`). The `syn` test was added only to prevent a programmer from voluntarily typing `..` to silence that compiler error [V: `digest.rs:14-15`].
+No. Writing `let Self { a, b } = self;` in standard Rust already fails to
+compile if a field is added to `Self`
+(`error[E0027]: pattern does not mention field...`). The `syn` test was added
+only to prevent a programmer from voluntarily typing `..` to silence that
+compiler error [V: `digest.rs:14-15`].
 
 ### Alternative Mechanisms
 
@@ -151,11 +216,17 @@ No. Writing `let Self { a, b } = self;` in standard Rust already fails to compil
    }
    ```
 
-   A macro generates both the struct and its destructuring pattern from a single field list [P]. It is syntactically impossible for a field to be omitted or for `..` to be written [P].
-2. **Ruff / uv `CacheKey` Pattern**:
-   In `astral-sh/uv` (`uv_cache_key`), a `CacheKey` trait and derive macro hash every field of a struct in declaration order [V]. In Traces, without introducing a proc-macro crate, a simple `macro_rules!` achieves identical safety [P].
-3. **Dropping `syn`**:
-   Deleting `src/config/model/digest.rs` and replacing the `fingerprint.rs` test with macro/exhaustive pattern allows **completely removing `syn` from `Cargo.toml`**, reducing dev-dependency compile times [P].
+   A macro generates both the struct and its destructuring pattern from a single
+   field list [P]. It is syntactically impossible for a field to be omitted or
+   for `..` to be written [P].
+2. **Ruff / uv `CacheKey` Pattern**: In `astral-sh/uv` (`uv_cache_key`), a
+   `CacheKey` trait and derive macro hash every field of a struct in declaration
+   order [V]. In Traces, without introducing a proc-macro crate, a simple
+   `macro_rules!` achieves identical safety [P].
+3. **Dropping `syn`**: Deleting `src/config/model/digest.rs` and replacing the
+   `fingerprint.rs` test with macro/exhaustive pattern allows
+   **completely removing `syn` from `Cargo.toml`**, reducing dev-dependency
+   compile times [P].
 
 ---
 
@@ -163,11 +234,19 @@ No. Writing `let Self { a, b } = self;` in standard Rust already fails to compil
 
 ### Persisted Wire Format in `META`
 
-- In `src/index/store.rs:43`, table `META` stores the raw byte array under key `b"fingerprint"` [V].
-- Today, `encode()` outputs `[[u8; 32]; 10]`, exactly 320 bytes [V: `fingerprint.rs:204-206`].
-- If `decode(bytes)` receives anything other than the exact expected length, it returns `None`, resulting in `StoredFingerprint::Unreadable` (`fingerprint.rs:210-214`) [V].
-- `StoredFingerprint::Unreadable` triggers `RefreshState::Drifted { cause: DriftCause::Unrecorded }`, causing an automatic full index rebuild [V: `fingerprint.rs:424`, `service.rs:174-184`].
-- **Ticket 16 Envelope Compatibility**: Ticket 16 explicitly permits wiping `index.redb` and forcing a rebuild during migrations [V]. Zero user data is lost.
+- In `src/index/store.rs:43`, table `META` stores the raw byte array under key
+  `b"fingerprint"` [V].
+- Today, `encode()` outputs `[[u8; 32]; 10]`, exactly 320 bytes [V:
+  `fingerprint.rs:204-206`].
+- If `decode(bytes)` receives anything other than the exact expected length, it
+  returns `None`, resulting in `StoredFingerprint::Unreadable`
+  (`fingerprint.rs:210-214`) [V].
+- `StoredFingerprint::Unreadable` triggers
+  `RefreshState::Drifted { cause: DriftCause::Unrecorded }`, causing an
+  automatic full index rebuild [V: `fingerprint.rs:424`, `service.rs:174-184`].
+- **Ticket 16 Envelope Compatibility**: Ticket 16 explicitly permits wiping
+  `index.redb` and forcing a rebuild during migrations [V]. Zero user data is
+  lost.
 
 ### Tests Pinning 10-Digest Layout
 
@@ -177,7 +256,9 @@ No. Writing `let Self { a, b } = self;` in standard Rust already fails to compil
 - `rejects_bytes_of_the_wrong_length` (`fingerprint.rs:387-395`) [V].
 - `display::joins_the_settings_of_a_drift_cause` (`fingerprint.rs:497-502`) [V].
 
-If C6 retains the 10 settings (or adds `IgnorePolicy` and `PeriodParsePolicy`), `SETTING_COUNT` adjusts to 11 or 12, the test cases update to match, and any existing redb cache is safely rebuilt on first run [P].
+If C6 retains the 10 settings (or adds `IgnorePolicy` and `PeriodParsePolicy`),
+`SETTING_COUNT` adjusts to 11 or 12, the test cases update to match, and any
+existing redb cache is safely rebuilt on first run [P].
 
 ### Line of Code (LoC) Delta: C2 vs C6
 
@@ -193,7 +274,8 @@ If C6 retains the 10 settings (or adds `IgnorePolicy` and `PeriodParsePolicy`), 
 | **Total Test LoC** | — | **-118 LoC** | **-304 LoC** |
 | **Net Total LoC Delta** | — | **-158 LoC** | **-436 LoC** |
 
-C6 deletes **nearly three times as much code** as C2, removing an entire module and an external dev-dependency [V].
+C6 deletes **nearly three times as much code** as C2, removing an entire module
+and an external dev-dependency [V].
 
 ---
 
@@ -201,44 +283,73 @@ C6 deletes **nearly three times as much code** as C2, removing an entire module 
 
 ### NoteParserConfig Interplay
 
-Ticket 22 settled decision `b2`: `note` defines `NoteParserConfig` containing `TaskStatusMap`, `tag_filters`, and `tags_name`.
+Ticket 22 settled decision `b2`: `note` defines `NoteParserConfig` containing
+`TaskStatusMap`, `tag_filters`, and `tags_name`.
 
 - In C6, `IndexPolicy` directly embeds or projects `NoteParserConfig` [P].
-- `IndexerService::parse_note` passes `&self.policy.note_parser` to `MarkdownParserInput::new` [P].
-- There is zero duplication of configuration state: `NoteParserConfig` is constructed once when `IndexPolicy` is built, and borrowed for every note parsed in Rayon [P].
+- `IndexerService::parse_note` passes `&self.policy.note_parser` to
+  `MarkdownParserInput::new` [P].
+- There is zero duplication of configuration state: `NoteParserConfig` is
+  constructed once when `IndexPolicy` is built, and borrowed for every note
+  parsed in Rayon [P].
 
 ### Ignore Policy and Freshness
 
-- Today, `IndexerService::scan` (`src/index/service.rs:424`) calls `env_vars::is_ignored_dir` directly [V].
-- Ticket 21 mandates: "HostInputs built once by adapters and passed to services as narrow projections (f2)... index freshness must include the ignore policy and persisted filename-period parse policy" [V].
+- Today, `IndexerService::scan` (`src/index/service.rs:424`) calls
+  `env_vars::is_ignored_dir` directly [V].
+- Ticket 21 mandates: "HostInputs built once by adapters and passed to services
+  as narrow projections (f2)... index freshness must include the ignore policy
+  and persisted filename-period parse policy" [V].
 - In C6:
   - `HostInputs` supplies `IgnorePolicy`.
   - `IndexPolicy` holds `IgnorePolicy`.
-  - `IndexerService::scan` uses `self.policy.ignore_policy` to prune directories during the disk walk [P].
-  - `IndexPolicy::fingerprint()` feeds `self.ignore_policy` into the fingerprint [P].
-  - **Result**: The exact policy that determined which files were walked is guaranteed to be what is fingerprinted. If the user changes an ignore rule, the fingerprint changes, detecting drift and triggering a rebuild [P].
+  - `IndexerService::scan` uses `self.policy.ignore_policy` to prune directories
+    during the disk walk [P].
+  - `IndexPolicy::fingerprint()` feeds `self.ignore_policy` into the fingerprint
+    [P].
+  - **Result**: The exact policy that determined which files were walked is
+    guaranteed to be what is fingerprinted. If the user changes an ignore rule,
+    the fingerprint changes, detecting drift and triggering a rebuild [P].
 
 ### The `trust --all` vs Index Walker Hazard
 
-- `src/config/discovery.rs:158` also calls `env_vars::is_ignored_dir` when discovering configs to trust [V].
-- If `trust --all` and `IndexerService::scan` used different ignore policies, a directory could have its config trusted but its notes ignored, or vice versa [H].
-- In C6, both receive projections of the host-owned `IgnorePolicy` from `HostInputs`, guaranteeing identical directory filtering across the entire application [P].
+- `src/config/discovery.rs:158` also calls `env_vars::is_ignored_dir` when
+  discovering configs to trust [V].
+- If `trust --all` and `IndexerService::scan` used different ignore policies, a
+  directory could have its config trusted but its notes ignored, or vice versa
+  [H].
+- In C6, both receive projections of the host-owned `IgnorePolicy` from
+  `HostInputs`, guaranteeing identical directory filtering across the entire
+  application [P].
 
 ---
 
 ## 8. Architectural Trajectory & Multi-Crate Impact (Ticket 33)
 
-Ticket 33 explores splitting the CLI into a separate crate (`traces-cli`), leaving core domain logic in `traces-core`, and potentially separating domain crates later (`traces-config`, `traces-note`, `traces-index`, `traces-query`).
+Ticket 33 explores splitting the CLI into a separate crate (`traces-cli`),
+leaving core domain logic in `traces-core`, and potentially separating domain
+crates later (`traces-config`, `traces-note`, `traces-index`, `traces-query`).
 
 ### Coupling Under C2 / C7 vs C6
 
-- Under **C2**: `config` must generate `ConfigDigests`. To do so, `config` must know what the index needs, or compute digests for every setting. In a multi-crate setup, `traces-config` is coupled to index-specific hashing needs [H].
-- Under **C7**: `config` defines `IndexView`. `traces-config` must define a struct tailored to `traces-index`. If `IndexView` references `NoteParserConfig`, `traces-config` must depend on `traces-note`, inverting standard layering [H].
+- Under **C2**: `config` must generate `ConfigDigests`. To do so, `config` must
+  know what the index needs, or compute digests for every setting. In a
+  multi-crate setup, `traces-config` is coupled to index-specific hashing needs
+  [H].
+- Under **C7**: `config` defines `IndexView`. `traces-config` must define a
+  struct tailored to `traces-index`. If `IndexView` references
+  `NoteParserConfig`, `traces-config` must depend on `traces-note`, inverting
+  standard layering [H].
 - Under **C6**:
   - `traces-index` defines `IndexPolicy`.
-  - `traces-index` depends downward on `traces-note` (for `NoteParserConfig`) and root types (`Tag`, `FieldName`, `IgnorePolicy`).
-  - `traces-index` does **not** need to depend on `traces-config`! The projection `from_config` can live in the application composition layer (`traces-app` or `traces-cli`), which maps `(Config, HostInputs) -> IndexPolicy` and passes it to `IndexerService` [P].
-  - This satisfies the strict Dependency Inversion Principle: `index` defines the interface it requires; callers supply it [H].
+  - `traces-index` depends downward on `traces-note` (for `NoteParserConfig`)
+    and root types (`Tag`, `FieldName`, `IgnorePolicy`).
+  - `traces-index` does **not** need to depend on `traces-config`! The
+    projection `from_config` can live in the application composition layer
+    (`traces-app` or `traces-cli`), which maps
+    `(Config, HostInputs) -> IndexPolicy` and passes it to `IndexerService` [P].
+  - This satisfies the strict Dependency Inversion Principle: `index` defines
+    the interface it requires; callers supply it [H].
 
 ---
 
@@ -247,18 +358,27 @@ Ticket 33 explores splitting the CLI into a separate crate (`traces-cli`), leavi
 ### Alternative C2: Dead Surface Pruning (Conservative)
 
 - Keep `ConfigDigests` in `src/config/model/digest.rs`.
-- Delete the 5 discarded digests (`root`, `templates.local`, `templates.global`, `templates.output`, `schemas.directory`).
-- Delete `Config::hash`, `ConfigDigests::compose`, and `CONFIG_LABEL = b"traces.config.v1"`.
-- Keep the per-setting digests in `config` and `IndexFingerprint::new(&ConfigDigests)`.
-- *Verdict*: Safe, but preserves the two-stage parallel destructuring indirection, retains `syn`, and leaves `IndexerService` taking `&Config` [H].
+- Delete the 5 discarded digests (`root`, `templates.local`, `templates.global`,
+  `templates.output`, `schemas.directory`).
+- Delete `Config::hash`, `ConfigDigests::compose`, and
+  `CONFIG_LABEL = b"traces.config.v1"`.
+- Keep the per-setting digests in `config` and
+  `IndexFingerprint::new(&ConfigDigests)`.
+- *Verdict*: Safe, but preserves the two-stage parallel destructuring
+  indirection, retains `syn`, and leaves `IndexerService` taking `&Config` [H].
 
 ### Alternative C7: Config-Owned `IndexView`
 
-- `config` defines `pub struct IndexView { tasks: TaskConfig, frontmatter_tags: FieldName, class_field: FieldName }`.
-- `Config` provides an exhaustive projection `pub fn index_view(&self) -> IndexView`.
-- `IndexerService::from(view: IndexView, host: HostInputs)` consumes `IndexView`.
+- `config` defines
+  `pub struct IndexView { tasks: TaskConfig, frontmatter_tags: FieldName, class_field: FieldName }`.
+- `Config` provides an exhaustive projection
+  `pub fn index_view(&self) -> IndexView`.
+- `IndexerService::from(view: IndexView, host: HostInputs)` consumes
+  `IndexView`.
 - Fingerprint is computed from `IndexView` + `HostInputs`.
-- *Verdict*: Good compile-time safety, but couples `config` to `index` consumption patterns and creates awkward dependencies in a multi-crate architecture [H].
+- *Verdict*: Good compile-time safety, but couples `config` to `index`
+  consumption patterns and creates awkward dependencies in a multi-crate
+  architecture [H].
 
 ---
 
@@ -332,7 +452,11 @@ impl IndexPolicy {
 
 #### 3. Module Boundary Rules
 
-1. `src/index/**` must **never import `crate::Config`** or `crate::config::Config`, except inside `src/index/policy.rs` [P].
+1. `src/index/**` must **never import `crate::Config`** or
+   `crate::config::Config`, except inside `src/index/policy.rs` [P].
 2. `IndexerService::from` takes `IndexPolicy`, never `&Config` [P].
-3. Add an automated test `src/index/policy.rs::tests::index_never_imports_config` that verifies no `.rs` file under `src/index/` (excluding `policy.rs`) references `crate::Config` [P].
+3. Add an automated test
+   `src/index/policy.rs::tests::index_never_imports_config` that verifies no
+   `.rs` file under `src/index/` (excluding `policy.rs`) references
+   `crate::Config` [P].
 4. Remove `syn` from `Cargo.toml` dev-dependencies [P].

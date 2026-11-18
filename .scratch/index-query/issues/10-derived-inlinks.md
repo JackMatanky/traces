@@ -1,6 +1,7 @@
 # 10 — Derived Inlinks
 
-**What to build:** WorkspaceIndex derives inlinks from indexed outlinks so Notes can be queried by incoming relationships.
+**What to build:** WorkspaceIndex derives inlinks from indexed outlinks so Notes
+can be queried by incoming relationships.
 
 **Blocked by:** 04 — Fresh Query Source Selection
 
@@ -12,9 +13,12 @@
 - [x] IndexRecords expose inlinks for markdown Notes.
 - [x] Query execution can select or filter by incoming relationships.
 - [x] Refreshing changed outlinks updates derived inlinks.
-- [x] Querying by a target returns every Note that links to it, including at least two Notes linking to the same target.
-- [x] Deleting a Note that linked to a target removes that inbound edge after refresh.
-- [x] Duplicate outlinks within one Note and self-links do not corrupt the derived set.
+- [x] Querying by a target returns every Note that links to it, including at
+      least two Notes linking to the same target.
+- [x] Deleting a Note that linked to a target removes that inbound edge after
+      refresh.
+- [x] Duplicate outlinks within one Note and self-links do not corrupt the
+      derived set.
 
 ## Comments
 
@@ -24,34 +28,61 @@
 
 **What we've established so far:**
 
-- Outlinks are already indexed per-Note (`Note::outlinks()`); no inlink derivation or incoming-relationship query surface exists anywhere in `src/`.
-- Prior-rejection check: no `.out-of-scope/` record applies — this is genuinely new work.
+- Outlinks are already indexed per-Note (`Note::outlinks()`); no inlink
+  derivation or incoming-relationship query surface exists anywhere in `src/`.
+- Prior-rejection check: no `.out-of-scope/` record applies — this is genuinely
+  new work.
 - Blocked by #04, which is `completed`, so this ticket is unblocked.
-- Spec basis: user story #21 and the Implementation Decision "Inlinks are derived in a post-processing pass from indexed outlinks."
+- Spec basis: user story #21 and the Implementation Decision "Inlinks are
+  derived in a post-processing pass from indexed outlinks."
 
 **Recommended:** Category `enhancement`; State `ready-for-agent`.
 
 ## Agent Brief
 
-**Category:** enhancement
-**Summary:** WorkspaceIndex derives inlinks from indexed outlinks so Notes can be queried by incoming relationships.
+**Category:** enhancement **Summary:** WorkspaceIndex derives inlinks from
+indexed outlinks so Notes can be queried by incoming relationships.
 
-**Current behavior:**
-Each parsed markdown Note already indexes its own outlinks (`Outlink` target, display text, and `LinkType` for Markdown links and Obsidian wikilinks), and those Notes persist through the WorkspaceIndex redb store. The page-level and task-level query surfaces (`Source`, `IndexRecord`, `QueryOutcome`, field resolution) have no notion of incoming relationships: nothing computes which Notes link to a given target, and no query source or field can select or filter by inbound links.
+**Current behavior:** Each parsed markdown Note already indexes its own outlinks
+(`Outlink` target, display text, and `LinkType` for Markdown links and Obsidian
+wikilinks), and those Notes persist through the WorkspaceIndex redb store. The
+page-level and task-level query surfaces (`Source`, `IndexRecord`,
+`QueryOutcome`, field resolution) have no notion of incoming relationships:
+nothing computes which Notes link to a given target, and no query source or
+field can select or filter by inbound links.
 
-**Desired behavior:**
-Inlinks are derived in a post-processing pass over the already-indexed outlinks. Each markdown Note gets a derived set of inbound links pointing to it. Index refresh — when a Note's outlinks change, when Notes are added, or when Notes are deleted — recomputes the affected derived inlinks so results reflect the project root on disk. The derived data is exposed through the existing query surfaces so Templates and CLI can select or filter by incoming relationships (e.g. find every Note that links to a target Note). Edge cases to get right: multiple Notes linking to the same target, duplicate outlinks within one Note, and self-links.
+**Desired behavior:** Inlinks are derived in a post-processing pass over the
+already-indexed outlinks. Each markdown Note gets a derived set of inbound links
+pointing to it. Index refresh — when a Note's outlinks change, when Notes are
+added, or when Notes are deleted — recomputes the affected derived inlinks so
+results reflect the project root on disk. The derived data is exposed through
+the existing query surfaces so Templates and CLI can select or filter by
+incoming relationships (e.g. find every Note that links to a target Note). Edge
+cases to get right: multiple Notes linking to the same target, duplicate
+outlinks within one Note, and self-links.
 
 **Key interfaces:**
-- `Note` and its persisted form — currently exposes `outlinks()`; the spec says inlinks are derived, so decide whether they are stored at refresh time or computed on query.
-- `WorkspaceIndex` — the existing `(created_at, modified_at, size)`-driven refresh path that re-parses changed/added Notes and drops deleted ones must also keep derived inlinks consistent.
-- `IndexRecord` / query field resolution (`FieldPath`) — must expose an incoming-relationship accessor so `.where(...)`/`.filter(...)` can select by inbound links, following the existing `file.*`/`task.*`/tags accessor pattern.
-- `Source` — decide whether inbound-link selection is a new `Source` variant or a filter; the spec only mandates that query execution can select or filter by incoming relationships.
+
+- `Note` and its persisted form — currently exposes `outlinks()`; the spec says
+  inlinks are derived, so decide whether they are stored at refresh time or
+  computed on query.
+- `WorkspaceIndex` — the existing `(created_at, modified_at, size)`-driven
+  refresh path that re-parses changed/added Notes and drops deleted ones must
+  also keep derived inlinks consistent.
+- `IndexRecord` / query field resolution (`FieldPath`) — must expose an
+  incoming-relationship accessor so `.where(...)`/`.filter(...)` can select by
+  inbound links, following the existing `file.*`/`task.*`/tags accessor pattern.
+- `Source` — decide whether inbound-link selection is a new `Source` variant or
+  a filter; the spec only mandates that query execution can select or filter by
+  incoming relationships.
 
 **Out of scope:**
-- Changing outlink extraction behavior; this issue consumes the existing `Note::outlinks()` data.
+
+- Changing outlink extraction behavior; this issue consumes the existing
+  `Note::outlinks()` data.
 - Inlink support for non-markdown File Records — only markdown Notes have links.
-- A Dataview Query Language parser, DataviewJS, or link/backlink graph visualization.
+- A Dataview Query Language parser, DataviewJS, or link/backlink graph
+  visualization.
 - Editing Notes through query output.
 
 ---
@@ -60,14 +91,82 @@ Inlinks are derived in a post-processing pass over the already-indexed outlinks.
 
 ### Implementation Notes
 
-- **Computed, not persisted** (`src/index/inlinks.rs`, new): `derive_inlinks(&[Note]) -> BTreeMap<PathBuf, Vec<PathBuf>>` resolves every indexed Note's outlinks against every other indexed Note's path and recomputes on every `WorkspaceIndex::query`/`query_tasks` call. No new redb table, no `Note` field, no invalidation logic — `notes` is already fully re-derived by `WorkspaceIndex::refresh` on every call, so recomputing inlinks alongside it is O(l) extra work with nothing to keep in sync. Directly answers the ticket's "decide whether they are stored at refresh time or computed on query": computed.
-- **Target resolution** (`resolve_target`, `src/index/inlinks.rs`): tries, in order, an exact root-relative path match, the same path with `.md` appended (Markdown-style links omitting the extension), then a unique file-stem match across every indexed Note (Obsidian wikilink-by-name resolution). An ambiguous stem match resolves to `None` rather than guessing. A `#heading` fragment is stripped before matching, so a link into a heading still resolves to its owning Note. `ponytail:`-flagged ceiling: no note-directory-relative resolution (`../sibling.md`) and no Obsidian shortest-unique-path search — only markdown Notes are ever search targets (`resolve_target` only sees `notes: &[Note]`), so non-markdown targets and external URLs naturally never resolve, satisfying "Inlink support for non-markdown File Records" being out of scope without any extra filtering.
-- **Dedup via `BTreeSet`** (`derive_inlinks`): edges are keyed `(target, source)` pairs collected into a `BTreeMap<&Path, BTreeSet<&Path>>` before being turned into sorted `Vec<PathBuf>`. Duplicate outlinks to the same target within one Note collapse to one edge; a self-link (source resolves to itself) is a normal, valid edge that does not disturb any other Note's inlinks — both directly satisfy the ticket's "do not corrupt the derived set" criterion.
-- **`FieldPath::Inlinks`** (`src/index/query/field.rs`): a new bare `inlinks` accessor parsed the same way as the existing `tags` accessor, following the ticket's "existing `file.*`/`task.*`/tags accessor pattern" guidance exactly — no new `Source` variant. `IndexRecord::field("inlinks")`/`.where("contains(inlinks, \"note.md\")")` work through the pre-existing generic filter/`contains()` machinery (#05) with zero changes there.
-- **`IndexRecord.inlinks: Vec<PathBuf>`** (`src/index/query.rs`): set via a new `with_inlinks` builder (mirroring the existing `with_task`) from `WorkspaceIndex::query`/`query_tasks`, which call `derive_inlinks(&self.notes)` — over *every* indexed Note, before `matched_pairs` filters down to `source` — and `remove()` (not `.get().cloned()`) each matched Note's entry out of the derived map, avoiding a `Vec<PathBuf>` clone per row since each Note is looked up at most once per query. This also means a Note excluded by `source` (e.g. wrong tag) still correctly contributes to the inlinks of a Note that *is* included; covered by `includes_a_linking_note_outside_the_source_in_the_targets_inlinks`. Task-level rows built by `query_tasks` inherit their parent Note's inlinks the same way `file.*`/frontmatter/tags already flow through.
-- **Tests**: `src/index/inlinks.rs` unit-tests `resolve_target` and `derive_inlinks` directly (path match, missing-extension match, stem match, ambiguous-stem rejection, fragment stripping, external-URL non-match, duplicate-outlink dedup, self-link, multi-source target). `src/index/query.rs` adds `IndexRecord::inlinks`/`with_inlinks` accessor tests and `field("inlinks")` resolution tests (populated list, empty list — always `List`, never `Null`, unlike a missing metadata key). `src/index/mod.rs` adds WorkspaceIndex-seam integration tests per the ticket's own acceptance wording: two Notes linking to the same target, a Note outside the query `source` still counted, duplicate-outlink/self-link non-corruption, and — in `mod refresh` — deleting the one Note that linked to a target and refreshing removes that inbound edge. `mod query_tasks` gets one test proving task rows retain their parent's inlinks.
-- **Verification**: `mise run fmt` (`--check` clean via the mise-pinned nightly toolchain — plain `cargo fmt --check` on stable produced spurious diffs on unrelated pre-existing files, not from this change), `mise run clippy` clean, the stricter `MISE_EXPERIMENTAL=1 mise x -- cargo clippy --workspace --tests --all-features -- -D warnings` gate clean, `mise run doc` clean, `cargo nextest run` **1117/1117 passing**, `cargo test --workspace` (doctests included) clean. Live smoke test against the built binary: `traces index` then `traces table --column file.path --column inlinks` on three Notes (two linking to a shared target) rendered `target.md | a.md, b.md` correctly; deleting the linking Note and re-running `traces table` (lazy refresh, no explicit `traces index`) dropped it from the target's `inlinks` column.
-- **Out of scope, deliberately not touched**: outlink extraction (`Note::outlinks()`, `src/note/`), non-markdown File Record inlinks, a Dataview Query Language parser, DataviewJS, link/backlink graph visualization, and editing Notes through query output.
+- **Computed, not persisted** (`src/index/inlinks.rs`, new):
+  `derive_inlinks(&[Note]) -> BTreeMap<PathBuf, Vec<PathBuf>>` resolves every
+  indexed Note's outlinks against every other indexed Note's path and recomputes
+  on every `WorkspaceIndex::query`/`query_tasks` call. No new redb table, no
+  `Note` field, no invalidation logic — `notes` is already fully re-derived by
+  `WorkspaceIndex::refresh` on every call, so recomputing inlinks alongside it
+  is O(l) extra work with nothing to keep in sync. Directly answers the ticket's
+  "decide whether they are stored at refresh time or computed on query":
+  computed.
+- **Target resolution** (`resolve_target`, `src/index/inlinks.rs`): tries, in
+  order, an exact root-relative path match, the same path with `.md` appended
+  (Markdown-style links omitting the extension), then a unique file-stem match
+  across every indexed Note (Obsidian wikilink-by-name resolution). An ambiguous
+  stem match resolves to `None` rather than guessing. A `#heading` fragment is
+  stripped before matching, so a link into a heading still resolves to its
+  owning Note. `ponytail:`-flagged ceiling: no note-directory-relative
+  resolution (`../sibling.md`) and no Obsidian shortest-unique-path search —
+  only markdown Notes are ever search targets (`resolve_target` only sees
+  `notes: &[Note]`), so non-markdown targets and external URLs naturally never
+  resolve, satisfying "Inlink support for non-markdown File Records" being out
+  of scope without any extra filtering.
+- **Dedup via `BTreeSet`** (`derive_inlinks`): edges are keyed
+  `(target, source)` pairs collected into a `BTreeMap<&Path, BTreeSet<&Path>>`
+  before being turned into sorted `Vec<PathBuf>`. Duplicate outlinks to the same
+  target within one Note collapse to one edge; a self-link (source resolves to
+  itself) is a normal, valid edge that does not disturb any other Note's inlinks
+  — both directly satisfy the ticket's "do not corrupt the derived set"
+  criterion.
+- **`FieldPath::Inlinks`** (`src/index/query/field.rs`): a new bare `inlinks`
+  accessor parsed the same way as the existing `tags` accessor, following the
+  ticket's "existing `file.*`/`task.*`/tags accessor pattern" guidance exactly —
+  no new `Source` variant.
+  `IndexRecord::field("inlinks")`/`.where("contains(inlinks, \"note.md\")")`
+  work through the pre-existing generic filter/`contains()` machinery (#05) with
+  zero changes there.
+- **`IndexRecord.inlinks: Vec<PathBuf>`** (`src/index/query.rs`): set via a new
+  `with_inlinks` builder (mirroring the existing `with_task`) from
+  `WorkspaceIndex::query`/`query_tasks`, which call
+  `derive_inlinks(&self.notes)` — over *every* indexed Note, before
+  `matched_pairs` filters down to `source` — and `remove()` (not
+  `.get().cloned()`) each matched Note's entry out of the derived map, avoiding
+  a `Vec<PathBuf>` clone per row since each Note is looked up at most once per
+  query. This also means a Note excluded by `source` (e.g. wrong tag) still
+  correctly contributes to the inlinks of a Note that *is* included; covered by
+  `includes_a_linking_note_outside_the_source_in_the_targets_inlinks`.
+  Task-level rows built by `query_tasks` inherit their parent Note's inlinks the
+  same way `file.*`/frontmatter/tags already flow through.
+- **Tests**: `src/index/inlinks.rs` unit-tests `resolve_target` and
+  `derive_inlinks` directly (path match, missing-extension match, stem match,
+  ambiguous-stem rejection, fragment stripping, external-URL non-match,
+  duplicate-outlink dedup, self-link, multi-source target). `src/index/query.rs`
+  adds `IndexRecord::inlinks`/`with_inlinks` accessor tests and
+  `field("inlinks")` resolution tests (populated list, empty list — always
+  `List`, never `Null`, unlike a missing metadata key). `src/index/mod.rs` adds
+  WorkspaceIndex-seam integration tests per the ticket's own acceptance wording:
+  two Notes linking to the same target, a Note outside the query `source` still
+  counted, duplicate-outlink/self-link non-corruption, and — in `mod refresh` —
+  deleting the one Note that linked to a target and refreshing removes that
+  inbound edge. `mod query_tasks` gets one test proving task rows retain their
+  parent's inlinks.
+- **Verification**: `mise run fmt` (`--check` clean via the mise-pinned nightly
+  toolchain — plain `cargo fmt --check` on stable produced spurious diffs on
+  unrelated pre-existing files, not from this change), `mise run clippy` clean,
+  the stricter
+  `MISE_EXPERIMENTAL=1 mise x -- cargo clippy --workspace --tests --all-features -- -D warnings`
+  gate clean, `mise run doc` clean, `cargo nextest run` **1117/1117 passing**,
+  `cargo test --workspace` (doctests included) clean. Live smoke test against
+  the built binary: `traces index` then
+  `traces table --column file.path --column inlinks` on three Notes (two linking
+  to a shared target) rendered `target.md | a.md, b.md` correctly; deleting the
+  linking Note and re-running `traces table` (lazy refresh, no explicit
+  `traces index`) dropped it from the target's `inlinks` column.
+- **Out of scope, deliberately not touched**: outlink extraction
+  (`Note::outlinks()`, `src/note/`), non-markdown File Record inlinks, a
+  Dataview Query Language parser, DataviewJS, link/backlink graph visualization,
+  and editing Notes through query output.
 
 ---
 
@@ -134,15 +233,14 @@ every CLI invocation where `refresh` found nothing changed. Since
   either fully recompute (unchanged from the original design, so still
   correct) or fully reuse the last computation (correct because nothing
   changed) — never partially patched.
-- **Tests added**: `store.rs` — links round-trip and drop-on-replace.
-  `mod.rs` —
-  `reuses_persisted_inlinks_when_nothing_on_disk_changed` (proves
-  the `!dirty` reuse path preserves data) and
+- **Tests added**: `store.rs` — links round-trip and drop-on-replace. `mod.rs` —
+  `reuses_persisted_inlinks_when_nothing_on_disk_changed` (proves the `!dirty`
+  reuse path preserves data) and
   `resolves_an_unedited_notes_ambiguous_wikilink_once_an_unrelated_note_is_deleted`
-  (the regression test for the correctness hazard above: an untouched
-  note's ambiguous `[[foo]]` self-heals once a same-stem note elsewhere
-  is deleted, proving the *whole-index* dirty gate, not a per-note diff,
-  drives recomputation).
+  (the regression test for the correctness hazard above: an untouched note's
+  ambiguous `[[foo]]` self-heals once a same-stem note elsewhere is deleted,
+  proving the *whole-index* dirty gate, not a per-note diff, drives
+  recomputation).
 - **Verification**: `cargo check`/`--tests --all-features` clean,
   targeted `store`/`inlinks`/`mod` suites (29 + 28 tests) passing,
   `mise run fmt`/`clippy` (both the plain and strict

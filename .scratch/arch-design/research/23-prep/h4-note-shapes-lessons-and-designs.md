@@ -1,8 +1,8 @@
 # Note shapes: lessons from Markdown tools and a stress test of designs
 
-**Superseded in part.** The ticket's `## Answer` is the final decision. Section 5
-of this file proposed one event loop with an optional document hook. The review
-in `h5-round2-review.md` replaced that hook with a separate scan,
+**Superseded in part.** The ticket's `## Answer` is the final decision. Section
+5 of this file proposed one event loop with an optional document hook. The
+review in `h5-round2-review.md` replaced that hook with a separate scan,
 `NoteDoc::scan`. Read sections 1 to 4 for the lessons. Ignore the pipeline
 diagram and `opts.doc` in section 5.
 

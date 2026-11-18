@@ -1,10 +1,13 @@
 # Holistic Alternatives: Config Ownership and Lifecycle (Ticket 22)
 
-This document provides a holistic analysis of the configuration ownership and lifecycle design for Wayfinder, centered around the proposed decisions Q1–Q15 in `m-decision-candidates.md`.
+This document provides a holistic analysis of the configuration ownership and
+lifecycle design for Wayfinder, centered around the proposed decisions Q1–Q15 in
+`m-decision-candidates.md`.
 
 ## 1. Module Dependency and Architecture
 
-The following diagram represents the production module dependencies under the proposed decisions (Q1–Q15).
+The following diagram represents the production module dependencies under the
+proposed decisions (Q1–Q15).
 
 ```mermaid
 graph TD
@@ -25,12 +28,19 @@ graph TD
 
 ### Dependency Analysis
 
-- **Acyclicity Check**: The proposed design maintains the strictly acyclic DAG requirement. Modules in Tier 4+ (Config, Schema) do not depend on higher-tier modules (Note, Index, Query).
+- **Acyclicity Check**: The proposed design maintains the strictly acyclic DAG
+  requirement. Modules in Tier 4+ (Config, Schema) do not depend on higher-tier
+  modules (Note, Index, Query).
 - **Ownership Verification**:
   - `NoteParserConfig` (Q1): Owned by `note`, built from `Config` seam.
   - `IndexPolicy` (Q8): Owned by `index`, built from `Config` seam.
   - `Config`: A pure data bag (Q3, Q10).
-- **Asymmetries**: `Index` and `Note` subsystems own their policy types (built from `Config`), while `TemplateService` takes `&Config` and `QueryService` takes scalars. This asymmetry is acceptable as `Template` requires high-level rendering settings, while `Query` operates on projected field data. Generalizing `QueryService` to take a `QueryPolicy` is deferred until `ticket 24`.
+- **Asymmetries**: `Index` and `Note` subsystems own their policy types (built
+  from `Config`), while `TemplateService` takes `&Config` and `QueryService`
+  takes scalars. This asymmetry is acceptable as `Template` requires high-level
+  rendering settings, while `Query` operates on projected field data.
+  Generalizing `QueryService` to take a `QueryPolicy` is deferred until
+  `ticket 24`.
 
 ## 2. Holistic Design Alternatives
 
@@ -46,11 +56,16 @@ We evaluate the lead design (A) against three alternatives.
 | **LSP/MCP Fit** | Excellent | Excellent | Good | Good |
 | **Reversibility** | High | High | Low | Low |
 
-- **Alternative B**: Every subsystem owns its policy, and a `Workspace` composition module projects `Config` + `HostInputs` into all.
-- **Alternative C**: Narrow `Config` with accessor views; plain-data `Workspace` value with `check`/`reload`.
-- **Alternative D**: Separate CLI into its own crate. Core crate (config, trust, init, primitives) defines the minimal public API.
+- **Alternative B**: Every subsystem owns its policy, and a `Workspace`
+  composition module projects `Config` + `HostInputs` into all.
+- **Alternative C**: Narrow `Config` with accessor views; plain-data `Workspace`
+  value with `check`/`reload`.
+- **Alternative D**: Separate CLI into its own crate. Core crate (config, trust,
+  init, primitives) defines the minimal public API.
 
-**Recommendation**: Retain **Alternative A**. It provides the best balance of safety (type-safe seams), testability (plain-data projections), and simplicity (minimal crate structure).
+**Recommendation**: Retain **Alternative A**. It provides the best balance of
+safety (type-safe seams), testability (plain-data projections), and simplicity
+(minimal crate structure).
 
 ## 3. Missing Responsibilities
 
@@ -81,25 +96,35 @@ pub fn project_index_policy(config: &Config, inputs: &HostInputs) -> IndexPolicy
 }
 ```
 
-*Status*: The projections compile correctly with no borrowing issues. The `IndexPolicy` correctly owns its components.
+*Status*: The projections compile correctly with no borrowing issues. The
+`IndexPolicy` correctly owns its components.
 
 ## 5. Amendments and Risks
 
 ### Amendments (Ranked)
 
-1. **Strictly typed `ConfigLocator`**: Explicitly separate locator logic from trust state.
-2. **Unify `InitOutcome`**: Standardize `InitOutcome` to carry absolute path to created traces dir.
+1. **Strictly typed `ConfigLocator`**: Explicitly separate locator logic from
+   trust state.
+2. **Unify `InitOutcome`**: Standardize `InitOutcome` to carry absolute path to
+   created traces dir.
 3. **Refine `ConfigError`**: Flatten hierarchy to ease diagnostic printing.
 
 ### 5 Riskiest Assumptions
 
-1. **Zero-reader policy for aliases**: Risk: 23/24 may find alias readers, breaking the Q8 assumption. *Test*: Search alias usages.
-2. **Atomic `create_dir` sufficiency**: Risk: File system race conditions during `init`. *Test*: Property test with concurrent `init` calls.
-3. **Config fingerprint stability**: Risk: Serialization format change breaks index invalidation. *Test*: Regression test for `ConfigFingerprint` bytes.
-4. **HostInputs projection purity**: Risk: `project` seam has side effects. *Test*: Unit test that `project` is deterministic.
-5. **Task resolution order**: Risk: Merge complexity with global/local tasks. *Test*: Property test for merge order stability.
+1. **Zero-reader policy for aliases**: Risk: 23/24 may find alias readers,
+   breaking the Q8 assumption. *Test*: Search alias usages.
+2. **Atomic `create_dir` sufficiency**: Risk: File system race conditions during
+   `init`. *Test*: Property test with concurrent `init` calls.
+3. **Config fingerprint stability**: Risk: Serialization format change breaks
+   index invalidation. *Test*: Regression test for `ConfigFingerprint` bytes.
+4. **HostInputs projection purity**: Risk: `project` seam has side effects.
+   *Test*: Unit test that `project` is deterministic.
+5. **Task resolution order**: Risk: Merge complexity with global/local tasks.
+   *Test*: Property test for merge order stability.
 
 ---
 
 Path: `.scratch/arch-design/research/22-prep/n6-holistic-alternatives.md`
-Summary: Holistic analysis of Config ownership (Ticket 22), covering dependencies, alternatives, missing responsibilities, and signature verification.
+Summary: Holistic analysis of Config ownership (Ticket 22), covering
+dependencies, alternatives, missing responsibilities, and signature
+verification.

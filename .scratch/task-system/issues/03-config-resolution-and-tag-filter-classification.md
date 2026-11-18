@@ -30,11 +30,11 @@ E2E suites:
 - Full test coverage for exact tag matching, empty filter fallback, config
   normalization (`task` / `#task`), invalid filter diagnostics, and top-level
   re-exports.
-
 - [x] `Config` gains `tasks: TaskConfig` field with `#[serde(default)]`
 - [x] `TaskConfig` has a `Default` impl (empty statuses map, empty tag filters)
 - [x] Config resolution builds `TaskStatusMap` once from configured statuses
-- [x] Empty `tag_filters`: all status-marked list items become `ListItemType::Task`
+- [x] Empty `tag_filters`: all status-marked list items become
+      `ListItemType::Task`
 - [x] Non-empty `tag_filters`: status-marked item becomes Task only when any
   tag on the item exactly matches any configured filter
 - [x] Non-matching status-marked items become `ListItemType::Checkbox` (not
@@ -68,7 +68,7 @@ E2E suites:
 
 ### Config threading
 
-```
+```text
 IndexerService::build/refresh
   → IndexBuilder::build
     → parse_note(root, file, &config)
@@ -80,7 +80,7 @@ IndexerService::build/refresh
 
 ### Tag filter classification
 
-```
+```text
 Event::End(Item)
   → end_item(tag_filters, statuses):
       flush_active_item_scan_buffer()  ← tags extracted here
@@ -110,6 +110,7 @@ issue's classification logic determines whether the item becomes `Task` or
 value inside the `Task` variant.
 
 Key changes:
+
 - Tag extraction happens during `flush_active_item_scan_buffer` (before
   `end_item` classifies)
 - Empty tag_filters → all status-marked items become Task (current behavior

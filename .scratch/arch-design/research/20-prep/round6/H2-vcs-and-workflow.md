@@ -19,8 +19,8 @@ traces owns the write or the harness denies native writes."
 
 This investigation evaluated 18 mechanisms across Git, alternative VCSs (jj,
 Pijul), database engines (Dolt, SQLite), workflow architectures (Terraform,
-Kubernetes, Gerrit, sync inboxes, APFS copy-on-write clones), shell integrations,
-and store-authority designs.
+Kubernetes, Gerrit, sync inboxes, APFS copy-on-write clones), shell
+integrations, and store-authority designs.
 
 ### The Storage Authority Axiom
 
@@ -37,8 +37,8 @@ unmediated write access to the canonical storage files `[H]`.
 Conversely, when an untrusted process (AI agent, shell script, or human editor)
 has write access to `vault/note.md`:
 
-1. Every in-place gate (watcher daemon, shell hook, clean filter) operates either
-   asynchronously after disk bytes are flushed or at discrete VCS command
+1. Every in-place gate (watcher daemon, shell hook, clean filter) operates
+   either asynchronously after disk bytes are flushed or at discrete VCS command
    boundaries `[V]`.
 2. True **prevention** without harness cooperation is possible if and only if
    the writer is isolated to a sandbox copy (Git worktree/branch or APFS CoW
@@ -75,8 +75,8 @@ four empirical experiments were executed on macOS Darwin arm64:
   5. Critical pitfall: When `required = true` was configured without an explicit
      `filter.<driver>.smudge cat`, subsequent `git checkout HEAD -- file.md`
      crashed with exit code 128 (`smudge filter failed`) and deleted the working
-     tree file `[V]`. Furthermore, `git diff` on an invalid file failed with exit
-     code 128 `[V]`.
+     tree file `[V]`. Furthermore, `git diff` on an invalid file failed with
+     exit code 128 `[V]`.
 
 ### Experiment 2: Git `reference-transaction` Hook
 
@@ -117,8 +117,8 @@ four empirical experiments were executed on macOS Darwin arm64:
 - **Observations:**
   1. `clonefile(dir_src, dir_dst, 0)` cloned the entire nested directory tree
      in <1 millisecond `[V]`.
-  2. Inodes in `dir_dst` differed from `dir_src`, but disk storage was shared via
-     copy-on-write `[V]`.
+  2. Inodes in `dir_dst` differed from `dir_src`, but disk storage was shared
+     via copy-on-write `[V]`.
   3. Modifying files in `dir_dst` left `dir_src` completely untouched `[V]`.
 
 ---
@@ -139,11 +139,11 @@ four empirical experiments were executed on macOS Darwin arm64:
   - *(b) Timing & Feedback:* Runs at `git commit`. If validation fails, `git
     commit` aborts with stderr diagnostics. Staged files remain staged in the
     index; working tree files are untouched `[V]`.
-  - *(c) Atomicity:* When inspecting staged blobs via `git show :<path>` (or `git
-    diff --cached`), it is fully isolated from unstaged working-tree dirty states
-    `[V]`. The index is updated atomically.
-  - *(d) Platforms:* macOS, Linux, Windows (requires shell or executable; Windows
-    needs git-bash or binary `.exe`).
+  - *(c) Atomicity:* When inspecting staged blobs via `git show :<path>` (or
+    `git diff --cached`), it is fully isolated from unstaged working-tree dirty
+    states `[V]`. The index is updated atomically.
+  - *(d) Platforms:* macOS, Linux, Windows (requires shell or executable;
+    Windows needs git-bash or binary `.exe`).
   - *(e) PKM Cost:* Zero for Git users. High friction for non-Git PKM users
     (requires initializing a repository and committing changes) `[V]`.
   - *(f) Bypass routes:* `git commit --no-verify`, `git commit -n`, modifying
@@ -161,8 +161,9 @@ four empirical experiments were executed on macOS Darwin arm64:
   (<https://git-scm.com/docs/gitattributes>).
 - **Stress-Test Analysis:**
   - *(a) Writers seen:* Executed whenever Git stages a file into the object
-    database (`git add`, `git commit -a`, `git stash`). Also invoked during `git
-    diff` `[V]`. Does not see unstaged disk writes by editors or shell redirects.
+    database (`git add`, `git commit -a`, `git stash`). Also invoked during
+    `git diff` `[V]`. Does not see unstaged disk writes by editors or shell
+    redirects.
   - *(b) Timing & Feedback:* Synchronous during `git add`. When configured with
     `required = true`, an exit 1 halts `git add` with exit code 128 `[V]`.
     Writer receives: `fatal: <file>: clean filter '<name>' failed` plus filter
@@ -179,8 +180,8 @@ four empirical experiments were executed on macOS Darwin arm64:
   - *(g) Failure mode:* Git defaults to fail-open (`required = false`). Setting
     `required = true` (fail-closed) breaks basic Git porcelain commands upon any
     schema violation or checker crash `[V]`.
-  - *(h) Rust fit:* `traces filter-clean %f` is trivial to implement in Rust, but
-    the Git porcelain blast radius is catastrophic `[H]`.
+  - *(h) Rust fit:* `traces filter-clean %f` is trivial to implement in Rust,
+    but the Git porcelain blast radius is catastrophic `[H]`.
 - **Verdict: Reject.** Too brittle and hazardous; breaks checkout, stash, and
   diff when files violate schema.
 
@@ -191,7 +192,8 @@ four empirical experiments were executed on macOS Darwin arm64:
 - **Stress-Test Analysis:**
   - *(a) Writers seen:* Only remote push operations (`git push`).
   - *(b) Timing & Feedback:* Remote synchronization time. Too late for local
-    authoring loops. Invalid commits are already recorded in local history `[V]`.
+    authoring loops. Invalid commits are already recorded in local history
+    `[V]`.
   - *(c) Atomicity:* Validates commit ranges before network transmission. If
     hook exits non-zero, push is aborted; local repo is unchanged `[V]`.
   - *(d) Platforms:* Cross-platform.
@@ -306,8 +308,8 @@ four empirical experiments were executed on macOS Darwin arm64:
     - Jujutsu: Currently NO hook support `[V]`. Working-copy snapshots cannot be
       gated. `jj fix` exists for post-hoc rewriting, but runs after commits are
       created `[V]`.
-    - Pijul: `pijul record` executes approved record hooks; aborts patch creation
-      if hook exits non-zero `[V]`.
+    - Pijul: `pijul record` executes approved record hooks; aborts patch
+      creation if hook exits non-zero `[V]`.
   - *(c) Atomicity:* Both provide transaction rollback (`jj undo`, Pijul patch
     unrecord) `[V]`.
   - *(d) Platforms:* Cross-platform.
@@ -327,9 +329,9 @@ four empirical experiments were executed on macOS Darwin arm64:
   <https://www.dolthub.com/blog/2024-07-23-schema-conflicts/>) `[V]`.
 - **Stress-Test Analysis:**
   - *(a) Writers seen:* SQL queries (`INSERT`, `UPDATE`), `dolt merge` `[V]`.
-  - *(b) Timing & Feedback:* SQL write time (table constraints enforce types) and
-    merge time (multi-phase lifecycle: schema merge -> data merge -> conflict
-    resolution -> constraint validation) `[V]`.
+  - *(b) Timing & Feedback:* SQL write time (table constraints enforce types)
+    and merge time (multi-phase lifecycle: schema merge -> data merge ->
+    conflict resolution -> constraint validation) `[V]`.
   - *(c) Atomicity:* ACID transaction atomicity.
   - *(d) Platforms:* Cross-platform.
   - *(e) PKM Cost:* Extreme. Storing notes in SQL tables / Prolly trees destroys
@@ -342,8 +344,9 @@ four empirical experiments were executed on macOS Darwin arm64:
 
 #### 10. Database Constraints & Triggers (PostgreSQL / SQLite)
 
-- **Precedent:** SQLite `CHECK` constraints, `BEFORE INSERT/UPDATE` triggers with
-  `RAISE(ABORT, 'msg')` (<https://www.sqlite.org/lang_createtrigger.html>) `[V]`.
+- **Precedent:** SQLite `CHECK` constraints, `BEFORE INSERT/UPDATE` triggers
+  with `RAISE(ABORT, 'msg')` (<https://www.sqlite.org/lang_createtrigger.html>)
+  `[V]`.
 - **Stress-Test Analysis:**
   - *(a) Writers seen:* Only writes executed through the database connection.
     Completely invisible to filesystem edits made to loose markdown files `[V]`.
@@ -368,7 +371,8 @@ four empirical experiments were executed on macOS Darwin arm64:
 
 - **Precedent:** HashiCorp Terraform
   (<https://developer.hashicorp.com/terraform/cli/commands/plan>), Open Policy
-  Agent Conftest (<https://www.openpolicyagent.org/docs/latest/terraform/>) `[V]`.
+  Agent Conftest (<https://www.openpolicyagent.org/docs/latest/terraform/>)
+  `[V]`.
 - **Stress-Test Analysis:**
   - *(a) Writers seen:* Tools/agents execute `traces plan` (or `propose`). A
     speculative change plan is generated. Target files are not touched `[V]`.
@@ -431,11 +435,11 @@ four empirical experiments were executed on macOS Darwin arm64:
   (<https://docs.syncthing.net/users/sync-conflicts.html>) `[V]`, Obsidian Inbox
   / Drop Folder pattern.
 - **Stress-Test Analysis:**
-  - *(a) Writers seen:* Untrusted processes (agents, mobile sync, external tools)
-    write exclusively into an `Inbox/` or `_incoming/` directory `[V]`.
-  - *(b) Timing & Feedback:* At ingestion time (`traces ingest` / `traces
-    triage`). Conforming notes are moved to canonical paths; invalid notes remain
-    quarantined in `Inbox/` with diagnostic logs `[V]`.
+  - *(a) Writers seen:* Untrusted processes (agents, mobile sync, external
+    tools) write exclusively into an `Inbox/` or `_incoming/` directory `[V]`.
+  - *(b) Timing & Feedback:* At ingestion time (`traces ingest` /
+    `traces triage`). Conforming notes are moved to canonical paths; invalid
+    notes remain quarantined in `Inbox/` with diagnostic logs `[V]`.
   - *(c) Atomicity:* Per-file `rename()` within same filesystem is atomic `[V]`.
   - *(d) Platforms:* Universal cross-platform.
   - *(e) PKM Cost:* Zero tools required. Pure directory structure convention
@@ -465,8 +469,8 @@ four empirical experiments were executed on macOS Darwin arm64:
     promotes to canonical vault. If invalid, promotion aborts with diagnostics;
     canonical vault remains untouched `[V]`.
   - *(c) Atomicity:*
-    - Single file: atomic `rename()` or `renameatx_np(..., RENAME_SWAP)` on macOS
-      `[V]`.
+    - Single file: atomic `rename()` or `renameatx_np(..., RENAME_SWAP)` on
+      macOS `[V]`.
     - Multi-file: Requires transactional promotion loop (recording a manifest or
       journal) to guarantee all-or-nothing atomicity `[H]`.
     - Concurrency: Must verify that canonical files were not concurrently
@@ -516,7 +520,8 @@ four empirical experiments were executed on macOS Darwin arm64:
   - `launchd` `WatchPaths` / `QueueDirectories` (<https://www.launchd.info/>)
     `[V]`.
   - `systemd.path` with `PathModified=`
-    (<https://www.freedesktop.org/software/systemd/man/systemd.path.html>) `[V]`.
+    (<https://www.freedesktop.org/software/systemd/man/systemd.path.html>)
+    `[V]`.
 - **Stress-Test Analysis:**
   - *(a) Writers seen:*
     - PATH shims: Only see commands explicitly intercepted (e.g. `git`). Blind
@@ -529,8 +534,8 @@ four empirical experiments were executed on macOS Darwin arm64:
   - *(b) Timing & Feedback:*
     - PATH shims: Command execution time.
     - PROMPT_COMMAND: Interactive prompt time.
-    - launchd / systemd: Asynchronously AFTER writes have flushed to disk. Cannot
-      veto writes; writer does not receive synchronous feedback `[V]`.
+    - launchd / systemd: Asynchronously AFTER writes have flushed to disk.
+      Cannot veto writes; writer does not receive synchronous feedback `[V]`.
   - *(c) Atomicity:* N/A (post-write detection).
   - *(d) Platforms:* Heavily fragmented (macOS launchd vs Linux systemd vs shell
     types).
@@ -539,8 +544,8 @@ four empirical experiments were executed on macOS Darwin arm64:
     editors `[V]`.
   - *(g) Failure mode:* Must fail-open to prevent breaking user shell sessions
     `[H]`.
-  - *(h) Rust fit:* CLI can be called by scripts, but daemon management is out of
-    scope for `traces`.
+  - *(h) Rust fit:* CLI can be called by scripts, but daemon management is out
+    of scope for `traces`.
 - **Verdict: Reject shell and OS daemon integrations.** High friction, fragile,
   fragmented, and strictly post-write.
 
@@ -601,14 +606,16 @@ categorized by repository type:
 ## 5. Architectural Conclusions for Ticket 20
 
 1. **Reaffirmation of the Advisory Contract:** The decision in Ticket 20 to make
-   the portable contract `check_note(before, after)` with detect-and-feed-back is
-   100% validated. When untrusted processes possess write access to canonical
+   the portable contract `check_note(before, after)` with detect-and-feed-back
+   is 100% validated. When untrusted processes possess write access to canonical
    files on disk, no in-place mechanism can synchronously prevent byte writes
    without severe instability or harness hooks.
 2. **True Prevention Requires Namespace Isolation:**
-   - For Git vaults: Worktree/branch isolation with gated merge (`traces merge`).
-   - For non-Git vaults: APFS CoW clone sandbox (`traces clone` + `traces merge`)
-     on macOS/Linux, or Quarantine/Inbox folders on all platforms.
+   - For Git vaults: Worktree/branch isolation with gated merge
+     (`traces merge`).
+   - For non-Git vaults: APFS CoW clone sandbox (`traces clone` +
+     `traces merge`) on macOS/Linux, or Quarantine/Inbox folders on all
+     platforms.
 3. **Clean Filters Rejected:** While Git clean filters with `required = true`
    block invalid `git add` and cannot be bypassed by `--no-verify`, their
    collateral damage (crashing `git checkout`, deleting working files, and

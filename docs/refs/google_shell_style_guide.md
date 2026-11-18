@@ -6,7 +6,6 @@ See README.md for details.
 
 # Shell Style Guide
 
-
 Authored, revised and maintained by many Googlers.
 
 ## Table of Contents
@@ -21,12 +20,11 @@ Section                                                                         
 [Features and Bugs](#s6-features-and-bugs)                                           |    [ShellCheck](#s6.1-shellcheck) - [Command Substitution](#s6.2-command-substitution) - [Test, `[… ]`, and `[[… ]]`](#s6.3-tests) - [Testing Strings](#s6.4-testing-strings) - [Wildcard Expansion of Filenames](#s6.5-wildcard-expansion-of-filenames) - [Eval](#s6.6-eval) - [Arrays](#s6.7-arrays) - [Pipes to While](#s6.8-pipes-to-while) - [Arithmetic](#s6.9-arithmetic) - [Aliases](#s6.10-aliases)
 [Naming Conventions](#s7-naming-conventions)                                         | [Function Names](#s7.1-function-names) - [Variable Names](#s7.2-variable-names) - [Constants and Environment Variable Names](#s7.3-constants-and-environment-variable-names) - [Source Filenames](#s7.4-source-filenames) - [Use Local Variables](#s7.5-use-local-variables) - [Function Location](#s7.6-function-location) - [main](#s7.7-main)
 [Calling Commands](#s8-calling-commands)                                             | [Checking Return Values](#s8.1-checking-return-values) - [Builtin Commands vs. External Commands](#s8.2-builtin-commands-vs-external-commands)
-[When in Doubt: Be Consistent](#s9-conclusion)                                       |
+ [When in Doubt: Be Consistent](#s9-conclusion) |  |
 
 <a id="s1-background"></a>
 
 ## Background
-
 
 <a id="s1.1-which-shell-to-use"></a>
 
@@ -61,16 +59,16 @@ used for widespread deployment.
 
 Some guidelines:
 
-*   If you're mostly calling other utilities and are doing relatively little
-    data manipulation, shell is an acceptable choice for the task.
-*   If performance matters, use something other than shell.
-*   If you are writing a script that is more than 100 lines long, or that uses
-    non-straightforward control flow logic, you should rewrite it in a more
-    structured language *now*. Bear in mind that scripts grow. Rewrite your
-    script early to avoid a more time-consuming rewrite at a later date.
-*   When assessing the complexity of your code (e.g. to decide whether to switch
-    languages) consider whether the code is easily maintainable by people other
-    than its author.
+- If you're mostly calling other utilities and are doing relatively little
+  data manipulation, shell is an acceptable choice for the task.
+- If performance matters, use something other than shell.
+- If you are writing a script that is more than 100 lines long, or that uses
+  non-straightforward control flow logic, you should rewrite it in a more
+  structured language *now*. Bear in mind that scripts grow. Rewrite your
+  script early to avoid a more time-consuming rewrite at a later date.
+- When assessing the complexity of your code (e.g. to decide whether to switch
+  languages) consider whether the code is easily maintainable by people other
+  than its author.
 
 <a id="s2-shell-files-and-interpreter-invocation"></a>
 
@@ -82,17 +80,17 @@ Some guidelines:
 
 Executables should have a `.sh` extension or no extension.
 
--   If the executable will have a build rule that renames the source file
-    then prefer to use a `.sh` extension.
-    This enables you to use the recommended naming convention, with a source
-    file like `foo.sh` and a build rule named `foo`.
--   If the executable will be added directly to the user's `PATH`, then prefer
-    to use no extension. It is not necessary to know what language a program is
-    written in when executing it and shell doesn't require an extension so we
-    prefer not to use one for executables that will be directly invoked by
-    users. At the same time, consider whether it is preferable to deploy the
-    output of a build rule rather than deploying the source file directly.
--   If neither of the above apply, then either choice is acceptable.
+- If the executable will have a build rule that renames the source file
+  then prefer to use a `.sh` extension.
+  This enables you to use the recommended naming convention, with a source
+  file like `foo.sh` and a build rule named `foo`.
+- If the executable will be added directly to the user's `PATH`, then prefer
+  to use no extension. It is not necessary to know what language a program is
+  written in when executing it and shell doesn't require an extension so we
+  prefer not to use one for executables that will be directly invoked by
+  users. At the same time, consider whether it is preferable to deploy the
+  output of a build rule rather than deploying the source file directly.
+- If neither of the above apply, then either choice is acceptable.
 
 Libraries must have a `.sh` extension and should not be executable.
 
@@ -172,12 +170,12 @@ program or to use a function in your library by reading the comments
 
 All function header comments should describe the intended API behaviour using:
 
-*   Description of the function.
-*   Globals: List of global variables used and modified.
-*   Arguments: Arguments taken.
-*   Outputs: Output to STDOUT or STDERR.
-*   Returns: Returned values other than the default exit status of the last
-    command run.
+- Description of the function.
+- Globals: List of global variables used and modified.
+- Arguments: Arguments taken.
+- Outputs: Output to STDOUT or STDERR.
+- Returns: Returned values other than the default exit status of the last
+  command run.
 
 Example:
 
@@ -237,8 +235,8 @@ out of the ordinary, put a short comment in.
 Use TODO comments for code that is temporary, a short-term solution, or
 good-enough but not perfect.
 
-This matches the convention in the [C++ Guide](https://google.github.io/styleguide/cppguide.html#TODO_Comments).
-
+This matches the convention in the
+[C++ Guide](https://google.github.io/styleguide/cppguide.html#TODO_Comments).
 
 `TODO`s should include the string `TODO` in all caps, followed by the name,
 e-mail address, or other identifier of the person with the best context about
@@ -328,7 +326,7 @@ Pipelines should be split one per line if they don't all fit on one line.
 If a pipeline all fits on one line, it should be on one line.
 
 If not, it should be split at one pipe segment per line with the pipe on the
-newline and a 2 space indent for the next section of the pipe. `\ ` should be
+newline and a 2 space indent for the next section of the pipe. `\` should be
 consistently used to indicate line continuation. This applies to a chain of
 commands combined using `|` as well as to logical compounds using `||` and `&&`.
 
@@ -397,11 +395,11 @@ done
 
 ### Case statement
 
-*   Indent alternatives by 2 spaces.
-*   A one-line alternative needs a space after the close parenthesis of the
-    pattern and before the `;;`.
-*   Long or multi-command alternatives should be split over multiple lines with
-    the pattern, actions, and `;;` on separate lines.
+- Indent alternatives by 2 spaces.
+- A one-line alternative needs a space after the close parenthesis of the
+  pattern and before the `;;`.
+- Long or multi-command alternatives should be split over multiple lines with
+  the pattern, actions, and `;;` on separate lines.
 
 The matching expressions are indented one level from the `case` and `esac`.
 Multiline actions are indented another level. In general, there is no need to
@@ -461,10 +459,10 @@ not mandatory doesn't mean it should be taken lightly or downplayed.
 
 They are listed in order of precedence.
 
-*   Stay consistent with what you find for existing code.
-*   Quote variables, see [Quoting section below](#quoting).
-*   Don't brace-delimit single character shell specials / positional parameters,
-    unless strictly necessary or avoiding deep confusion.
+- Stay consistent with what you find for existing code.
+- Quote variables, see [Quoting section below](#quoting).
+- Don't brace-delimit single character shell specials / positional parameters,
+  unless strictly necessary or avoiding deep confusion.
 
 Prefer brace-delimiting all other variables.
 
@@ -510,21 +508,21 @@ be used *as well*.
 
 ### Quoting
 
-*   Always quote strings containing variables, command substitutions, spaces or
-    shell meta characters, unless careful unquoted expansion is required or it's
-    a shell-internal integer (see next point).
-*   Use arrays for safe quoting of lists of elements, especially command-line
-    flags. See [Arrays](#arrays) below.
-*   Optionally quote shell-internal, readonly
-    [special variables](https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html)
-    that are defined to be integers: `$?`, `$#`, `$$`, `$!`. Prefer quoting of
-    "named" internal integer variables, e.g. PPID etc for consistency.
-*   Prefer quoting strings that are "words" (as opposed to command options or
-    path names).
-*   Be aware of the quoting rules for pattern matches in `[[ … ]]`. See the
-    [Test, `[ … ]`, and `[[ … ]]`](#tests) section below.
-*   Use `"$@"` unless you have a specific reason to use `$*`, such as simply
-    appending the arguments to a string in a message or log.
+- Always quote strings containing variables, command substitutions, spaces or
+  shell meta characters, unless careful unquoted expansion is required or it's
+  a shell-internal integer (see next point).
+- Use arrays for safe quoting of lists of elements, especially command-line
+  flags. See [Arrays](#arrays) below.
+- Optionally quote shell-internal, readonly
+  [special variables](https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html)
+  that are defined to be integers: `$?`, `$#`, `$$`, `$!`. Prefer quoting of
+  "named" internal integer variables, e.g. PPID etc for consistency.
+- Prefer quoting strings that are "words" (as opposed to command options or
+  path names).
+- Be aware of the quoting rules for pattern matches in `[[ … ]]`. See the
+  [Test, `[ … ]`, and `[[ … ]]`](#tests) section below.
+- Use `"$@"` unless you have a specific reason to use `$*`, such as simply
+  appending the arguments to a string in a message or log.
 
 ```shell
 # 'Single' quotes indicate that no substitution is desired.
@@ -634,6 +632,7 @@ var="`command \`command1\``"
 <a id="s6.3-tests"></a>
 
 <a id="tests"></a>
+
 ### Test, `[ … ]`, and `[[ … ]]`
 
 `[[ … ]]` is preferred over `[ … ]`, `test` and `/usr/bin/[`.
@@ -665,7 +664,8 @@ if [ "filename" == f* ]; then
 fi
 ```
 
-For the gory details, see E14 in the [Bash FAQ](http://tiswww.case.edu/php/chet/bash/FAQ)
+For the gory details, see E14 in the
+[Bash FAQ](http://tiswww.case.edu/php/chet/bash/FAQ)
 
 <a id="s6.4-testing-strings"></a>
 
@@ -789,7 +789,6 @@ removed `./somefile'
 
 `eval` should be avoided.
 
-
 Eval munges the input when used for assignment to variables and can
 set variables without making it possible to check what those variables
 were.
@@ -857,11 +856,11 @@ mybinary $(get_arguments)
 
 #### Arrays Pros
 
-*   Using Arrays allows lists of things without confusing quoting semantics.
-    Conversely, not using arrays leads to misguided attempts to nest quoting
-    inside a string.
-*   Arrays make it possible to safely store sequences/lists of arbitrary
-    strings, including strings containing whitespace.
+- Using Arrays allows lists of things without confusing quoting semantics.
+  Conversely, not using arrays leads to misguided attempts to nest quoting
+  inside a string.
+- Arrays make it possible to safely store sequences/lists of arbitrary
+  strings, including strings containing whitespace.
 
 <a id="s6.7.2-arrays-cons"></a>
 
@@ -961,6 +960,7 @@ For preference, don't use `[[ … ]]` *at all* for numeric comparisons, use
 
 It is recommended to avoid using `(( … ))` as a standalone
 statement, and otherwise be wary of its expression evaluating to zero
+
 - particularly with `set -e` enabled. For example,
 `set -e; i=0; (( i++ ))` will cause the shell to exit.
 

@@ -1,8 +1,11 @@
 # 15: U2: three proptests
 
-**What to build:** Three property tests protect laws that no example can: table escaping, tag containment and the total order of `NoteFieldValue`. Read spec section 9.8.
+**What to build:** Three property tests protect laws that no example can: table
+escaping, tag containment and the total order of `NoteFieldValue`. Read spec
+section 9.8.
 
-**Current state:** No proptest covers these three laws. No proptest regression files are committed.
+**Current state:** No proptest covers these three laws. No proptest regression
+files are committed.
 
 **Spec:** `.scratch/bdd-testing/spec.md`
 

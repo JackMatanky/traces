@@ -8,7 +8,8 @@ Status: resolved
 Investigate zk against the local corpus (`docs/digests/zk-digest.txt` full repo,
 `-src-digest.txt`, `-docs-digest.txt`, particularly `docs/config/config-lsp.md`,
 `docs/notes/note-id.md`, `docs/notes/note-frontmatter.md`, `docs/notes/tags.md`,
-`docs/tips/daily-journal.md`) and, where stale, <https://github.com/zk-org/zk> and
+`docs/tips/daily-journal.md`) and, where stale, <https://github.com/zk-org/zk>
+and
 <https://zk-org.github.io/zk/>.
 
 Establish and cite for each:

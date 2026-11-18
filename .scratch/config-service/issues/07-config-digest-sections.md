@@ -114,15 +114,15 @@ fail-closed guarantee for every future config setting.
 > are crate-private, so trybuild's external-crate harness cannot observe them,
 > making trybuild architecturally incapable of pinning this convention.
 
-> Implementation note (through `a2b6eb01`): `src/config/model.rs`
-> defines `Config::digests()` and `Config::hash()`; section-local
-> `digests()` methods live in `src/config/model/{templates,schemas,frontmatter,tasks}.rs`.
+> Implementation note (through `a2b6eb01`): `src/config/model.rs` defines
+> `Config::digests()` and `Config::hash()`; section-local `digests()` methods
+> live in `src/config/model/{templates,schemas,frontmatter,tasks}.rs`.
 > `src/config/model/digest.rs` owns the digest bundles, the length-prefixed
 > setting-label frame, and composition under `b"traces.config.v1"`.
-> `FieldName::feed_into()` in `src/field.rs` encodes exact UTF-8 bytes,
-> while `Blake3Hasher::digest()` in `src/hash.rs` frames child digests.
-> The previous aggregate encoding was removed; no index or persistence
-> consumer was added in this ticket.
+> `FieldName::feed_into()` in `src/field.rs` encodes exact UTF-8 bytes, while
+> `Blake3Hasher::digest()` in `src/hash.rs` frames child digests. The previous
+> aggregate encoding was removed; no index or persistence consumer was added in
+> this ticket.
 >
 > Verification note: unit tests cover setting framing (including the
 > named `ROOT` label), isolated setting changes, bundle composition, the

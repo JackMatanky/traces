@@ -42,23 +42,23 @@ relative path, size, timestamps, and format classification.
 
 An elapsed duration carrying both its total seconds magnitude and written source
 components. `src/temporal/` is the sole owner of duration recognition, parsing,
-and the unit registry (`TEMPORAL_UNITS`, `TimeUnit`, `nominal_seconds`). Compares and
-hashes canonically by total seconds, so `1h 30m` and `90m` are equal. Negative
-zeros normalize (`-0m` equals `0m`) at construction; raw float comparisons follow
-a unified signed-zero doctrine (ticket 09 extraction home). The unit vocabulary
-maintains a strict sync contract between `UNIT_SPELLINGS_HINT` and `TEMPORAL_UNITS`
-(invariant test in `unit.rs`).
+and the unit registry (`TEMPORAL_UNITS`, `TimeUnit`, `nominal_seconds`).
+Compares and hashes canonically by total seconds, so `1h 30m` and `90m` are
+equal. Negative zeros normalize (`-0m` equals `0m`) at construction; raw float
+comparisons follow a unified signed-zero doctrine (ticket 09 extraction home).
+The unit vocabulary maintains a strict sync contract between
+`UNIT_SPELLINGS_HINT` and `TEMPORAL_UNITS` (invariant test in `unit.rs`).
 *Avoid*: elapsed time, time span, interval
 
 #### Temporal Strictness & Resolution
 
-Temporal parsing strictness follows a strictness-by-seam rule: user input in notes
-and templates is lenient with actionable error diagnostics; serde deserialization
-is strict; query filters evaluate strict typed expressions. Week math and
-numbering pin strictly to ISO Monday via standard calendar primitives, never
-locale-dependent offsets or epoch-day division. Avoid terms listed across this
-glossary are strictly prohibited from appearing as concept names or definitions.
-*Avoid*: locale week, lenient parser
+Temporal parsing strictness follows a strictness-by-seam rule: user input in
+notes and templates is lenient with actionable error diagnostics; serde
+deserialization is strict; query filters evaluate strict typed expressions. Week
+math and numbering pin strictly to ISO Monday via standard calendar primitives,
+never locale-dependent offsets or epoch-day division. Avoid terms listed across
+this glossary are strictly prohibited from appearing as concept names or
+definitions. *Avoid*: locale week, lenient parser
 
 #### Path Codec
 

@@ -2,13 +2,17 @@
 
 **Target:** Grilling prep for Ticket 22 (Config ownership and lifecycle).  
 **Subject:** Design D6 (Unified `FilePathTracker` store for Trust and Tracking).  
-**Tags:** `[V]` Verified in source code or execution, `[H]` Inference / deduction, `[P]` Architectural proposal.
+**Tags:** `[V]` Verified in source code or execution, `[H]` Inference /
+deduction, `[P]` Architectural proposal.
 
 ---
 
 ## 1. Executive Summary & Verdict
 
-Design D6 proposes unifying `TrustStore` and `TrackerStore` into a single `FilePathTracker` directory under `$XDG_STATE_HOME/traces/workspace-configs/`. In D6, a hash-named symlink acts as the tracked entry, and a `<hash>.trust` companion file stores the BLAKE3 digest of `.traces/config.toml`.
+Design D6 proposes unifying `TrustStore` and `TrackerStore` into a single
+`FilePathTracker` directory under `$XDG_STATE_HOME/traces/workspace-configs/`.
+In D6, a hash-named symlink acts as the tracked entry, and a `<hash>.trust`
+companion file stores the BLAKE3 digest of `.traces/config.toml`.
 
 | Proposal Element | Verdict | Summary Assessment |
 |:---|:---|:---|
@@ -22,56 +26,112 @@ Design D6 proposes unifying `TrustStore` and `TrackerStore` into a single `FileP
 
 ### 2.1 Pre-Planted Companion Vulnerability in Auto-Recording `verify`
 
-- **Mechanism Today [V]:** In `TrustStore::trust` (`src/config/trust.rs:182-197`), trust requires an explicit call to `trust()`. `config_file_trust_check` (`:245-251`) checks `self.store.contains(root)?` first; if absent, it returns `Untrusted`. A rogue companion `<hash>.hash` without a recorded root symlink evaluates to `Untrusted`.
-- **Flaw in D6 [H]:** D6 moves best-effort tracker recording into `verify` (record entry, then check companion). If an attacker or untrusted local script pre-creates `<hash>.trust` containing `BLAKE3(malicious_config)` in `$STATE/traces/` (predictable hash based on known project path), the user merely opening or querying the directory causes `verify` to automatically record the entry symlink, observe the matching companion, and grant `Trusted` status without any human `traces trust` invocation.
-- **Verdict:** **HOLDS WITH CHANGE** [P]. `verify` must never promote an untrusted workspace to trusted based on a companion file unless the entry was created by an explicit human `grant()`. In Amended D6, `<hash>.trust` must be accompanied by an authorization marker or recorded in a protected mode.
+- **Mechanism Today [V]:** In `TrustStore::trust`
+  (`src/config/trust.rs:182-197`), trust requires an explicit call to `trust()`.
+  `config_file_trust_check` (`:245-251`) checks `self.store.contains(root)?`
+  first; if absent, it returns `Untrusted`. A rogue companion `<hash>.hash`
+  without a recorded root symlink evaluates to `Untrusted`.
+- **Flaw in D6 [H]:** D6 moves best-effort tracker recording into `verify`
+  (record entry, then check companion). If an attacker or untrusted local script
+  pre-creates `<hash>.trust` containing `BLAKE3(malicious_config)` in
+  `$STATE/traces/` (predictable hash based on known project path), the user
+  merely opening or querying the directory causes `verify` to automatically
+  record the entry symlink, observe the matching companion, and grant `Trusted`
+  status without any human `traces trust` invocation.
+- **Verdict:** **HOLDS WITH CHANGE** [P]. `verify` must never promote an
+  untrusted workspace to trusted based on a companion file unless the entry was
+  created by an explicit human `grant()`. In Amended D6, `<hash>.trust` must be
+  accompanied by an authorization marker or recorded in a protected mode.
 
 ### 2.2 Companion Truncation or Partial Write
 
-- **Mechanism Today [V]:** `FilePathTracker::write_companion` (`src/file_tracker.rs:206-227`) uses `fs::write(&companion, contents)`. If the process is terminated mid-write, `<hash>.hash` can be truncated or empty. `config_file_trust_check` (`src/config/trust.rs:255`) compares `recorded.trim() == current.to_hex()`. An empty or truncated string fails comparison and returns `ConfigTrustCheck::Stale`.
-- **Flaw in D6 [V, H]:** Direct `fs::write` has identical failure modes in D6. If `<hash>.trust` is truncated to 0 bytes, `read_companion` reads `""`, which does not match a 64-character BLAKE3 hex digest, safely defaulting to `Stale`.
-- **Verdict:** **HOLDS WITH CHANGE** [P]. While fail-safe towards refusal, direct `fs::write` leaves corrupt state that requires manual repair or `clean`. `FilePathTracker::write_companion` must use write-to-tempfile and atomic `fs::rename`.
+- **Mechanism Today [V]:** `FilePathTracker::write_companion`
+  (`src/file_tracker.rs:206-227`) uses `fs::write(&companion, contents)`. If the
+  process is terminated mid-write, `<hash>.hash` can be truncated or empty.
+  `config_file_trust_check` (`src/config/trust.rs:255`) compares
+  `recorded.trim() == current.to_hex()`. An empty or truncated string fails
+  comparison and returns `ConfigTrustCheck::Stale`.
+- **Flaw in D6 [V, H]:** Direct `fs::write` has identical failure modes in D6.
+  If `<hash>.trust` is truncated to 0 bytes, `read_companion` reads `""`, which
+  does not match a 64-character BLAKE3 hex digest, safely defaulting to `Stale`.
+- **Verdict:** **HOLDS WITH CHANGE** [P]. While fail-safe towards refusal,
+  direct `fs::write` leaves corrupt state that requires manual repair or
+  `clean`. `FilePathTracker::write_companion` must use write-to-tempfile and
+  atomic `fs::rename`.
 
 ### 2.3 Entry Exists but Points Elsewhere
 
-- **Mechanism Today [V]:** In `src/file_tracker.rs:101-113`, `contains(target)` canonicalizes `target`, computes its hash, and calls `entry_path.try_exists()`. It **never checks** `fs::read_link(&entry_path)`. If entry `<hash>` points to `/victim/path`, calling `contains("/attacker/path")` where `H(/attacker) == H(/victim)` (or via a symlink redirect) returns `true`.
-- **Flaw in D6 [V, H]:** If an entry symlink is corrupted or maliciously redirected, D6's `verify` checks `<hash>.trust` against the current config content without validating that `<hash>` points to the expected path.
-- **Verdict:** **HOLDS WITH CHANGE** [P]. `FilePathTracker::contains` and `verify` must verify that `fs::read_link(&entry_path) == canonical_target`.
+- **Mechanism Today [V]:** In `src/file_tracker.rs:101-113`, `contains(target)`
+  canonicalizes `target`, computes its hash, and calls
+  `entry_path.try_exists()`. It **never checks** `fs::read_link(&entry_path)`.
+  If entry `<hash>` points to `/victim/path`, calling
+  `contains("/attacker/path")` where `H(/attacker) == H(/victim)` (or via a
+  symlink redirect) returns `true`.
+- **Flaw in D6 [V, H]:** If an entry symlink is corrupted or maliciously
+  redirected, D6's `verify` checks `<hash>.trust` against the current config
+  content without validating that `<hash>` points to the expected path.
+- **Verdict:** **HOLDS WITH CHANGE** [P]. `FilePathTracker::contains` and
+  `verify` must verify that `fs::read_link(&entry_path) == canonical_target`.
 
 ### 2.4 Hash-Collision-Free Assumption
 
-- **Evidence [V]:** Traces uses BLAKE3 (`src/hash.rs:69-106`) with 256-bit digests formatted as 64 hex characters.
-- **Assessment [H]:** BLAKE3 provides a 128-bit security level against collision attacks. Assuming collision freedom for both path hashes and content hashes is cryptographically standard.
+- **Evidence [V]:** Traces uses BLAKE3 (`src/hash.rs:69-106`) with 256-bit
+  digests formatted as 64 hex characters.
+- **Assessment [H]:** BLAKE3 provides a 128-bit security level against collision
+  attacks. Assuming collision freedom for both path hashes and content hashes is
+  cryptographically standard.
 - **Verdict:** **HOLDS** [V]. No regression.
 
 ### 2.5 Surviving Trusted Companion on Directory Recreation
 
-- **Scenario [H]:** Workspace `/home/user/project` is trusted with config A (`<hash>.trust` written). The directory `/home/user/project` is deleted. Later, an untrusted archive is extracted to the same path `/home/user/project` with malicious config B.
-- **Behavior Today [V]:** `clean` removes dangling symlinks and companions (`src/config/trust.rs:305-309`). If `clean` did not run, loading config B rechecks `digest(B) == digest(A)`. Because the digest differs, it returns `ConfigTrustStatus::Stale` and halts execution (`src/config/file.rs:227`).
-- **Behavior in D6 [H]:** Exactly identical: `current_digest != recorded_digest` yields `Stale` and refuses to parse. If config B happened to be identical to config A, it would be trusted in both systems.
+- **Scenario [H]:** Workspace `/home/user/project` is trusted with config A
+  (`<hash>.trust` written). The directory `/home/user/project` is deleted.
+  Later, an untrusted archive is extracted to the same path `/home/user/project`
+  with malicious config B.
+- **Behavior Today [V]:** `clean` removes dangling symlinks and companions
+  (`src/config/trust.rs:305-309`). If `clean` did not run, loading config B
+  rechecks `digest(B) == digest(A)`. Because the digest differs, it returns
+  `ConfigTrustStatus::Stale` and halts execution (`src/config/file.rs:227`).
+- **Behavior in D6 [H]:** Exactly identical: `current_digest != recorded_digest`
+  yields `Stale` and refuses to parse. If config B happened to be identical to
+  config A, it would be trusted in both systems.
 - **Verdict:** **HOLDS** [V]. No regression.
 
 ### 2.6 Symlinked `.traces` Directory and Canonicalisation Escapes
 
-- **Evidence [V]:** `src/config/service.rs:261-272` canonicalizes paths using `path.canonicalize()`.
-- **Attack Scenario [H]:** Suppose two workspaces `/repo1` and `/repo2` both contain `.traces` symlinked to a shared location `/shared/traces_config`.
+- **Evidence [V]:** `src/config/service.rs:261-272` canonicalizes paths using
+  `path.canonicalize()`.
+- **Attack Scenario [H]:** Suppose two workspaces `/repo1` and `/repo2` both
+  contain `.traces` symlinked to a shared location `/shared/traces_config`.
   - If D6 keys by **config file path**:
-    `canonicalize("/repo1/.traces/config.toml")` resolves to `/shared/traces_config/config.toml`.
-    `canonicalize("/repo2/.traces/config.toml")` resolves to `/shared/traces_config/config.toml`.
-    Both workspaces share the **identical hash key** `H(/shared/traces_config/config.toml)`!
-    Trusting `/repo1` **silently and automatically trusts `/repo2`**, even if `/repo2` has dangerous templates or malicious scripts in its own workspace root!
-  - If D6 keys by **workspace root**:
-    `canonicalize("/repo1")` resolves to `/repo1`.
-    `canonicalize("/repo2")` resolves to `/repo2`.
-    Keys are distinct: `H(/repo1) != H(/repo2)`. Trusting `/repo1` has zero effect on `/repo2`.
-- **Verdict:** **REFUTED for Config-Path Keying; HOLDS WITH CHANGE for Root Keying** [V, H]. D6 must not key by config path.
+    `canonicalize("/repo1/.traces/config.toml")` resolves to
+    `/shared/traces_config/config.toml`.
+    `canonicalize("/repo2/.traces/config.toml")` resolves to
+    `/shared/traces_config/config.toml`. Both workspaces share the
+    **identical hash key** `H(/shared/traces_config/config.toml)`! Trusting
+    `/repo1` **silently and automatically trusts `/repo2`**, even if `/repo2`
+    has dangerous templates or malicious scripts in its own workspace root!
+  - If D6 keys by **workspace root**: `canonicalize("/repo1")` resolves to
+    `/repo1`. `canonicalize("/repo2")` resolves to `/repo2`. Keys are distinct:
+    `H(/repo1) != H(/repo2)`. Trusting `/repo1` has zero effect on `/repo2`.
+- **Verdict:**
+  **REFUTED for Config-Path Keying; HOLDS WITH CHANGE for Root Keying** [V, H].
+  D6 must not key by config path.
 
 ### 2.7 Root vs Config-Path Key Choice and ADR-0002 Root Perimeter
 
-- **Evidence [V]:** ADR-0002 (`docs/adr/0002-config-trust-and-tracking.md:21-29`) explicitly defines the trust boundary:
-  > "What's actually trusted is the **workspace** — a project's root directory... A project's template directory is configured by its config file... trusting the workspace is what authorizes any template rendering that config points at."
-- **Flaw in D6 Config-Path Keying [H]:** Keying by config file path reduces trust to a single file. It completely ignores that template execution reads files throughout the workspace root.
-- **Verdict:** **REFUTED for Config-Path Keying; HOLDS for Root Keying** [V]. The root directory must remain the primary key.
+- **Evidence [V]:** ADR-0002
+  (`docs/adr/0002-config-trust-and-tracking.md:21-29`) explicitly defines the
+  trust boundary:
+  > "What's actually trusted is the **workspace** — a project's root
+  > directory... A project's template directory is configured by its config
+  > file... trusting the workspace is what authorizes any template rendering
+  > that config points at."
+- **Flaw in D6 Config-Path Keying [H]:** Keying by config file path reduces
+  trust to a single file. It completely ignores that template execution reads
+  files throughout the workspace root.
+- **Verdict:** **REFUTED for Config-Path Keying; HOLDS for Root Keying** [V].
+  The root directory must remain the primary key.
 
 ---
 
@@ -80,17 +140,28 @@ Design D6 proposes unifying `TrustStore` and `TrackerStore` into a single `FileP
 ### 3.1 Observable CLI Output and Exit Code Changes
 
 1. **`traces trust <dir without config>`:**
-   - *Today [V]:* Succeeds with exit code `0`, prints `trusted <dir>`, writes a root symlink without companion (`src/cli/trust.rs:134-146`, `src/config/service.rs:128-136`).
-   - *D6 [P]:* Fails with exit code `1` (or `2`), printing an error suggesting `traces init`.
+   - *Today [V]:* Succeeds with exit code `0`, prints `trusted <dir>`, writes a
+     root symlink without companion (`src/cli/trust.rs:134-146`,
+     `src/config/service.rs:128-136`).
+   - *D6 [P]:* Fails with exit code `1` (or `2`), printing an error suggesting
+     `traces init`.
 2. **`ConfigTrustStatus::MissingBaseline` Removed:**
-   - *Today [V]:* `traces trust --show` prints `<path>\tmissing baseline` (`src/config/trust.rs:103`, `src/cli/trust.rs:121`). Loading fails with `ConfigTrustError::Untrusted { status: MissingBaseline }` (`src/config/file.rs:228`).
-   - *D6 [P]:* Status is absent. An entry without companion is reported as `untrusted`.
+   - *Today [V]:* `traces trust --show` prints `<path>\tmissing baseline`
+     (`src/config/trust.rs:103`, `src/cli/trust.rs:121`). Loading fails with
+     `ConfigTrustError::Untrusted { status: MissingBaseline }`
+     (`src/config/file.rs:228`).
+   - *D6 [P]:* Status is absent. An entry without companion is reported as
+     `untrusted`.
 3. **`traces untrust` Output and State:**
-   - *Today [V]:* Removes root symlink and companion file (`src/config/trust.rs:277-280`).
-   - *D6 [P]:* Removes only `<hash>.trust`, retaining the symlink entry in the store. `traces tracked list` continues to display the entry.
+   - *Today [V]:* Removes root symlink and companion file
+     (`src/config/trust.rs:277-280`).
+   - *D6 [P]:* Removes only `<hash>.trust`, retaining the symlink entry in the
+     store. `traces tracked list` continues to display the entry.
 4. **`traces tracked list` Output:**
-   - *Today [V]:* Displays canonical config file paths (`src/cli/tracked.rs:51-58`).
-   - *D6 Root-Keyed [H]:* Displays workspace roots, or appends default `.traces/config.toml`.
+   - *Today [V]:* Displays canonical config file paths
+     (`src/cli/tracked.rs:51-58`).
+   - *D6 Root-Keyed [H]:* Displays workspace roots, or appends default
+     `.traces/config.toml`.
 
 ### 3.2 Impact on Existing Tests (18 Tests Pinned to Root-Only / MissingBaseline)
 
@@ -119,10 +190,18 @@ The following tests pin root-only trust or `MissingBaseline`:
 
 ### 3.3 Ticket 16 Envelope Assessment
 
-- **Exit Codes (Frozen) [V]:** Changing `traces trust <dir without config>` from success (`0`) to error (`1`) requires a change-table entry under Ticket 16 because exit codes are Frozen (`16:76`).
-- **Trust Gate Behavior (Frozen) [V]:** Ticket 16 defines the trust gate as "untrusted or stale config refuses to load; hash before parse" (`:82`). D6 preserves this invariant.
-- **Symlink Layout (Free) [V]:** Abandoning `$STATE/trusted-configs` in favor of a unified directory is explicitly permitted: "Trust/tracking symlink layout under XDG is Free; re-running `traces trust` is acceptable" (`:83`).
-- **Rust Library Surface (Free) [V]:** Deleting `MissingBaseline` and removing `TrustRequest::Root` touches library types in `public-api-test-utils.txt:801`, which Ticket 16 marks Free (`:87`).
+- **Exit Codes (Frozen) [V]:** Changing `traces trust <dir without config>` from
+  success (`0`) to error (`1`) requires a change-table entry under Ticket 16
+  because exit codes are Frozen (`16:76`).
+- **Trust Gate Behavior (Frozen) [V]:** Ticket 16 defines the trust gate as
+  "untrusted or stale config refuses to load; hash before parse" (`:82`). D6
+  preserves this invariant.
+- **Symlink Layout (Free) [V]:** Abandoning `$STATE/trusted-configs` in favor of
+  a unified directory is explicitly permitted: "Trust/tracking symlink layout
+  under XDG is Free; re-running `traces trust` is acceptable" (`:83`).
+- **Rust Library Surface (Free) [V]:** Deleting `MissingBaseline` and removing
+  `TrustRequest::Root` touches library types in `public-api-test-utils.txt:801`,
+  which Ticket 16 marks Free (`:87`).
 
 ---
 
@@ -132,9 +211,14 @@ The following tests pin root-only trust or `MissingBaseline`:
 
 - **Race Condition [H]:**
   1. Process A executes `grant(workspace)`: writes symlink entry `<hash>`.
-  2. Process B executes `traces tracked clean`: reads entries in store. Process B inspects `<hash>`. Target workspace exists, so Process B retains `<hash>`.
-  3. If Process A crashes before writing `<hash>.trust`: entry `<hash>` exists with no companion. The workspace is tracked, but `trust_status` returns `Untrusted`.
-- **Verdict:** **HOLDS** [V, H]. The failure mode is fail-safe (workspace remains untrusted).
+  2. Process B executes `traces tracked clean`: reads entries in store. Process
+     B inspects `<hash>`. Target workspace exists, so Process B retains
+     `<hash>`.
+  3. If Process A crashes before writing `<hash>.trust`: entry `<hash>` exists
+     with no companion. The workspace is tracked, but `trust_status` returns
+     `Untrusted`.
+- **Verdict:** **HOLDS** [V, H]. The failure mode is fail-safe (workspace
+  remains untrusted).
 
 ### 4.2 The `EEXIST` Race in `FilePathTracker::record`
 
@@ -146,15 +230,26 @@ The following tests pin root-only trust or `MissingBaseline`:
   std::os::unix::fs::symlink(&entry.canonical_target, &entry_path)
   ```
 
-  - **Issue 1 (Dangling Symlinks):** `entry_path.exists()` follows symlinks. If `entry_path` is a dangling symlink (target deleted/moved), `exists()` returns `false`. `symlink()` is called on an existing path and fails with `io::ErrorKind::AlreadyExists` (`EEXIST`)!
-  - **Issue 2 (Concurrent Writers):** If two processes execute `record()` simultaneously, both evaluate `!exists()`, and the second caller fails with `EEXIST`.
-- **Fix Required [P]:** Create a temporary symlink in the store directory (`entry_path.with_extension("tmp-PID")`) and execute `fs::rename(tmp, entry_path)`. On POSIX, `rename` atomically overwrites existing or dangling symlinks.
+  - **Issue 1 (Dangling Symlinks):** `entry_path.exists()` follows symlinks. If
+    `entry_path` is a dangling symlink (target deleted/moved), `exists()`
+    returns `false`. `symlink()` is called on an existing path and fails with
+    `io::ErrorKind::AlreadyExists` (`EEXIST`)!
+  - **Issue 2 (Concurrent Writers):** If two processes execute `record()`
+    simultaneously, both evaluate `!exists()`, and the second caller fails with
+    `EEXIST`.
+- **Fix Required [P]:** Create a temporary symlink in the store directory
+  (`entry_path.with_extension("tmp-PID")`) and execute
+  `fs::rename(tmp, entry_path)`. On POSIX, `rename` atomically overwrites
+  existing or dangling symlinks.
 
 ### 4.3 Windows Plain-File Fallback
 
-- **Windows Behavior [V]:** On Windows, `src/file_tracker.rs:76-79` writes a plain text file containing canonical path bytes.
-- **Concurrency Risk [H]:** Plain file writes are not atomic. Concurrent writes can trigger Windows sharing violations (`ERROR_SHARING_VIOLATION`).
-- **Fix Required [P]:** Use write-to-tempfile and `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`.
+- **Windows Behavior [V]:** On Windows, `src/file_tracker.rs:76-79` writes a
+  plain text file containing canonical path bytes.
+- **Concurrency Risk [H]:** Plain file writes are not atomic. Concurrent writes
+  can trigger Windows sharing violations (`ERROR_SHARING_VIOLATION`).
+- **Fix Required [P]:** Use write-to-tempfile and `MoveFileExW` with
+  `MOVEFILE_REPLACE_EXISTING`.
 
 ---
 
@@ -162,16 +257,25 @@ The following tests pin root-only trust or `MissingBaseline`:
 
 To support D6 or Amended D6, `src/file_tracker.rs` must implement:
 
-1. **Atomic Symlink / File Replacement [P]:** Replace `exists()` check with temporary file creation followed by atomic `rename` (`src/file_tracker.rs:62-84`).
-2. **Atomic Companion Writes [P]:** Rewrite `write_companion` (`:206-227`) to write to `<companion>.tmp.<pid>` and atomically `rename` over target.
-3. **Target Validation in `contains` [P]:** Update `contains` (`:101-113`) to verify `read_link(&entry_path) == canonical_target` rather than bare `try_exists()`.
-4. **Config-Aware Clean Predicate [P]:** `clean_reporting` (`:324-348`) checks only whether the recorded symlink target exists. In a unified store where entries point to workspace roots, `clean` must prune the `.trust` companion if `.traces/config.toml` is deleted, even while the root directory remains.
+1. **Atomic Symlink / File Replacement [P]:** Replace `exists()` check with
+   temporary file creation followed by atomic `rename`
+   (`src/file_tracker.rs:62-84`).
+2. **Atomic Companion Writes [P]:** Rewrite `write_companion` (`:206-227`) to
+   write to `<companion>.tmp.<pid>` and atomically `rename` over target.
+3. **Target Validation in `contains` [P]:** Update `contains` (`:101-113`) to
+   verify `read_link(&entry_path) == canonical_target` rather than bare
+   `try_exists()`.
+4. **Config-Aware Clean Predicate [P]:** `clean_reporting` (`:324-348`) checks
+   only whether the recorded symlink target exists. In a unified store where
+   entries point to workspace roots, `clean` must prune the `.trust` companion
+   if `.traces/config.toml` is deleted, even while the root directory remains.
 
 ---
 
 ## 6. Attack Point 5: Honest LoC Delta (Production vs Test)
 
-Analysis of current source lines (via direct count) versus projected lines under D6:
+Analysis of current source lines (via direct count) versus projected lines under
+D6:
 
 | File | Current Prod | Current Test | Current Total | D6 Prod $\Delta$ | D6 Test $\Delta$ | D6 Total $\Delta$ | Explanation |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|
@@ -185,7 +289,9 @@ Analysis of current source lines (via direct count) versus projected lines under
 | `src/file_tracker.rs` | 539 | 650 | 1189 | +60 | +50 | +110 | Atomic rename (+25), companion tempfile (+20), clean predicate (+15) |
 | **Total** | **1,824** | **2,508** | **4,332** | **-91** | **-283** | **-374** | **Net saving: ~91 prod LoC, ~283 test LoC** |
 
-**Assessment [H]:** The reduction is modest (~91 production lines). The primary saving is deleting `tracker.rs` (96 lines), partly offset by necessary safety fixes in `file_tracker.rs` (+60 lines).
+**Assessment [H]:** The reduction is modest (~91 production lines). The primary
+saving is deleting `tracker.rs` (96 lines), partly offset by necessary safety
+fixes in `file_tracker.rs` (+60 lines).
 
 ---
 
@@ -198,14 +304,25 @@ The human stated: *"The tracked store is a superset of the trust store."*
 - **Structural Invariant [H]:** In D6, a workspace is trusted if and only if:
   1. Entry symlink exists (Tracked).
   2. Companion `<hash>.trust` exists and matches content digest.
-- `untrust` removes only `<hash>.trust`. The entry remains. Therefore, $\text{Trusted} \subseteq \text{Tracked}$ holds structurally under nominal execution.
+- `untrust` removes only `<hash>.trust`. The entry remains. Therefore,
+  $\text{Trusted} \subseteq \text{Tracked}$ holds structurally under nominal
+  execution.
 
 ### 7.2 Failure Sequences Where Invariant Breaks
 
-1. **Orphaned Companion via Manual Intervention [H]:** A user or script deletes entry symlink `<hash>` but leaves `<hash>.trust`. If an audit tool lists `<hash>.trust`, the store contains trust metadata for an untracked path.
-2. **I/O Failure in `verify` [H]:** In `verify(path, digest)`, recording the entry is best-effort. If `record()` fails (e.g. read-only disk, permission error on state directory), but `<hash>.trust` was already present from a previous run: the workspace is evaluated as `Trusted`, yet it is **not recorded in the tracker**.
-3. **Partial Clean Failure [H]:** `clean` removes a dangling symlink entry but encounters an I/O error when removing the companion file. The companion survives unlinked.
-4. **Legacy Store Leftovers [H]:** If existing grants in `trusted-configs/` are not migrated, trust state exists outside the unified store.
+1. **Orphaned Companion via Manual Intervention [H]:** A user or script deletes
+   entry symlink `<hash>` but leaves `<hash>.trust`. If an audit tool lists
+   `<hash>.trust`, the store contains trust metadata for an untracked path.
+2. **I/O Failure in `verify` [H]:** In `verify(path, digest)`, recording the
+   entry is best-effort. If `record()` fails (e.g. read-only disk, permission
+   error on state directory), but `<hash>.trust` was already present from a
+   previous run: the workspace is evaluated as `Trusted`, yet it is
+   **not recorded in the tracker**.
+3. **Partial Clean Failure [H]:** `clean` removes a dangling symlink entry but
+   encounters an I/O error when removing the companion file. The companion
+   survives unlinked.
+4. **Legacy Store Leftovers [H]:** If existing grants in `trusted-configs/` are
+   not migrated, trust state exists outside the unified store.
 
 ---
 
@@ -214,7 +331,8 @@ The human stated: *"The tracked store is a superset of the trust store."*
 ### Alternative A: Encapsulated Twin Stores (Minimal / Keep Two)
 
 - Keep separate `$STATE/tracked-configs` and `$STATE/trusted-configs`.
-- Make store mutation methods private to `config/`. `ConfigService` is the sole writer.
+- Make store mutation methods private to `config/`. `ConfigService` is the sole
+  writer.
 - Fix the `EEXIST` symlink bug in `FilePathTracker`.
 - Preserves full backward compatibility and zero CLI breakage.
 
@@ -223,11 +341,13 @@ The human stated: *"The tracked store is a superset of the trust store."*
 - Single directory `$STATE/workspace-configs/`.
 - Key = `BLAKE3(canonical_root)`. Entry = symlink to `canonical_root`.
 - Companion = `<hash>.trust` holding `BLAKE3(.traces/config.toml)`.
-- Eliminates `MissingBaseline`. `traces trust <dir without config>` returns an error directing to `traces init`.
+- Eliminates `MissingBaseline`. `traces trust <dir without config>` returns an
+  error directing to `traces init`.
 
 ### Alternative C: D6 Original (Single Store, Keyed by Config File Path)
 
-- Key = `BLAKE3(canonical_config_path)`. Entry = symlink to `.traces/config.toml`.
+- Key = `BLAKE3(canonical_config_path)`. Entry = symlink to
+  `.traces/config.toml`.
 
 ### Head-to-Head Comparison Table
 
@@ -248,12 +368,16 @@ The human stated: *"The tracked store is a superset of the trust store."*
 ## 9. Attack Point 8: Decisions Delegated to Tickets 30 and 31
 
 1. **Ticket 30 (Path & Capability Model):**
-   - Canonicalization rules for symlinked `.traces/` directories and config files.
-   - Confinement boundary: whether template and schema paths must resolve strictly within `root`.
+   - Canonicalization rules for symlinked `.traces/` directories and config
+     files.
+   - Confinement boundary: whether template and schema paths must resolve
+     strictly within `root`.
    - Resolution base for relative paths declared inside `config.toml`.
 2. **Ticket 31 (Host Composition & Lifecycle):**
-   - Per-request admission caching: whether long-lived hosts (LSP/MCP) re-hash `config.toml` on every request or rely on file watchers.
-   - Interactive prompt handling when `Untrusted` or `Stale` configuration is detected during daemon operation.
+   - Per-request admission caching: whether long-lived hosts (LSP/MCP) re-hash
+     `config.toml` on every request or rely on file watchers.
+   - Interactive prompt handling when `Untrusted` or `Stale` configuration is
+     detected during daemon operation.
 
 ---
 
@@ -261,9 +385,13 @@ The human stated: *"The tracked store is a superset of the trust store."*
 
 Independent source inspection of `github.com/jdx/mise` at HEAD confirms:
 
-1. **Dual-Store Topology [V]:** `mise` maintains distinct directories `dirs::TRACKED_CONFIGS` (`~/.local/state/mise/tracked-configs`) and `dirs::TRUSTED_CONFIGS` (`~/.local/state/mise/trusted-configs`) (`src/dirs.rs`, `src/config/tracking.rs`).
+1. **Dual-Store Topology [V]:** `mise` maintains distinct directories
+   `dirs::TRACKED_CONFIGS` (`~/.local/state/mise/tracked-configs`) and
+   `dirs::TRUSTED_CONFIGS` (`~/.local/state/mise/trusted-configs`)
+   (`src/dirs.rs`, `src/config/tracking.rs`).
 2. **Granularity Difference [V]:**
-   - `Tracker::clean_in` (`src/config/tracking.rs:72-88`) specifically requires `path.is_file()`:
+   - `Tracker::clean_in` (`src/config/tracking.rs:72-88`) specifically requires
+     `path.is_file()`:
 
      ```rust
      let keep = match Self::tracked_path(&entry)? {
@@ -272,7 +400,8 @@ Independent source inspection of `github.com/jdx/mise` at HEAD confirms:
      };
      ```
 
-   - In contrast, `Trust::clean_in` (`src/cli/trust.rs:145-156`) inspects directories:
+   - In contrast, `Trust::clean_in` (`src/cli/trust.rs:145-156`) inspects
+     directories:
 
      ```rust
      // Tracker::clean_in asks is_file() because it records config files,
@@ -280,9 +409,17 @@ Independent source inspection of `github.com/jdx/mise` at HEAD confirms:
      // delete every entry.
      ```
 
-3. **Pre-Trusting Directories Without Config [V]:** `mise` explicitly supports trusting a directory before creating `mise.toml` (`src/cli/trust.rs:288-294`):
-   > "A directory with no config file in it yet still resolves, since its trust root is the directory itself and trusting a project before writing its `mise.toml` is a real thing to want."
-4. **Correction of Prior Research D1 [V]:** Research file `d1` asserted `mise` maintained two stores for GC tracking vs execution trust, which is correct. However, `d1` omitted the critical finding above: `mise` rejected merging the stores because tracking operates on **files** while trust operates on **directory roots**.
+3. **Pre-Trusting Directories Without Config [V]:** `mise` explicitly supports
+   trusting a directory before creating `mise.toml`
+   (`src/cli/trust.rs:288-294`):
+   > "A directory with no config file in it yet still resolves, since its trust
+   > root is the directory itself and trusting a project before writing its
+   > `mise.toml` is a real thing to want."
+4. **Correction of Prior Research D1 [V]:** Research file `d1` asserted `mise`
+   maintained two stores for GC tracking vs execution trust, which is correct.
+   However, `d1` omitted the critical finding above: `mise` rejected merging the
+   stores because tracking operates on **files** while trust operates on
+   **directory roots**.
 
 ---
 
@@ -332,7 +469,8 @@ $XDG_STATE_HOME/traces/workspaces/
 ### 11.3 Core Invariants and Operations
 
 - **`grant(root, config_path)`:**
-  1. Canonicalize `root` and `config_path`. Ensure `config_path` is enclosed by `root`.
+  1. Canonicalize `root` and `config_path`. Ensure `config_path` is enclosed by
+     `root`.
   2. Read UTF-8 content of `config_path` and compute `BLAKE3` digest.
   3. Atomically write `<hash_root>.trust.tmp` and rename to `<hash_root>.trust`.
   4. Atomically record entry symlink `<hash_root>` pointing to `root`.
@@ -340,8 +478,10 @@ $XDG_STATE_HOME/traces/workspaces/
   1. Record entry symlink `<hash_root>` best-effort (updates tracking).
   2. Read `<hash_root>.trust`. If absent $\rightarrow$ return `Untrusted`.
   3. Read `config_path` content and compute digest.
-  4. If `current_digest == recorded_digest` $\rightarrow$ return `Trusted(content)`. Else $\rightarrow$ return `Stale`.
-- **`untrust(root)`:** Removes `<hash_root>.trust`. Preserves `<hash_root>` entry symlink.
+  4. If `current_digest == recorded_digest` $\rightarrow$ return
+     `Trusted(content)`. Else $\rightarrow$ return `Stale`.
+- **`untrust(root)`:** Removes `<hash_root>.trust`. Preserves `<hash_root>`
+  entry symlink.
 
 ---
 
@@ -360,6 +500,14 @@ The following rows must be added to the redesign specification's change table:
 
 ## 13. Summary
 
-D6 keyed by config file path is refuted because it violates ADR-0002's root perimeter and causes cross-workspace trust collisions when `.traces` is symlinked. Amended D6 (keyed by workspace root) survives, eliminates `MissingBaseline`, and reduces ~91 production lines, but requires atomic file operations and a config-aware clean predicate in `FilePathTracker`. Alternative A (encapsulating the twin stores) remains a viable, zero-risk competitor matching mise's proven precedent. Ticket 16 accommodates Amended D6 via four change-table rows.
+D6 keyed by config file path is refuted because it violates ADR-0002's root
+perimeter and causes cross-workspace trust collisions when `.traces` is
+symlinked. Amended D6 (keyed by workspace root) survives, eliminates
+`MissingBaseline`, and reduces ~91 production lines, but requires atomic file
+operations and a config-aware clean predicate in `FilePathTracker`. Alternative
+A (encapsulating the twin stores) remains a viable, zero-risk competitor
+matching mise's proven precedent. Ticket 16 accommodates Amended D6 via four
+change-table rows.
 
-Target written: `.scratch/arch-design/research/22-prep/j-attack-unified-config-store.md`
+Target written:
+`.scratch/arch-design/research/22-prep/j-attack-unified-config-store.md`

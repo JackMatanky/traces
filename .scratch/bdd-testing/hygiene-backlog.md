@@ -28,8 +28,8 @@ in unit tests:
 These tests live in `tests/integration/`. They test isolated component logic and
 belong inline in unit tests under `src/`:
 
-1. `query.rs::page_query_returns_real_indexed_notes`: single-component page query
-   lookup. Twin lives in `src/query/service.rs`.
+1. `query.rs::page_query_returns_real_indexed_notes`: single-component page
+   query lookup. Twin lives in `src/query/service.rs`.
 2. `query.rs::query_tasks_returns_task_level_rows_distinct_from_page_level_query`:
    task row flattening over memory notes. Twin lives in `src/query/service.rs`.
 3. `query.rs::query_builder_reuses_one_index_for_page_and_task_queries`: index
@@ -42,8 +42,8 @@ belong inline in unit tests under `src/`:
    Twin lives in `src/query/sort.rs`.
 7. `query.rs::filters_pages_using_unquoted_iso_date_literals`: grammar literal
    parsing. Twin lives in `src/query/grammar/filter.rs`.
-8. `query.rs::filters_pages_handle_null_and_missing_temporal_operands`: null operand
-   propagation. Twin lives in `src/query/grammar/filter.rs`.
+8. `query.rs::filters_pages_handle_null_and_missing_temporal_operands`: null
+   operand propagation. Twin lives in `src/query/grammar/filter.rs`.
 9. `template.rs::template_shorthands_support_iso_offsets_and_reference_format`:
    template date filter formatting. Twin lives in `src/template/engine/date.rs`.
 10. `template.rs::template_filters_support_bucketing_aliases_and_weekday_arg`:

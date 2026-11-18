@@ -10,8 +10,8 @@ source. `[H]` marks an implication for ticket 28.
    one file in one cycle; `take_changes` drains them for salsa
    (`https://raw.githubusercontent.com/rust-lang/rust-analyzer/master/crates/vfs/src/lib.rs`).
    Lesson for 28: C2 — a change log plus merge-in-cycle is a proven shape for
-   "many edits between refreshes". [H] Traces can map it to overlay entries
-   that attach to one generation and are replaced by the next publish.
+   "many edits between refreshes". [H] Traces can map it to overlay entries that
+   attach to one generation and are replaced by the next publish.
 
 2. **rust-analyzer host/snapshot.** [V] `AnalysisHost` mutates; `Analysis` is
    an immutable, cheaply cloned snapshot handed to each request (research 24

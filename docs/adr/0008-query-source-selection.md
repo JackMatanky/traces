@@ -78,11 +78,12 @@ are `Tag(String)`, `Path(GlobPattern)`, and `Class { names: Vec<String>, mode:
 ClassExpansionMode }`. Path patterns and folder prefixes compile to
 `Path(GlobPattern)`.
 
-**Update: the real SourceAtom variants are Tag, Path and Class.** (Ticket 12, ticket 16.)
-The enum in src/query/grammar/source.rs defines `Tag(String)`,
-`Path(GlobPattern)`, and `Class { names: Vec<String>, mode: ClassExpansionMode }`.
-Path patterns use `Path`. Glob patterns are part of `GlobPattern` inside `Path`.
-The grammar section above keeps its user-facing syntax.
+**Update: the real SourceAtom variants are Tag, Path and Class.** (Ticket 12,
+ticket 16.) The enum in src/query/grammar/source.rs defines `Tag(String)`,
+`Path(GlobPattern)`, and
+`Class { names: Vec<String>, mode: ClassExpansionMode }`. Path patterns use
+`Path`. Glob patterns are part of `GlobPattern` inside `Path`. The grammar
+section above keeps its user-facing syntax.
 
 ## Consequences
 

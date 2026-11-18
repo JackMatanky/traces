@@ -60,12 +60,12 @@ defining Field Definitions that govern a File Class. A note's File Class(es) are
 read from the frontmatter key configured by `[schemas] class_field` (default
 `class`); the filename stem is the schema name and the filesystem is the
 registry. Schema TOML files deny unknown fields via
-`#[serde(deny_unknown_fields)]` on both RawSchema and RawSchemaFieldDef, so typos
-fail loudly at parse time. A Field Definition has a `type` (input, select,
+`#[serde(deny_unknown_fields)]` on both RawSchema and RawSchemaFieldDef, so
+typos fail loudly at parse time. A Field Definition has a `type` (input, select,
 boolean, number, date, file) with type-specific options plus optional `required`
-and `multi` flags; `file` fields resolve their option list from the WorkspaceIndex
-via an AND-composed filter of `folders` (array), `ext`, and `class` (array),
-with no regex.
+and `multi` flags; `file` fields resolve their option list from the
+WorkspaceIndex via an AND-composed filter of `folders` (array), `ext`, and
+`class` (array), with no regex.
 
 Templates consume schemas through a `schema` minijinja namespace:
 `schema.get("book")` binds a resolved Schema and `book.field("status")` returns

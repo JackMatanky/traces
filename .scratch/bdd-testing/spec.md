@@ -824,8 +824,8 @@ change.
   (`src/main.rs::ctrl_c_abort_exits_130` and
   `src/cli/mod.rs::user_interrupted_during_template_picker_returns_aborted_interrupted`).
   No process-level 130 case exists. No rustix feature is added. Spec sections
-  9.3, 9.7 and 9.9 are amended. The class-level 130 row reads `pinned:
-  src/main.rs::ctrl_c_abort_exits_130` in research/10.
+  9.3, 9.7 and 9.9 are amended. The class-level 130 row reads
+  `pinned: src/main.rs::ctrl_c_abort_exits_130` in research/10.
 - 2026-11-03: slice 5 closed. The configuration, tracking and template rows
   (01-G7, 01-G11, 01-G13, 01-G14, 01-G15, 01-G18, 01-G21, 01-G22, 01-G25,
   01-G26, 01-G27, 02-G10, 02-G11, 02-G12, 02-G18, 05-env_vars and
@@ -899,8 +899,8 @@ change.
   check and the `spec-change` hook. CI gained a three-OS unit job. Scheduled
   workflows run mutation, soak, bench and fuzz jobs. A fuzz run found and fixed
   a duration printing defect. The ledger section "Review Follow-up Wave" has the
-  details and the open items. The scheduled mutation gate reports without failing
-  until each module has a baseline.
+  details and the open items. The scheduled mutation gate reports without
+  failing until each module has a baseline.
 - 2026-11-05: the scenario suite moved to its own test binary.
   `tests/features.rs` holds the `scenarios!` entry. The steps moved to
   `tests/features/steps/`. The shared harness moved to `tests/support/`, which
@@ -909,16 +909,15 @@ change.
   stem carries the area, because a test name holds the stem and no folder. This
   replaces the flat layout and the rule that scenarios live in the `e2e` binary
   only. The nextest `features` phase and the CI `test (e2e)` job run both
-  binaries. An eighth check, the `step_gate` test, fails on an undefined, unused,
-  duplicate or ambiguous step. The 148 scenario titles are unchanged. The shared
-  harness compiles into both binaries, so the five `fixtures` tests run in each.
-  The gate script `check_scenarios.py` uses a `uv` script shebang.
-  `mise.toml` installs `uv`.
-  A break demonstration shows the `in time zone` step wins over the generic run
-  step: with `TZ` removed, three scenarios fail. The three nested-tag scenarios
-  stay. `Filtering by a tag includes nested tags` and `A parent tag selects
-  notes carrying its descendant tag` differ in the tag position. The filter
-  scenario uses a different mechanism.
+  binaries. An eighth check, the `step_gate` test, fails on an undefined,
+  unused, duplicate or ambiguous step. The 148 scenario titles are unchanged.
+  The shared harness compiles into both binaries, so the five `fixtures` tests
+  run in each. The gate script `check_scenarios.py` uses a `uv` script shebang.
+  `mise.toml` installs `uv`. A break demonstration shows the `in time zone` step
+  wins over the generic run step: with `TZ` removed, three scenarios fail. The
+  three nested-tag scenarios stay. `Filtering by a tag includes nested tags` and
+  `A parent tag selects notes carrying its descendant tag` differ in the tag
+  position. The filter scenario uses a different mechanism.
 - 2026-11-05: a section written as an array is now an error. `templates =
   ["x"]` filled `directory` and `schemas = ["a", "b"]` filled both keys,
   because a derived Serde struct also accepts a sequence. Seven fields in
@@ -938,8 +937,8 @@ change.
   `tests/features/step_gate.rs` reads the feature files with the `gherkin`
   parser. It matches the steps with the matcher of `rstest-bdd`. The files
   `check_steps.py`, `check_step_registry.sh` and the step baseline are deleted.
-- 2026-11-08: `.mise/scripts/check_scenario_count.sh` replaces the count function
-  of `mise run test`. CI runs it before the E2E and features run.
+- 2026-11-08: `.mise/scripts/check_scenario_count.sh` replaces the count
+  function of `mise run test`. CI runs it before the E2E and features run.
 - 2026-11-08: `check:layers` rejects `Scenario Outline`, `Scenario Template`,
   `Scenarios`, `Examples`, `Example` and `Background`. This settles item 8 of
   section 9.9 for Outlines.

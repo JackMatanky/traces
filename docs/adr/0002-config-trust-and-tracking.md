@@ -97,12 +97,12 @@ the tracking store.
 Granting trust to a missing config now fails with a tracker error where it
 previously failed with a hash error.
 
-**Update: moved directories are refused as untrusted, and trust checks read and hash.**
-(Ticket 12, ticket 16.) The Consequences and Confirmation sections have been
-updated to match the code: a moved directory does not become "stale": the loader
-refuses the config as untrusted until re-trusted. The hot path does not use an
-existence check only: it reads the config and checks its companion BLAKE3 hash
-before trust (trust-before-parse).
+**Update: moved directories are refused as untrusted, and trust checks read and
+hash.** (Ticket 12, ticket 16.) The Consequences and Confirmation sections have
+been updated to match the code: a moved directory does not become "stale": the
+loader refuses the config as untrusted until re-trusted. The hot path does not
+use an existence check only: it reads the config and checks its companion BLAKE3
+hash before trust (trust-before-parse).
 
 ### Consequences
 

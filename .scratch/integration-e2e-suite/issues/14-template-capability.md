@@ -1,39 +1,46 @@
 # 14: Template capability — overwrite refusal, non-TTY, freshness, index feedback
 
-**What to build:** The template capability's four unique process/integration boundaries:
-overwrite refusal proven non-destructive at process level for the first time, the real dialog
-path proven deterministic on null stdin (no CI hangs), and the two regressions flagged at
-audit §10 — I-4, named in code, and I-5, untested — gain their guards.
+**What to build:** The template capability's four unique process/integration
+boundaries: overwrite refusal proven non-destructive at process level for the
+first time, the real dialog path proven deterministic on null stdin (no CI
+hangs), and the two regressions flagged at audit §10 — I-4, named in code, and
+I-5, untested — gain their guards.
 
-**Blocked by:** 07 (prerequisites), 08 (spawn-only invariant), 10 (exit-code accessors).
+**Blocked by:** 07 (prerequisites), 08 (spawn-only invariant), 10 (exit-code
+accessors).
 
 **Category:** enhancement
 
 **Status:** resolved
 
-- [x] Overwrite refusal: spawn `template -i X --no-input` over an existing file → exit 1 +
-      `traces::cli::template::output_exists` diagnostic on stderr + target file byte-identical
-      afterward (highest-blast-radius gap: non-destructiveness never proven at process level)
-- [x] `-o` / `-f` argv paths spawned too (in-crate tests construct the struct directly today;
-      only the `-n`/`-o` conflict is argv-tested)
-- [x] Non-TTY determinism: spawned template test on null stdin **without `--no-input`** — that
-      flag swaps in the preset dialog provider, and the entire point is exercising the real
-      terminal dialog path (which short-circuits to defaults on non-TTY); assert the
-      deterministic outcome **exactly** — exit 0 with the default-path render (audit §14
-      P1.16's contract) — not merely that the test terminates; bounded by a std-only harness
-      watchdog (spawn + timed kill) so no hang can wedge the suite and no new dependency or
-      ticket-18 timeout is required
-- [x] Cross-render freshness: the cached-field regression named in code ("would wrongly persist
-      across independent renders") gains a guard — all existing template integration tests are
-      single-render
-- [x] Template output re-enters the index: writer → fs → refresh → query feedback loop asserted
-      (write units test path resolution only; index units read pre-existing files)
-- [x] Each test carries executes-vs-asserts note + defect class (destructive-overwrite,
-      nondeterministic-TTY, stale-cross-render-cache, untested-feedback-loop)
+- [x] Overwrite refusal: spawn `template -i X --no-input` over an existing file
+      → exit 1 + `traces::cli::template::output_exists` diagnostic on stderr +
+      target file byte-identical afterward (highest-blast-radius gap:
+      non-destructiveness never proven at process level)
+- [x] `-o` / `-f` argv paths spawned too (in-crate tests construct the struct
+      directly today; only the `-n`/`-o` conflict is argv-tested)
+- [x] Non-TTY determinism: spawned template test on null stdin
+      **without `--no-input`** — that flag swaps in the preset dialog provider,
+      and the entire point is exercising the real terminal dialog path (which
+      short-circuits to defaults on non-TTY); assert the deterministic outcome
+      **exactly** — exit 0 with the default-path render (audit §14 P1.16's
+      contract) — not merely that the test terminates; bounded by a std-only
+      harness watchdog (spawn + timed kill) so no hang can wedge the suite and
+      no new dependency or ticket-18 timeout is required
+- [x] Cross-render freshness: the cached-field regression named in code ("would
+      wrongly persist across independent renders") gains a guard — all existing
+      template integration tests are single-render
+- [x] Template output re-enters the index: writer → fs → refresh → query
+      feedback loop asserted (write units test path resolution only; index units
+      read pre-existing files)
+- [x] Each test carries executes-vs-asserts note + defect class
+      (destructive-overwrite, nondeterministic-TTY, stale-cross-render-cache,
+      untested-feedback-loop)
 
 ## Comments
 
 Resolved in commit `c8eb4b2d` (merged into `integration-e2e-suite`).
+
 - `tests/e2e/template_write.rs` (4 new tests on the 2 existing):
   - `overwrite_refusal_is_non_destructive_and_force_and_output_paths_spawn`:
     refusal exits 1 with `traces::cli::template::output_exists` and the
@@ -65,7 +72,7 @@ Resolved in commit `c8eb4b2d` (merged into `integration-e2e-suite`).
   (lib 3,151 / integration 61 / e2e 61 / doctests 83), clippy `-D warnings`,
   fmt — all green.
 
-**Evidence:** audit §10 E-1 (overwrite refusal — highest blast radius), E-4 (non-TTY), I-4
-(cross-render freshness), I-5 (output re-enters index); §14 P1.16 (non-TTY contract).
-**Defect class:** destructive-overwrite; nondeterministic-TTY; stale-cross-render-cache;
-untested-feedback-loop.
+**Evidence:** audit §10 E-1 (overwrite refusal — highest blast radius), E-4
+(non-TTY), I-4 (cross-render freshness), I-5 (output re-enters index); §14 P1.16
+(non-TTY contract). **Defect class:** destructive-overwrite;
+nondeterministic-TTY; stale-cross-render-cache; untested-feedback-loop.

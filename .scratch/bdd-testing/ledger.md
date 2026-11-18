@@ -575,8 +575,9 @@ pending)
 - **Proof status:** Kill demonstration done (above). Assertion comparison done.
   The old test asserted success and that the written `topic_note.md` equals
   `Category: Rust Programming (rust)`. The scenario states the same Given,
-  command, exit code 0. It asserts the written file content exactly through `And
-  file "topic_note.md" contains:` (equality, not substring). Twin re-read done:
+  command, exit code 0. It asserts the written file content exactly through
+  `And file "topic_note.md" contains:` (equality, not substring). Twin re-read
+  done:
   `tests/integration/template_render.rs::renders_a_file_sourced_select_field_in_template_rendering`
   pins the same fixture and rendered string in-process.
   `src/schema/fields/select.rs` unit tests keep the confinement pins. Mutation
@@ -635,9 +636,10 @@ diff this list after deleting the two tests.
       escaped.
   - **Open:** The kill demonstration does not name the broken symbol for the
     other two slice 7 deletions.
-  - **Name diff:** Verified `cargo nextest list --all-features --run-ignored
-    all` before and after deletion. `traces::e2e
-    query::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`
+  - **Name diff:** Verified
+    `cargo nextest list --all-features --run-ignored all` before and after
+    deletion.
+    `traces::e2e query::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`
     was removed.
   - **Twin re-read:** Re-read `task_table_renders_default_and_custom_columns`
     and `task_count_prints_only_the_match_total` in `tests/e2e/query.rs`.
@@ -918,8 +920,8 @@ Surviving mutants from the proof runs were triaged with new unit tests.
   `update_baseline` creates the baseline for each module.
 - The two `tracked.rs` tests stay. Scenario `A load without trust still records
   the configuration as tracked` covers the mutant, but no mutation compare ran.
-- Bare `traces trust --all list` and `--show list` parse `list` as a path. Closed
-  on 2026-11-05: see "Follow-up Triage".
+- Bare `traces trust --all list` and `--show list` parse `list` as a path.
+  Closed on 2026-11-05: see "Follow-up Triage".
 - The array-for-table quirk (`templates = ["x"]` parses as `directory = "x"`)
   was open. Closed on 2026-11-05: see "Array-for-table Fix".
 
@@ -1001,8 +1003,8 @@ Result: a defect in the config parser. It is not fixed yet.
   therefore fills `directory`. `RawSchemasConfig` has no default on its second
   field, so a one-element array fails there.
 - Reach: `templates = [dir]`, `templates = [dir, output_dir]` and
-  `tasks.statuses = [["x", "Name", "todo"]]` are accepted. Each means a different
-  thing than its text suggests.
+  `tasks.statuses = [["x", "Name", "todo"]]` are accepted. Each means a
+  different thing than its text suggests.
 - Fix options (first draft, corrected below): a `deserialize_with` function that
   calls `deserialize_map` would not work. In `toml` 1.1.6, `ArrayDeserializer`
   forwards both `deserialize_struct` and `deserialize_map` to
@@ -1338,8 +1340,9 @@ Changes:
 - The mirror score is now `(literal, -holes, typed)`.
 - The baseline file has a third column, `literal/placeholders/typed`. It holds
   `ERROR` for a pattern that the framework rejects.
-- The features binary has a test, `registered_steps_are_dumped_with_their_framework_regexes`
-  in `tests/features/registry.rs`. It writes `step-registry.tsv` in the Cargo
+- The features binary has a test,
+  `registered_steps_are_dumped_with_their_framework_regexes` in
+  `tests/features/registry.rs`. It writes `step-registry.tsv` in the Cargo
   target temp folder. Each line holds the keyword, the pattern, the framework
   regex and the framework score.
 - `check_steps.py --registry` compares the dump with the mirror for all 109

@@ -344,8 +344,8 @@ differ. The 148 scenario titles did not change.
   condition in decision (a) no longer holds. The `e2e` binary does not run them.
 - Features are in `tests/features/<capability>/` folders. A file stem keeps the
   area, for example `query/query-sort.feature`.
-- Steps are in `tests/features/steps/`. Shared harness code is in `tests/support/`.
-  `tests/features.rs` wires both with `#[path]`.
+- Steps are in `tests/features/steps/`. Shared harness code is in
+  `tests/support/`. `tests/features.rs` wires both with `#[path]`.
 - The `touch` rule is in the doc comment of `tests/features.rs`.
 - The dead-step check is the test `step_gate` in `tests/features/step_gate.rs`.
   It runs in the `features` binary, and so in `mise run test` and in CI. It
@@ -353,5 +353,6 @@ differ. The 148 scenario titles did not change.
   `cargo bdd unused` procedure in decision (h). It also finds undefined,
   duplicate and ambiguous steps. A script, `check_steps.py`, did this job
   before 2026-11-08.
-- The Rust-symbol patterns scan `tests/e2e.rs`, `tests/e2e/`, `tests/features.rs`,
-  `tests/features/` and `tests/support/`. They skip `.feature` files.
+- The Rust-symbol patterns scan `tests/e2e.rs`, `tests/e2e/`,
+  `tests/features.rs`, `tests/features/` and `tests/support/`. They skip
+  `.feature` files.

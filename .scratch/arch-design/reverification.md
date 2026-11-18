@@ -108,10 +108,11 @@ path errors, and log-only heal reports: see
 contains 44 benchmark IDs. These cover `WorkspaceIndex::refresh` no-op 50-20k,
 single-upsert/delete/linked at 1k and 5k, and rich profiles. They also cover
 `QueryService::sync_and_run` cold-cache zero-row/no-op/single-edit/full-scan
-50-20k. The suite was run as `cargo bench --features test-utils --bench index_refresh -- --quick --noplot`.
+50-20k. The suite was run as
+`cargo bench --features test-utils --bench index_refresh -- --quick --noplot`.
 Tests were executed on pre-merge `2dc3250d` (twice, in a detached worktree) and
-on `207cc3fb`. Each run used an isolated `CRITERION_HOME`. Runs executed back
-to back on the same Apple M4 Pro machine.
+on `207cc3fb`. Each run used an isolated `CRITERION_HOME`. Runs executed back to
+back on the same Apple M4 Pro machine.
 
 | Statistic over 44 IDs | Value |
 | --- | --- |

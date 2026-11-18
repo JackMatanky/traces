@@ -6,7 +6,7 @@ Every entry carries a URL; claims made without a fetched page stay [H].
 
 ## redb commit and crash semantics (28, 29)
 
-Source: https://github.com/cberner/redb/blob/master/docs/design.md [V]
+Source: <https://github.com/cberner/redb/blob/master/docs/design.md> [V]
 
 1. Non-durable commits: after a crash the database rolls back to the last
    durable commit; the file stays consistent. The ticket 27 ENOSPC finding
@@ -28,10 +28,10 @@ Source: https://github.com/cberner/redb/blob/master/docs/design.md [V]
 
 ## Watcher rename semantics (28, 32)
 
-Sources: https://lkml.org/lkml/2014/4/7/77 (inotify rename pairing, Jan
-Kara) [V]; https://docs.rs/notify-debouncer-full (DebouncedEvent
+Sources: <https://lkml.org/lkml/2014/4/7/77> (inotify rename pairing, Jan
+Kara) [V]; <https://docs.rs/notify-debouncer-full> (DebouncedEvent
 `track_id`, `event().flag` rename from/to markers) [V];
-https://forum.obsidian.md/t/macos-notes-with-nfd-normalized-filenames-disappear-from-file-explorer-and-search-when-edited-regression-in-1-13-5-1-13-6-watcher-existence-check-compares-raw-nfd-event-name-against-nfc-normalized-listing/117189
+<https://forum.obsidian.md/t/macos-notes-with-nfd-normalized-filenames-disappear-from-file-explorer-and-search-when-edited-regression-in-1-13-5-1-13-6-watcher-existence-check-compares-raw-nfd-event-name-against-nfc-normalized-listing/117189>
 [V]
 
 1. inotify: `IN_MOVED_FROM` and `IN_MOVED_TO` are usually consecutive,
@@ -54,10 +54,11 @@ https://forum.obsidian.md/t/macos-notes-with-nfd-normalized-filenames-disappear-
 
 ## Platform path rules (32)
 
-Sources: https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
-[V]; https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-[V]; https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlea
-[V]; https://help.obsidian.md/Symbolic+links+and+junctions [V]
+Sources:
+<https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats> [V];
+<https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file> [V];
+<https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlea>
+[V]; <https://help.obsidian.md/Symbolic+links+and+junctions> [V]
 
 1. Windows normalization: trailing dots and spaces are stripped from each
    component; the `\\?\` device-path prefix skips normalization. Two
@@ -83,14 +84,14 @@ Sources: https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
    directories. This is the platform fact behind the h2 case-stability
    rule. Keep the first-seen spelling as row identity, fold case only
    for link matching, and emit a notice on a flip. Source:
-   https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity [V]
+   <https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity> [V]
 
 ## File-system normalization facts (32)
 
-Sources: https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html
-[V]; https://bugs.openjdk.org/browse/JDK-8296141 and
-https://bugs.openjdk.org/browse/JDK-8366911 (JDK normalization history)
-[V]
+Sources:
+<https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/APFS_Guide/FAQ/FAQ.html>
+[V]; <https://bugs.openjdk.org/browse/JDK-8296141> and
+<https://bugs.openjdk.org/browse/JDK-8366911> (JDK normalization history) [V]
 
 1. APFS accepts only valid UTF-8 names and preserves both case and
    normalization on disk in all variants. Case-insensitive variants
@@ -111,7 +112,7 @@ https://bugs.openjdk.org/browse/JDK-8366911 (JDK normalization history)
 
 ## redb page reclaim and compaction (28, 29, 36)
 
-Source: https://github.com/cberner/redb/blob/master/docs/design.md [V];
+Source: <https://github.com/cberner/redb/blob/master/docs/design.md> [V];
 `Database::compact` doc string in redb 4.3.0 [V]
 
 1. Pages are copy-on-write after commit. A delete moves the page into
@@ -131,9 +132,9 @@ Source: https://github.com/cberner/redb/blob/master/docs/design.md [V];
 
 ## Editor overlay precedent detail (28)
 
-Sources: https://github.com/rust-lang/rust-analyzer/issues/3715 (Better
+Sources: <https://github.com/rust-lang/rust-analyzer/issues/3715> (Better
 VFS discussion, watchman-scale experience) [V];
-https://github.com/rust-lang/rust-analyzer/issues/3107 (live diagnostics
+<https://github.com/rust-lang/rust-analyzer/issues/3107> (live diagnostics
 driven by open buffers) [V]
 
 1. The rust-analyzer VFS separates the loader (filesystem watcher) from

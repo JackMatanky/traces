@@ -288,10 +288,10 @@ Ticket 14(b) consumes this list:
 
 - 2026-10-29: Pre-grilling research dossier consolidated from five parallel
   subagent passes (machinery survey, contradiction verification, and external
-  best-practices reviews): [research/12-coverage-gap-methodology.md](../research/12-coverage-gap-methodology.md).
-  Section 0 maps the evidence to decisions (a)-(f) and lists the open
-  empirical questions. Status stays `claimed`; the grilling itself has not
-  been held.
+  best-practices reviews):
+  [research/12-coverage-gap-methodology.md](../research/12-coverage-gap-methodology.md).
+  Section 0 maps the evidence to decisions (a)-(f) and lists the open empirical
+  questions. Status stays `claimed`; the grilling itself has not been held.
 - 2026-11-02: Grilling held. The round-3 package is locked: five-state
   coverage definition, inventory-resident gap method with the sixth gate
   check, review-lens rubric, anti-metrics, unchanged tooling, ten

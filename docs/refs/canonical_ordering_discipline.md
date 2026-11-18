@@ -2,7 +2,13 @@
 
 ## General definition ordering
 
-When read from top to bottom, a file should feel like a tour of the APIs it defines. The most important items should be defined further up the file, with their helpers below. No `impl` block should come before the type or trait to which it relates. In this way, lower-level implementation details are hidden from the reader until they wish to know more, at which point, having gained a good knowledge of the overall form of the code, they can read on to understand how it functions.
+When read from top to bottom, a file should feel like a tour of the APIs it
+defines. The most important items should be defined further up the file, with
+their helpers below. No `impl` block should come before the type or trait to
+which it relates. In this way, lower-level implementation details are hidden
+from the reader until they wish to know more, at which point, having gained a
+good knowledge of the overall form of the code, they can read on to understand
+how it functions.
 
 ✅ Do this:
 
@@ -82,7 +88,11 @@ impl Foo {
 
 ## Impl block placement
 
-By default, `impl SomeType` blocks for a given type should be in the same file, immediately below where that type is defined. Trait implementations `impl SomeTrait for SomeType` should go in the file where `SomeTrait` or `SomeType` is defined. This is effectively the orphan rule but applied within crates.
+By default, `impl SomeType` blocks for a given type should be in the same file,
+immediately below where that type is defined. Trait implementations
+`impl SomeTrait for SomeType` should go in the file where `SomeTrait` or
+`SomeType` is defined. This is effectively the orphan rule but applied within
+crates.
 
 ## Impl block ordering
 
@@ -104,10 +114,14 @@ The `impl` blocks in the same file for `MyTrait` should be ordered as follows:
 
 ## Derive ordering
 
-Put all derive items in a single `#[derive(...)]` (the formatter will preserve readability by introducing line-breaks as it deems fit). Derived items should be ordered as follows:
+Put all derive items in a single `#[derive(...)]` (the formatter will preserve
+readability by introducing line-breaks as it deems fit). Derived items should be
+ordered as follows:
 
-- `Copy` should come first (this has the most surprising effect on how the consumer will interact with values of the given type)
-- Standard library items, ordered lexicographically (these form a common expectation for basic behaviour and missing items are surprising)
+- `Copy` should come first (this has the most surprising effect on how the
+  consumer will interact with values of the given type)
+- Standard library items, ordered lexicographically (these form a common
+  expectation for basic behaviour and missing items are surprising)
 - Third party items, ordered lexicographically
 
 ✅ Do this:
@@ -130,7 +144,10 @@ struct MyType;
 
 ## Declaration ordering
 
-Rust provides several different types of declaration and where these are declared consecutively in the same block, they should be ordered for visual consistency. This will help draw the reader's eye to the important parts of each declaration, rather than getting lost in some superfluous ordering.
+Rust provides several different types of declaration and where these are
+declared consecutively in the same block, they should be ordered for visual
+consistency. This will help draw the reader's eye to the important parts of each
+declaration, rather than getting lost in some superfluous ordering.
 
 Declarations should be ordered as follows:
 
@@ -141,15 +158,25 @@ Declarations should be ordered as follows:
 
 ## Struct field ordering
 
-The more public a field, the more likely a user will to want to know more about it and understand it. Therefore, we should put the items they are most likely to care about nearer the top of our code, avoiding them having to skip over parts uninteresting to them. Specifically, this means that we should place:
+The more public a field, the more likely a user will to want to know more about
+it and understand it. Therefore, we should put the items they are most likely to
+care about nearer the top of our code, avoiding them having to skip over parts
+uninteresting to them. Specifically, this means that we should place:
 
 - `pub` fields first,
 - `pub(crate)` fields next,
 - private fields last.
 
-Structs neatly organised in this way make it clear when the reader has entered implementation details and hence when they are less likely to glean useful information.
+Structs neatly organised in this way make it clear when the reader has entered
+implementation details and hence when they are less likely to glean useful
+information.
 
-If the reason for ordering fields in a different way to the above is due to a derivation such as `Ord` or `PartialOrd`, this is not a good reason for deviation from the norm. Maintaining consistency is of a higher priority than a single derivation, hence the relevant implementations should be written out by hand. The reader is more likely to be looking at the entire struct rather than just one trait implementation.
+If the reason for ordering fields in a different way to the above is due to a
+derivation such as `Ord` or `PartialOrd`, this is not a good reason for
+deviation from the norm. Maintaining consistency is of a higher priority than a
+single derivation, hence the relevant implementations should be written out by
+hand. The reader is more likely to be looking at the entire struct rather than
+just one trait implementation.
 
 ✅ Do this:
 

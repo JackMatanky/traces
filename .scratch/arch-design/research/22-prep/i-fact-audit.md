@@ -1,6 +1,8 @@
 # Fact Audit for Ticket 22: Config Ownership and Lifecycle
 
-Audits the 40 most load-bearing factual claims across preparatory research documents `a1`, `a2`, `a3`, `b1`, `b2`, `e`, `f`, `g` against the current codebase (`HEAD 8064cf76`) and primary documents.
+Audits the 40 most load-bearing factual claims across preparatory research
+documents `a1`, `a2`, `a3`, `b1`, `b2`, `e`, `f`, `g` against the current
+codebase (`HEAD 8064cf76`) and primary documents.
 
 ---
 
@@ -53,27 +55,67 @@ Audits the 40 most load-bearing factual claims across preparatory research docum
 
 ## 2. Citation Line Discrepancies Flagged
 
-1. **`a2-inventory-digests-lifecycle.md:21`**: Cites `FrontmatterDigests.title` at `src/config/model/frontmatter.rs:90`. In current source, line 90 is a comment; definition is at line 323, construction at line 83.
-2. **`a2-inventory-digests-lifecycle.md:24`**: Cites `DateFieldDigests.name` at `src/config/model/frontmatter.rs:125`. In current source, line 125 is inside `for_test`; definition is at line 348, construction at line 147.
-3. **`a1-inventory-type-placement.md:493`**: Cites "18 root files (excluding lib/main: 10,955 LoC)". Verified that there are 18 root files besides `lib.rs` and `main.rs`, but exact line count fluctuates slightly as tests evolve.
+1. **`a2-inventory-digests-lifecycle.md:21`**: Cites `FrontmatterDigests.title`
+   at `src/config/model/frontmatter.rs:90`. In current source, line 90 is a
+   comment; definition is at line 323, construction at line 83.
+2. **`a2-inventory-digests-lifecycle.md:24`**: Cites `DateFieldDigests.name` at
+   `src/config/model/frontmatter.rs:125`. In current source, line 125 is inside
+   `for_test`; definition is at line 348, construction at line 147.
+3. **`a1-inventory-type-placement.md:493`**: Cites "18 root files (excluding
+   lib/main: 10,955 LoC)". Verified that there are 18 root files besides
+   `lib.rs` and `main.rs`, but exact line count fluctuates slightly as tests
+   evolve.
 
 ---
 
 ## 3. Impacts on Design Leans (e, f, g)
 
-The audit validates 37 of 40 claims, partially refutes 1 (callers of `file_tracker`), and identifies 2 stale line citations. Several verified facts directly reinforce or challenge the design leans:
+The audit validates 37 of 40 claims, partially refutes 1 (callers of
+`file_tracker`), and identifies 2 stale line citations. Several verified facts
+directly reinforce or challenge the design leans:
 
 1. **Sub-question (c) — Dropping `syn` Dev-Dependency (Option C3 vs C2)**:
-   - *Audit Finding (#10)*: `f:185` claimed C3 drops `syn`. However, `src/index/fingerprint.rs:507-552` duplicates the `syn` AST scan. Retiring `ConfigDigests` in `digest.rs` alone **does not** drop `syn` from `Cargo.toml`. To drop `syn`, Option C3 must also explicitly delete `src/index/fingerprint.rs:506-552`. If `index` retains its scan, `syn` remains a dependency.
-2. **Sub-question (c) — Missing Ticket 21 Freshness Inputs in `IndexFingerprint`**:
-   - *Audit Finding (#1)*: Confirmed that `IndexFingerprint` today contains *zero* ignore policy and *zero* filename-period policy. If Option C3 folds config invalidation into `index`, `IndexFingerprint` cannot merely copy the existing 10-setting array; it must expand to include the normalized ignore set and filename parse policy mandated by Ticket 21.
+   - *Audit Finding (#10)*: `f:185` claimed C3 drops `syn`. However,
+     `src/index/fingerprint.rs:507-552` duplicates the `syn` AST scan. Retiring
+     `ConfigDigests` in `digest.rs` alone **does not** drop `syn` from
+     `Cargo.toml`. To drop `syn`, Option C3 must also explicitly delete
+     `src/index/fingerprint.rs:506-552`. If `index` retains its scan, `syn`
+     remains a dependency.
+2. **Sub-question (c) — Missing Ticket 21 Freshness Inputs in
+   `IndexFingerprint`**:
+   - *Audit Finding (#1)*: Confirmed that `IndexFingerprint` today contains
+     *zero* ignore policy and *zero* filename-period policy. If Option C3 folds
+     config invalidation into `index`, `IndexFingerprint` cannot merely copy the
+     existing 10-setting array; it must expand to include the normalized ignore
+     set and filename parse policy mandated by Ticket 21.
 3. **Sub-question (d) — Retiring `TrackerStore` (Option D4 vs D5)**:
-   - *Audit Finding (#3)*: Confirmed that `TrackerStore` has zero engine consumers and exists only for `traces tracked list|clean`. This strongly supports **Option D4** (deleting `TrackerStore`), eliminating 409 LoC and the artificial track-before-grant ordering invariant, unless the human explicitly demands cross-workspace CLI inventory.
-4. **Sub-question (d) & (f) — Dangling Symlink `EEXIST` Hazard in `FilePathTracker`**:
-   - *Audit Finding (#5)*: Confirmed that `entry_path.exists()` followed by `symlink()` crashes with `EEXIST` when encountering dangling symlinks. Any design that retains `FilePathTracker` (or moves it to `config::store`) must replace `exists()` with `symlink_metadata()` or use atomic tempfile rename (`rename(2)`).
+   - *Audit Finding (#3)*: Confirmed that `TrackerStore` has zero engine
+     consumers and exists only for `traces tracked list|clean`. This strongly
+     supports **Option D4** (deleting `TrackerStore`), eliminating 409 LoC and
+     the artificial track-before-grant ordering invariant, unless the human
+     explicitly demands cross-workspace CLI inventory.
+4. **Sub-question (d) & (f) — Dangling Symlink `EEXIST` Hazard in
+   `FilePathTracker`**:
+   - *Audit Finding (#5)*: Confirmed that `entry_path.exists()` followed by
+     `symlink()` crashes with `EEXIST` when encountering dangling symlinks. Any
+     design that retains `FilePathTracker` (or moves it to `config::store`) must
+     replace `exists()` with `symlink_metadata()` or use atomic tempfile rename
+     (`rename(2)`).
 5. **Sub-question (e) — Phantom Typestate Elimination (Option E2 vs E1)**:
-   - *Audit Finding (#12, #25)*: Confirmed that `file.rs` (632 LoC) maintains generic phantom states (`IsLocal`, `IsGlobal`, `Discovered`, `Trusted`, `Parsed`) across single-call linear pipelines where global config is unverified anyway. This strongly supports **Option E2** (trust-only token/newtype) over E1.
+   - *Audit Finding (#12, #25)*: Confirmed that `file.rs` (632 LoC) maintains
+     generic phantom states (`IsLocal`, `IsGlobal`, `Discovered`, `Trusted`,
+     `Parsed`) across single-call linear pipelines where global config is
+     unverified anyway. This strongly supports **Option E2** (trust-only
+     token/newtype) over E1.
 6. **Sub-question (a) & (b) — Task & Field Decoupling**:
-   - *Audit Finding (#6, #7, #21)*: Note parser reads only 3 scalar config values; `FieldName` and `FieldKey` are completely disjoint; `TaskListItem` incurs ~10k heap string allocations from `TaskStatus.name`. This confirms that dissolving `task.rs` and `field.rs` (Option a2) and breaking the `note -> config` edge (Option b2) eliminates genuine architectural coupling and runtime memory waste.
+   - *Audit Finding (#6, #7, #21)*: Note parser reads only 3 scalar config
+     values; `FieldName` and `FieldKey` are completely disjoint; `TaskListItem`
+     incurs ~10k heap string allocations from `TaskStatus.name`. This confirms
+     that dissolving `task.rs` and `field.rs` (Option a2) and breaking the
+     `note -> config` edge (Option b2) eliminates genuine architectural coupling
+     and runtime memory waste.
 7. **Sub-question (g) — Scaffolding Auto-Trust**:
-   - *Audit Finding (#2)*: Confirmed that running `traces init` currently guarantees that the very next user command will fail with `ConfigTrustError::Untrusted`. This confirms the usability friction driving Option G5 (auto-trust during scaffolding).
+   - *Audit Finding (#2)*: Confirmed that running `traces init` currently
+     guarantees that the very next user command will fail with
+     `ConfigTrustError::Untrusted`. This confirms the usability friction driving
+     Option G5 (auto-trust during scaffolding).

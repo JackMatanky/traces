@@ -8,19 +8,27 @@ Status: ready-for-agent
 
 ## What to build
 
-Register flat-named filters for path string inspection. All take a path string as pipeline input and return the transformed/inspected value. I/O-based filters resolve relative paths against `Config::root()`.
+Register flat-named filters for path string inspection. All take a path string
+as pipeline input and return the transformed/inspected value. I/O-based filters
+resolve relative paths against `Config::root()`.
 
 ### Filters
 
-- **`path_exists`** — Returns `true` if the path points to an existing file/directory. Resolves relative paths against `Config::root()`.
+- **`path_exists`** — Returns `true` if the path points to an existing
+  file/directory. Resolves relative paths against `Config::root()`.
 - **`path_is_file`** — Returns `true` if the path points to an existing file.
-- **`path_is_dir`** — Returns `true` if the path points to an existing directory.
-- **`path_filename`** — Returns the filename with extension (e.g., `"main.rs"`). Uses `Path::file_name`.
-- **`path_basename`** — Returns the filename without extension (e.g., `"main"`). Uses `Path::file_stem`.
-- **`path_extension`** — Returns just the extension (e.g., `"rs"`). Uses `Path::extension`.
+- **`path_is_dir`** — Returns `true` if the path points to an existing
+  directory.
+- **`path_filename`** — Returns the filename with extension (e.g., `"main.rs"`).
+  Uses `Path::file_name`.
+- **`path_basename`** — Returns the filename without extension (e.g., `"main"`).
+  Uses `Path::file_stem`.
+- **`path_extension`** — Returns just the extension (e.g., `"rs"`). Uses
+  `Path::extension`.
 - **`path_parent`** — Returns the parent directory path. Uses `Path::parent`.
 
 Usage in templates:
+
 ```jinja
 {{ "/foo/bar/main.rs" | path_basename }}   {# -> "main" #}
 {{ "/foo/bar/main.rs" | path_parent }}     {# -> "/foo/bar" #}
@@ -30,19 +38,34 @@ Usage in templates:
 ## Acceptance criteria
 
 - [ ] All 7 filters callable from templates as `{{ value | path_exists }}`, etc.
-- [ ] `path_exists`, `path_is_file`, `path_is_dir` resolve relative paths against `Config::root()`
+- [ ] `path_exists`, `path_is_file`, `path_is_dir` resolve relative paths
+      against `Config::root()`
 - [ ] I/O filters propagate errors as `minijinja::Error` (not panics)
 - [ ] Pure string filters are side-effect-free (no I/O, no Config dependency)
 - [ ] Tests cover absolute/relative/edge-case paths (no extension, root, empty)
 
 ## Rust guidance
 
-- **File layout:** `src/template/engine/path_ops.rs` — `PathOps` struct holding `root: Arc<Path>` (same as `FileOps`), with `pub(super) fn new(root: Arc<Path>) -> Self` and `pub(super) fn register(self, env: &mut Environment<'static>)`.
-- **Registration:** `register` calls `env.add_filter(...)` for each of the 7 filters. Filters needing `root` capture `Arc::clone(&self.root)` in their closure — `Arc` clone is cheap; `Value::from_function` closures must be `Send + Sync + 'static`, so borrowing isn't possible.
-- **I/O filters:** `exists`/`is_file`/`is_dir` call `std::path::Path::exists`/`is_file`/`is_dir`. These methods already swallow the `NotFound` case gracefully (return `false`). Other I/O errors (permission denied) propagate via `minijinja::Error` (`ErrorKind::InvalidOperation`).
-- **String filters:** `filename`/`basename`/`extension`/`parent` are pure string transformations via `std::path::Path` methods — no I/O, no `root` dependency. For `path_parent`, `Path::parent` returns `None` for a root path → return empty string or `.` as fallback.
+- **File layout:** `src/template/engine/path_ops.rs` — `PathOps` struct holding
+  `root: Arc<Path>` (same as `FileOps`), with
+  `pub(super) fn new(root: Arc<Path>) -> Self` and
+  `pub(super) fn register(self, env: &mut Environment<'static>)`.
+- **Registration:** `register` calls `env.add_filter(...)` for each of the 7
+  filters. Filters needing `root` capture `Arc::clone(&self.root)` in their
+  closure — `Arc` clone is cheap; `Value::from_function` closures must be
+  `Send + Sync + 'static`, so borrowing isn't possible.
+- **I/O filters:** `exists`/`is_file`/`is_dir` call
+  `std::path::Path::exists`/`is_file`/`is_dir`. These methods already swallow
+  the `NotFound` case gracefully (return `false`). Other I/O errors (permission
+  denied) propagate via `minijinja::Error` (`ErrorKind::InvalidOperation`).
+- **String filters:** `filename`/`basename`/`extension`/`parent` are pure string
+  transformations via `std::path::Path` methods — no I/O, no `root` dependency.
+  For `path_parent`, `Path::parent` returns `None` for a root path → return
+  empty string or `.` as fallback.
 - **No new dependencies.**
-- **Wiring in `engine.rs`:** add `mod path_ops;`, then `PathOps::new(Arc::clone(&root)).register(&mut env);` alongside the existing registrations.
+- **Wiring in `engine.rs`:** add `mod path_ops;`, then
+  `PathOps::new(Arc::clone(&root)).register(&mut env);` alongside the existing
+  registrations.
 
 ## Implementation notes
 
@@ -134,16 +157,15 @@ current, corrected behavior.
 
 One deliberate deviation from the Rust guidance: the I/O tests
 (`path_exists`/`is_file_path`/`is_dir_path`) do **not** call
-`Path::exists`/`Path::is_file`/`Path::is_dir` directly. Those methods
-silently fold every I/O error — not just `NotFound`, but permission
-failures too — into `false`, which contradicts the acceptance
-criterion that I/O filters "propagate errors as `minijinja::Error`".
-Since there would be no way to satisfy that criterion while calling
-the three convenience methods as written, `inspect()` reads
-`std::fs::metadata` directly instead: `NotFound` still answers
-`false`, but any other error (e.g. permission denied) propagates. A
-regression test (`io_errors::propagates_a_permission_error_instead_of_reporting_false`)
-covers this by revoking permissions on a temp directory.
+`Path::exists`/`Path::is_file`/`Path::is_dir` directly. Those methods silently
+fold every I/O error — not just `NotFound`, but permission failures too — into
+`false`, which contradicts the acceptance criterion that I/O filters "propagate
+errors as `minijinja::Error`". Since there would be no way to satisfy that
+criterion while calling the three convenience methods as written, `inspect()`
+reads `std::fs::metadata` directly instead: `NotFound` still answers `false`,
+but any other error (e.g. permission denied) propagates. A regression test
+(`io_errors::propagates_a_permission_error_instead_of_reporting_false`) covers
+this by revoking permissions on a temp directory.
 
 An absolute `path` argument is used as-is (not confined/rejected like
 `file.include()`'s `path`) — these checks only stat the filesystem,
@@ -156,22 +178,20 @@ guard against.
 documents status only, per the "checkboxes are left as originally
 written" convention.)
 
-- **SUPERSEDED, not literally MET** — "All 7 filters callable from
-  templates as `{{ value | path_exists }}`, etc." Taken literally,
-  this is **unfulfilled**: `path_exists`/`is_file_path`/`is_dir_path`
-  are *not* callable via `|` — they're minijinja tests, callable via
-  `is`/`is not` (`{{ value is path_exists }}`,
-  `{% if path is is_file_path %}`), per the explicit, approved "Spec
-  correction" above. All 7 *are* registered and callable — 3 as tests,
-  4 as filters — in `PathOps::register`
+- **SUPERSEDED, not literally MET** — "All 7 filters callable from templates as
+  `{{ value | path_exists }}`, etc." Taken literally, this is **unfulfilled**:
+  `path_exists`/`is_file_path`/`is_dir_path` are *not* callable via `|` —
+  they're minijinja tests, callable via `is`/`is not`
+  (`{{ value is path_exists }}`, `{% if path is is_file_path %}`), per the
+  explicit, approved "Spec correction" above. All 7 *are* registered and
+  callable — 3 as tests, 4 as filters — in `PathOps::register`
   (`src/template/engine/path_ops.rs`), wired into `TemplateEngine::new`
   (`src/template/engine.rs`). End-to-end regression test
   `engine.rs::tests::render::path_tests_and_filters_are_registered_and_resolve_against_root`
-  renders all 7 through the real `TemplateEngine`, not just the
-  isolated `PathOps` unit tests. If "MET" requires the literal `|`
-  syntax for all 7 as originally specified, this criterion is not and
-  cannot be met without reverting the (explicitly requested,
-  source-verified) test/filter split.
+  renders all 7 through the real `TemplateEngine`, not just the isolated
+  `PathOps` unit tests. If "MET" requires the literal `|` syntax for all 7 as
+  originally specified, this criterion is not and cannot be met without
+  reverting the (explicitly requested, source-verified) test/filter split.
 - **MET** — `path_exists`/`is_file_path`/`is_dir_path` resolve
   relative paths against `Config::root()`: `resolve()` joins a
   relative `path` onto `root`; `TemplateEngine::new` passes
@@ -180,8 +200,8 @@ written" convention.)
   call site, already threading `root` since issue 05). Tested in
   `path_ops.rs::tests::path_exists`/`is_file_path`/`is_dir_path`
   (relative, absolute, and root-itself cases).
-- **MET** — I/O checks propagate errors as `minijinja::Error`, not
-  panics: see the deviation note above. Tested in
+- **MET** — I/O checks propagate errors as `minijinja::Error`, not panics: see
+  the deviation note above. Tested in
   `path_ops.rs::tests::io_errors::propagates_a_permission_error_instead_of_reporting_false`.
 - **MET** — Pure string filters (`path_filename`/`path_basename`/
   `path_extension`/`path_parent`) are side-effect-free: each is a

@@ -1,25 +1,32 @@
 # Research: Schema- & File-Class-Aware Language Intelligence
 
-> Consolidated research for [ticket 20](../issues/20-schema-and-fileclass-intelligence.md).
+> Consolidated research for
+> [ticket 20](../issues/20-schema-and-fileclass-intelligence.md).
 >
-> **Sources:** Five parallel research passes (crate ecosystem, LSP mechanism survey, performance best practices, codebase analysis, PKM plugin precedents) plus existing ticket-08 research and all relevant tool digests.
+> **Sources:** Five parallel research passes (crate ecosystem, LSP mechanism
+> survey, performance best practices, codebase analysis, PKM plugin precedents)
+> plus existing ticket-08 research and all relevant tool digests.
 
 ---
 
 ## Table of Contents
 
-- [Quick Reference](#quick-reference) — one-paragraph summary of each finding area
-- [Part I: Landscape](#part-i-landscape) — what exists, what doesn't, what's novel
+- [Quick Reference](#quick-reference) — one-paragraph summary of each finding
+  area
+- [Part I: Landscape](#part-i-landscape) — what exists, what doesn't, what's
+  novel
   - [1.1 The Gap](#11-the-gap-what-doesnt-exist-yet)
   - [1.2 Precedent Map](#12-precedent-map-what-each-system-does-and-doesnt)
-- [Part II: Codebase Grounding](#part-ii-codebase-grounding) — what Traces already has
+- [Part II: Codebase Grounding](#part-ii-codebase-grounding) — what Traces
+  already has
   - [2.1 Schema System](#21-schema-system-srcschema)
   - [2.2 File-Class Binding](#22-file-class-binding)
   - [2.3 Note/Frontmatter Parsing](#23-notefrontmatter-parsing)
   - [2.4 Type Mapping](#24-type-mapping-schemafieldtype--notefieldvalue)
   - [2.5 Existing Diagnostic Pattern](#25-existing-diagnostic-pattern)
   - [2.6 Identified Gaps](#26-identified-gaps)
-- [Part III: LSP Mechanism Survey](#part-iii-lsp-mechanism-survey) — how existing tools solve each sub-problem
+- [Part III: LSP Mechanism Survey](#part-iii-lsp-mechanism-survey) — how
+  existing tools solve each sub-problem
   - [3.1 Schema Association](#31-schema-association)
   - [3.2 Validation → Diagnostics Pipeline](#32-validation--diagnostics-pipeline)
   - [3.3 Completion Scoping](#33-completion-scoping)
@@ -80,15 +87,24 @@
 
 ### 1.1 The Gap: What Doesn't Exist Yet
 
-No existing Markdown LSP validates frontmatter against user-defined schemas. The five closest systems each cover a different slice of the problem:
+No existing Markdown LSP validates frontmatter against user-defined schemas. The
+five closest systems each cover a different slice of the problem:
 
-- **Metadata Menu** — field-value completion by `fileClass` type. No diagnostics, no hover, no go-to-definition. Modal UI only.
-- **yaml-language-server** — full JSON Schema validation of YAML. No Markdown awareness, no PKM concepts.
-- **schematter** — validates Markdown frontmatter (JSON Schema) + body structure. CLI only, not LSP.
-- **marksman / markdown-oxide** — link/tag intelligence. Zero schema validation, zero field-type intelligence.
-- **rumdl** — frontmatter structural linting (blank lines, syntax). No semantic understanding of field content.
+- **Metadata Menu** — field-value completion by `fileClass` type. No
+  diagnostics, no hover, no go-to-definition. Modal UI only.
+- **yaml-language-server** — full JSON Schema validation of YAML. No Markdown
+  awareness, no PKM concepts.
+- **schematter** — validates Markdown frontmatter (JSON Schema) + body
+  structure. CLI only, not LSP.
+- **marksman / markdown-oxide** — link/tag intelligence. Zero schema validation,
+  zero field-type intelligence.
+- **rumdl** — frontmatter structural linting (blank lines, syntax). No semantic
+  understanding of field content.
 
-**Conclusion:** Traces would be the first system to bring hover/diagnostics/definition-grade intelligence to schema-bound Markdown frontmatter. This is genuinely novel territory — no existing LSP-shaped pattern to port, only design lessons to adapt.
+**Conclusion:** Traces would be the first system to bring
+hover/diagnostics/definition-grade intelligence to schema-bound Markdown
+frontmatter. This is genuinely novel territory — no existing LSP-shaped pattern
+to port, only design lessons to adapt.
 
 ### 1.2 Precedent Map: What Each System Does and Doesn't
 
@@ -149,7 +165,8 @@ SchemaSelectFieldEntry::label() -> Option<&str>
 ```
 
 **Resolution pipeline:**
-```
+
+```text
 schemas/*.toml
   → read_raw_schemas()
   → SchemaBuilder::new(&raw, &field_context).build()
@@ -160,7 +177,8 @@ schemas/*.toml
   → IndexMap<SchemaName, Arc<Schema>>
 ```
 
-Field `$ref` targets resolved to Global + `extends` ancestors. Inheritance is first-listed-wins.
+Field `$ref` targets resolved to Global + `extends` ancestors. Inheritance is
+first-listed-wins.
 
 ### 2.2 File-Class Binding
 
@@ -171,11 +189,14 @@ Field `$ref` targets resolved to Global + `extends` ancestors. Inheritance is fi
 | `FileClassExpander for SchemaService` | `src/file_class_expander.rs` | The sole bridge between schema and query modules |
 
 **Expansion modes:**
+
 - `ClassExpansionMode::Exact` — `@thing` → `{"thing"}`
 - `ClassExpansionMode::Children` — `@thing+` → `{"thing", "book"}`
-- `ClassExpansionMode::Descendants` — `@thing*` → `{"thing", "book", "sci_fi", ...}`
+- `ClassExpansionMode::Descendants` — `@thing*` →
+  `{"thing", "book", "sci_fi", ...}`
 
-**Gap:** Unknown class values are only warned at query-time (`tracing::warn!`), never at note-write time.
+**Gap:** Unknown class values are only warned at query-time (`tracing::warn!`),
+never at note-write time.
 
 ### 2.3 Note/Frontmatter Parsing
 
@@ -187,7 +208,9 @@ Field `$ref` targets resolved to Global + `extends` ancestors. Inheritance is fi
 | `FieldKey` | `src/field.rs:285` | Canonicalized field key (case-folded, trimmed) |
 
 **Field access:**
-- `Note::fields()` → `(&FieldKey, &NoteFieldValue)` — frontmatter first, then inline (deduped)
+
+- `Note::fields()` → `(&FieldKey, &NoteFieldValue)` — frontmatter first, then
+  inline (deduped)
 - `Note::frontmatter()` → `Option<&Frontmatter>`
 - `Frontmatter::get(key)` → `Option<&NoteFieldValue>`
 
@@ -204,7 +227,8 @@ Field `$ref` targets resolved to Global + `extends` ancestors. Inheritance is fi
 
 ### 2.5 Existing Diagnostic Pattern
 
-`QuerySyntaxError` (`src/query/error.rs:106`) is the canonical span-aware diagnostic:
+`QuerySyntaxError` (`src/query/error.rs:106`) is the canonical span-aware
+diagnostic:
 
 ```rust
 #[derive(Diagnostic, Error)]
@@ -220,7 +244,8 @@ pub struct QuerySyntaxError {
 }
 ```
 
-Uses `miette::SourceSpan`, `#[source_code]`, `#[label]` for rich diagnostics. **This is the pattern to follow for schema-validation diagnostics.**
+Uses `miette::SourceSpan`, `#[source_code]`, `#[label]` for rich diagnostics.
+**This is the pattern to follow for schema-validation diagnostics.**
 
 ### 2.6 Identified Gaps
 
@@ -247,13 +272,15 @@ How does the server know which schema applies to which document?
 | SchemaStore catalog | yaml-language-server | Auto-match by filename patterns | Future: centralized schema catalog |
 | Custom provider API | json-language-server | Dynamic registration | Overkill for current needs |
 
-**For Traces:** Schema binding is already content-based — the `class` frontmatter value determines the schema. No glob, directive, or catalog needed. This is simpler than the general case.
+**For Traces:** Schema binding is already content-based — the `class`
+frontmatter value determines the schema. No glob, directive, or catalog needed.
+This is simpler than the general case.
 
 ### 3.2 Validation → Diagnostics Pipeline
 
 All tools follow the same four-step pipeline:
 
-```
+```text
 Schema validator
   → errors with instance paths (e.g., "/fields/status/type")
   → map instance paths to AST node positions (byte offset / line-column)
@@ -275,7 +302,7 @@ Schema validator
 
 The universal pattern across all schema-aware LSPs:
 
-```
+```text
 1. Parse document to AST
 2. Find node at cursor position
 3. Walk schema tree → find matching sub-schema for that node
@@ -330,7 +357,10 @@ The universal pattern across all schema-aware LSPs:
 | `jsonschema` | 0.53.0 | No | JSON Pointer | No | For JSON Schema — Traces schemas are TOML |
 | **Custom validator** | — | Yes (via noyalib) | Byte ranges | — | **Recommended:** direct validation of `NoteFieldValue` against `SchemaFieldType` |
 
-**Why custom, not `garde`/`validator`:** The validation logic for 6 field types is ~10-30 lines each. A span-mapping wrapper around `garde` would be more complexity than writing the validation directly. The `QuerySyntaxError` pattern provides the diagnostic structure.
+**Why custom, not `garde`/`validator`:** The validation logic for 6 field types
+is ~10-30 lines each. A span-mapping wrapper around `garde` would be more
+complexity than writing the validation directly. The `QuerySyntaxError` pattern
+provides the diagnostic structure.
 
 ### 4.2 TOML Parsing with Spans
 
@@ -341,7 +371,9 @@ The universal pattern across all schema-aware LSPs:
 | **`toml-span`** | 0.7.1 | **Native `Span { start, end }`** | No (custom Deserialize) | No serde, no serialization, no datetime yet | **Best for schema definitions** — TOML equivalent of `noyalib` |
 | **`noyalib`** | (already chosen) | `Spanned<T>` | Drop-in | Already in use for YAML frontmatter (ticket 19) | Frontmatter parsing |
 
-**Recommendation:** Use existing `toml` crate for schema definition files (load-once, flat structures). Keep `toml-span` in reserve if complex inheritance structures break `toml::Spanned<T>`.
+**Recommendation:** Use existing `toml` crate for schema definition files
+(load-once, flat structures). Keep `toml-span` in reserve if complex inheritance
+structures break `toml::Spanned<T>`.
 
 ### 4.3 Field-Specific Validation
 
@@ -356,7 +388,8 @@ The universal pattern across all schema-aware LSPs:
 
 ### 4.4 Completion Infrastructure
 
-No additional crates needed. `lsp-types::CompletionItem` + `tower-lsp-server::LanguageServer::completion` provide the full pipeline.
+No additional crates needed. `lsp-types::CompletionItem` +
+`tower-lsp-server::LanguageServer::completion` provide the full pipeline.
 
 Key `CompletionItem` fields for schema intelligence:
 
@@ -382,9 +415,13 @@ Key `CompletionItem` fields for schema intelligence:
 | **On open + debounced change + save** | **Open, 300ms after edit, save** | **Low impact, fast feedback** | **Balanced** | **Recommended** |
 | On demand (user triggers) | Explicit request | Zero background cost | User must request | Future option |
 
-**Key insight:** Parsing the full document is cheap (< 1ms via pulldown-cmark). Only the validation step (comparing frontmatter against schema) needs debouncing. On `didChange`, always re-parse for completions/gotodef (cheap), but debounce the validation+diagnostics path.
+**Key insight:** Parsing the full document is cheap (< 1ms via pulldown-cmark).
+Only the validation step (comparing frontmatter against schema) needs
+debouncing. On `didChange`, always re-parse for completions/gotodef (cheap), but
+debounce the validation+diagnostics path.
 
 **Implementation sketch:**
+
 ```rust
 fn did_change(&self, params: DidChangeTextDocumentParams) {
     let text = params.content_changes.last().unwrap().text.clone();
@@ -400,9 +437,10 @@ fn did_change(&self, params: DidChangeTextDocumentParams) {
 
 ### 5.2 Schema Change Cascade
 
-When a schema file changes (field renamed, required field added), many notes may become invalid:
+When a schema file changes (field renamed, required field added), many notes may
+become invalid:
 
-```
+```text
 Schema file changes
   → re-parse schema, swap Arc<CompiledSchema>
   → DON'T validate all 500 notes immediately (would freeze the server)
@@ -411,7 +449,9 @@ Schema file changes
   → background sweep: validate remaining in batches (50 at a time on rayon pool)
 ```
 
-**Precedent:** rust-analyzer's Salsa marks dependent queries as "maybe stale" — recomputed only when requested. TypeScript does the same: after config change, marks project as "needs recheck."
+**Precedent:** rust-analyzer's Salsa marks dependent queries as "maybe stale" —
+recomputed only when requested. TypeScript does the same: after config change,
+marks project as "needs recheck."
 
 ### 5.3 Diagnostic Debouncing
 
@@ -431,9 +471,11 @@ fn on_edit() {
 }
 ```
 
-Collapses bursts of edits into a single diagnostics run. Only the task whose generation is still current after the delay actually runs.
+Collapses bursts of edits into a single diagnostics run. Only the task whose
+generation is still current after the delay actually runs.
 
-**Adopters:** Markdown Oxide (300ms), rumdl (100ms), ELPS LSP (300ms), Vale LSP (300ms).
+**Adopters:** Markdown Oxide (300ms), rumdl (100ms), ELPS LSP (300ms), Vale LSP
+(300ms).
 
 ### 5.4 Performance Targets
 
@@ -467,40 +509,57 @@ Collapses bursts of edits into a single diagnostics run. Only the task whose gen
 
 ### 6.1 Metadata Menu
 
-> Source: `docs/digests/obsidian_mdelobelle-metadatamenu-digest.txt`, `research/08-dataview-templater-metadatamenu-parity.md`
+> Source: `docs/digests/obsidian_mdelobelle-metadatamenu-digest.txt`,
+> `research/08-dataview-templater-metadatamenu-parity.md`
 
 **The closest structural precedent for ticket 20.**
 
-- `ValueSuggest` (extends `EditorSuggest`) triggers inside frontmatter fields, offering field-value completion scoped by the note's `fileClass` type declaration
-- `fileClass` inheritance mirrors Traces' Schema module (Kahn's-topo-sort `extends` resolution)
-- Field types: `Select`, `Text`, `Date`, `Checkbox`, `Number`, `Links`, `Media`, `Metadata`, `Formula`, `Canvas`, `Canvas Group` — broader than Traces' current set
-- **No inline validation squiggles** — validates via modals and settings-menu UI, never live in-editor diagnostics
-- **No LSP precedent** — all Obsidian plugins use `EditorSuggest` for completion popups, never diagnostics/hover/definition
+- `ValueSuggest` (extends `EditorSuggest`) triggers inside frontmatter fields,
+  offering field-value completion scoped by the note's `fileClass` type
+  declaration
+- `fileClass` inheritance mirrors Traces' Schema module (Kahn's-topo-sort
+  `extends` resolution)
+- Field types: `Select`, `Text`, `Date`, `Checkbox`, `Number`, `Links`, `Media`,
+  `Metadata`, `Formula`, `Canvas`, `Canvas Group` — broader than Traces' current
+  set
+- **No inline validation squiggles** — validates via modals and settings-menu
+  UI, never live in-editor diagnostics
+- **No LSP precedent** — all Obsidian plugins use `EditorSuggest` for completion
+  popups, never diagnostics/hover/definition
 
 ### 6.2 Dataview
 
 > Source: `docs/digests/obsidian_blacksmithgu-obsidian-dataview-digest.txt`
 
-- DQL grammar: `SOURCE`/`WHERE`/`SORT`/`GROUP BY`/`FLATTEN` — structurally comparable to Traces' Query grammar
-- No DQL autocomplete, no inline error diagnostics for malformed `WHERE` clauses — errors are execution-time only
-- Traces' Query DSL already has `miette`-based span-aware syntax errors that go further than Dataview
-- **Relevant for ticket 20:** Dataview accepts extra fields silently — relevant precedent for severity calibration of "unknown field" diagnostics
+- DQL grammar: `SOURCE`/`WHERE`/`SORT`/`GROUP BY`/`FLATTEN` — structurally
+  comparable to Traces' Query grammar
+- No DQL autocomplete, no inline error diagnostics for malformed `WHERE` clauses
+  — errors are execution-time only
+- Traces' Query DSL already has `miette`-based span-aware syntax errors that go
+  further than Dataview
+- **Relevant for ticket 20:** Dataview accepts extra fields silently — relevant
+  precedent for severity calibration of "unknown field" diagnostics
 
 ### 6.3 Templater
 
 > Source: `docs/digests/obsidian_silentmargaret-templater-digest.txt`
 
-- `Autocomplete` class extends `EditorSuggest`, triggered by `tp\.(?<module>[a-z]*)?(\.(?<fn>[a-zA-Z_.]*)?)?$` regex
-- Directly analogous to what ticket 22 (template-language intelligence) needs for `ui.`/`file.`/`date.`/`query.`/`tasks.`/`schema.` namespaces
-- **No LSP precedent** for hover-on-function or pre-execution "undefined variable" diagnostics
+- `Autocomplete` class extends `EditorSuggest`, triggered by
+  `tp\.(?<module>[a-z]*)?(\.(?<fn>[a-zA-Z_.]*)?)?$` regex
+- Directly analogous to what ticket 22 (template-language intelligence) needs
+  for `ui.`/`file.`/`date.`/`query.`/`tasks.`/`schema.` namespaces
+- **No LSP precedent** for hover-on-function or pre-execution "undefined
+  variable" diagnostics
 
 ### 6.4 obsidian-tasks
 
 > Source: `docs/digests/obsidian-obsidian-tasks-digest.txt`
 
 - `EditorSuggestorPopup` offers attribute-completion while typing task lines
-- Supports both emoji-shorthand (`📅`, `🔁`) and Dataview-bracket (`[due:: ...]`) via pluggable `TaskSerializer` implementations
-- **Relevant for ticket 23:** Confirms Traces' existing emoji-marker date-shorthand support follows an established dual-format convention
+- Supports both emoji-shorthand (`📅`, `🔁`) and Dataview-bracket
+  (`[due:: ...]`) via pluggable `TaskSerializer` implementations
+- **Relevant for ticket 23:** Confirms Traces' existing emoji-marker
+  date-shorthand support follows an established dual-format convention
 
 ### 6.5 schematter
 
@@ -508,17 +567,29 @@ Collapses bursts of edits into a single diagnostics run. Only the task whose gen
 
 The closest existing work to full PKM document validation:
 
-- **Dual validation:** frontmatter (JSON Schema) + body structure (custom schema with sections, blocks, budgets)
-- **Violation reporting:** breadcrumb (document path) + schemaPath (JSON Pointer) + keyword + hint
-- **Architecture:** `schematter-validator` (markup-agnostic) + `schematter-lib` (markdown parser + token counter) + `schematter` (CLI)
-- **Not integrated as LSP** — CLI only, but the validation model is directly adaptable
-- **Token budgets** (`maxTokens`, `maxDepth`) — novel for PKM where note size matters for context windows
+- **Dual validation:** frontmatter (JSON Schema) + body structure (custom schema
+  with sections, blocks, budgets)
+- **Violation reporting:** breadcrumb (document path) + schemaPath (JSON
+  Pointer) + keyword + hint
+- **Architecture:** `schematter-validator` (markup-agnostic) + `schematter-lib`
+  (markdown parser + token counter) + `schematter` (CLI)
+- **Not integrated as LSP** — CLI only, but the validation model is directly
+  adaptable
+- **Token budgets** (`maxTokens`, `maxDepth`) — novel for PKM where note size
+  matters for context windows
 
 ### 6.6 Cross-Plugin Insight
 
-**Consistent finding across all four Obsidian plugins:** Rich completion-trigger-detection precedent, zero diagnostics/hover/definition precedent.
+**Consistent finding across all four Obsidian plugins:** Rich
+completion-trigger-detection precedent, zero diagnostics/hover/definition
+precedent.
 
-Traces would be the **first** system to bring hover/diagnostics/definition-grade intelligence to Dataview-, Templater-, and Metadata-Menu-shaped languages. This is consistent with the destination's goal of going *beyond* the Obsidian-plugin ecosystem, but it means there's more genuine design work (not just porting) required in tickets 20-22 than in the wikilink/tag tickets (15/16), where Markdown Oxide and Marksman already provide real LSP-shaped precedent.
+Traces would be the **first** system to bring hover/diagnostics/definition-grade
+intelligence to Dataview-, Templater-, and Metadata-Menu-shaped languages. This
+is consistent with the destination's goal of going *beyond* the Obsidian-plugin
+ecosystem, but it means there's more genuine design work (not just porting)
+required in tickets 20-22 than in the wikilink/tag tickets (15/16), where
+Markdown Oxide and Marksman already provide real LSP-shaped precedent.
 
 ---
 
@@ -536,13 +607,16 @@ Traces would be the **first** system to bring hover/diagnostics/definition-grade
 | **Reusability** | Same function serves LSP diagnostic path AND future `traces validate` CLI command |
 | **Test coverage** | Both LSP and CLI paths exercise the same logic naturally |
 
-**Why shared, not LSP-only:** The validation logic is pure (note + schema → diagnostics). There's no reason to restrict it to the LSP process. A CLI `traces validate` command would use the same logic, and test coverage comes naturally from both paths.
+**Why shared, not LSP-only:** The validation logic is pure (note + schema →
+diagnostics). There's no reason to restrict it to the LSP process. A CLI
+`traces validate` command would use the same logic, and test coverage comes
+naturally from both paths.
 
 ### 7.2 Field-Value Completion
 
 **Context detection algorithm:**
 
-```
+```text
 1. Is cursor in frontmatter? (between --- delimiters)
    → No: defer to other providers (links, tags, templates)
 2. Is cursor on a key or a value? (YAML structure analysis)
@@ -566,7 +640,7 @@ Traces would be the **first** system to bring hover/diagnostics/definition-grade
 
 When hovering over the `class` field value in frontmatter:
 
-```
+```text
 1. Look up SchemaService::get(class_value)
 2. If found:
    → Show resolved (post-inheritance) field list
@@ -589,9 +663,15 @@ When hovering over the `class` field value in frontmatter:
 | Missing required field | **Error** | Required field absent from frontmatter | `"Required field '{name}' is missing"` | Validation |
 
 **Severity calibration rationale:**
-- **Information** for unknown fields: schemas may be intentionally open. A note can have `tags: [...]` even if the schema doesn't declare it. Matches Dataview's behavior where extra fields are silently accepted.
-- **Warning** for unknown class: the note is bound to a schema that doesn't exist. Not an error (the note is still valid Markdown), but the user likely made a typo or hasn't created the schema yet.
-- **Error** for type mismatches and missing required fields: these are concrete validation failures.
+
+- **Information** for unknown fields: schemas may be intentionally open. A note
+  can have `tags: [...]` even if the schema doesn't declare it. Matches
+  Dataview's behavior where extra fields are silently accepted.
+- **Warning** for unknown class: the note is bound to a schema that doesn't
+  exist. Not an error (the note is still valid Markdown), but the user likely
+  made a typo or hasn't created the schema yet.
+- **Error** for type mismatches and missing required fields: these are concrete
+  validation failures.
 
 ### 7.5 Go-to-Definition
 
@@ -731,12 +811,29 @@ default — `Information` severity is already more opinionated.
 
 The five parallel research passes that fed this consolidation:
 
-1. **Crate ecosystem** (`20-crate-research.md`) — `rust-docs-mcp` analysis of validation crates (`garde`, `validator`, `jsonschema`, `schemars`), TOML-with-spans (`toml`, `toml_edit`, `toml-span`), field-specific crates (`jiff`, `globset`), completion infrastructure (`lsp-types`, `tower-lsp-server`), and existing LSP validation patterns (rust-analyzer Salsa).
+1. **Crate ecosystem** (`20-crate-research.md`) — `rust-docs-mcp` analysis of
+   validation crates (`garde`, `validator`, `jsonschema`, `schemars`),
+   TOML-with-spans (`toml`, `toml_edit`, `toml-span`), field-specific crates
+   (`jiff`, `globset`), completion infrastructure (`lsp-types`,
+   `tower-lsp-server`), and existing LSP validation patterns (rust-analyzer
+   Salsa).
 
-2. **LSP mechanism survey** (`20-lsp-schema-mechanisms.md`) — How seven tools handle schema association, validation→diagnostics, completion scoping, hover, and go-to-definition. Includes a synthesis section recommending architecture for a PKM LSP.
+2. **LSP mechanism survey** (`20-lsp-schema-mechanisms.md`) — How seven tools
+   handle schema association, validation→diagnostics, completion scoping, hover,
+   and go-to-definition. Includes a synthesis section recommending architecture
+   for a PKM LSP.
 
-3. **Performance best practices** (`20-lsp-performance-best-practices.md`) — Analysis of rust-analyzer, Biome, TypeScript, and Clangd performance models. Debouncing strategies, schema change cascade patterns, validation timing, and anti-patterns.
+3. **Performance best practices** (`20-lsp-performance-best-practices.md`) —
+   Analysis of rust-analyzer, Biome, TypeScript, and Clangd performance models.
+   Debouncing strategies, schema change cascade patterns, validation timing, and
+   anti-patterns.
 
-4. **Codebase analysis** (`20-codebase-analysis.md`) — Exhaustive review of SchemaService, File-Class binding, Note/Frontmatter parsing, Query system, Index system, Config system, and error/diagnostic patterns. Identifies four critical gaps and ten existing building blocks.
+4. **Codebase analysis** (`20-codebase-analysis.md`) — Exhaustive review of
+   SchemaService, File-Class binding, Note/Frontmatter parsing, Query system,
+   Index system, Config system, and error/diagnostic patterns. Identifies four
+   critical gaps and ten existing building blocks.
 
-5. **PKM plugin precedents** (consolidated from ticket-08 research + digests) — Metadata Menu's `ValueSuggest` and `fileClass` inheritance, Dataview's DQL and field handling, Templater's autocomplete regex, obsidian-tasks' dual-format serializers, schematter's dual-validation model.
+5. **PKM plugin precedents** (consolidated from ticket-08 research + digests) —
+   Metadata Menu's `ValueSuggest` and `fileClass` inheritance, Dataview's DQL
+   and field handling, Templater's autocomplete regex, obsidian-tasks'
+   dual-format serializers, schematter's dual-validation model.

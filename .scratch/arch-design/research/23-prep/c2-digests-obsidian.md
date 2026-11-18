@@ -7,9 +7,9 @@ version corrects. The other claims keep the tag of the first version.
 
 ## Summary
 
-- [V] Dataview collects the inline fields of a key in a `Map<string,
-  Literal[]>`. `finalizeInlineFields` then stores a single occurrence as a
-  scalar and several occurrences as an array
+- [V] Dataview collects the inline fields of a key in a
+  `Map<string, Literal[]>`. `finalizeInlineFields` then stores a single
+  occurrence as a scalar and several occurrences as an array
   (`docs/digests/obsidian_blacksmithgu-obsidian-dataview-src-digest.txt:3719-3731`).
 - [V] Dataview puts the frontmatter fields into the same map with
   `addInlineField(key, value, fields)`. It then calls `mergeFieldGroups(fields,

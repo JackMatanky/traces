@@ -27,22 +27,24 @@ Study (from the digests, see Deliverable):
 - how the in-memory graph is built and updated incrementally.
 - how that graph is kept consistent with files (`diwe` loader/watcher/fs,
   `iwes` base_path and open-buffer handling).
-- how the LSP router/server share state with the core and handle unsaved buffers.
+- how the LSP router/server share state with the core and handle unsaved
+  buffers.
 - how the MCP crate and the CLI call the same use cases (the "app layer").
 - config model and lifecycle (`model/config.rs`, `docs/configuration.md`).
 - markdown/djot readers and writers (lossless round-trip? normalisation?).
 - operations (`liwe/src/operations/*`: extract, inline, rename, attach, squash).
 - error and diagnostic types.
-- test and benchmark strategy (`docs/benchmark.md`, `crates/*/tests`, `benches`).
+- test and benchmark strategy (`docs/benchmark.md`, `crates/*/tests`,
+  `benches`).
 - CHANGELOGs as evidence of design reversals and regrets.
 
 Focus, against decisions already taken or still open in this map:
 
-- The layering principle of [ticket 20](./20-schema-note-typing-and-validation.md):
-  cli, lsp, mcp are thin hosts of `core`. The app layer holds use cases over
-  domain modules. No one-implementor traits cross the seam. Does IWE confirm,
-  contradict or refine it? Where do use cases live and are they functions or a
-  held context?
+- The layering principle of
+  [ticket 20](./20-schema-note-typing-and-validation.md): cli, lsp, mcp are thin
+  hosts of `core`. The app layer holds use cases over domain modules. No
+  one-implementor traits cross the seam. Does IWE confirm, contradict or refine
+  it? Where do use cases live and are they functions or a held context?
 - [Note document model](./23-note-document-model.md): spans, facts, items,
   children of note versus separate entities. Lossless versus lossy, graph versus
   tree, text store separate from structure.

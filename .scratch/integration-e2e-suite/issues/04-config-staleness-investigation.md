@@ -1,16 +1,18 @@
 # 04: Config-change staleness investigation
 
-**What to build:** The config-change staleness question is answered with a traced, deterministic
-reproduction and a recorded intended-behavior decision — before more config-sensitive tests are
-written that might depend on the wrong answer. If the product behavior is wrong, the fix goes to
-a separate spec; this ticket only decides and, where behavior is confirmed correct, adds the
-narrowest regression.
+**What to build:** The config-change staleness question is answered with a
+traced, deterministic reproduction and a recorded intended-behavior decision —
+before more config-sensitive tests are written that might depend on the wrong
+answer. If the product behavior is wrong, the fix goes to a separate spec; this
+ticket only decides and, where behavior is confirmed correct, adds the narrowest
+regression.
 
 **Category:** bug
 
-**Blocked by:** 01 (its possible regression-test AC changes code and must diff against the
-baselines; the repro and reading may start any time — the spec places this investigation at the
-`(gap ∥ investigation)` node, i.e. parallel with the gap-test phase, not before it).
+**Blocked by:** 01 (its possible regression-test AC changes code and must diff
+against the baselines; the repro and reading may start any time — the spec
+places this investigation at the `(gap ∥ investigation)` node, i.e. parallel
+with the gap-test phase, not before it).
 
 **Status:** resolved
 
@@ -18,22 +20,26 @@ baselines; the repro and reading may start any time — the spec places this inv
       `## Comments` in this ticket file: config A → `traces trust` → `traces
       index` → edit `class_field` / tag key / task filter → **re-trust** (mandatory — stale
       config blocks all loads until re-trusted) → query untouched notes
-- [x] Symptom shape documented per selector, recorded under `## Comments`: class-field changes
-      give false negatives (current-field re-check masks stale rows); tag/task-filter changes
-      give false positives (persisted tags trusted; task parsing bakes config at index time)
-- [x] Intended-behavior decision recorded: agent proposes a disposition with evidence, appended
-      under `## Comments` in this ticket file; **the maintainer decides** correct-as-designed vs
-      product defect (this is a judgment call, not an agent verdict)
-- [x] If correct-as-designed: narrowest regression test added — in-crate unit at the
-      refresh/freshness seam by default, one E2E canary only if process composition matters —
-      carrying the executes-vs-asserts note and named defect class. If a defect: no pinning
-      test, separate spec
-- [x] Repro recipe recorded as **forbidden as an assertion** anywhere else (it would pin a
-      potential defect); the staleness recipe is not used by ticket 12
+- [x] Symptom shape documented per selector, recorded under `## Comments`:
+      class-field changes give false negatives (current-field re-check masks
+      stale rows); tag/task-filter changes give false positives (persisted tags
+      trusted; task parsing bakes config at index time)
+- [x] Intended-behavior decision recorded: agent proposes a disposition with
+      evidence, appended under `## Comments` in this ticket file;
+      **the maintainer decides** correct-as-designed vs product defect (this is
+      a judgment call, not an agent verdict)
+- [x] If correct-as-designed: narrowest regression test added — in-crate unit at
+      the refresh/freshness seam by default, one E2E canary only if process
+      composition matters — carrying the executes-vs-asserts note and named
+      defect class. If a defect: no pinning test, separate spec
+- [x] Repro recipe recorded as **forbidden as an assertion** anywhere else (it
+      would pin a potential defect); the staleness recipe is not used by ticket
+      12
 
-**Evidence:** audit §10 potential-defects (RefreshPlan fingerprints only file metadata; class
-dimensions supplied only on the Stale arm); §15 plan item T3b.1 (§14 recommendation item 19).
-**Defect class:** potential product defect (decide, don't fix, don't pin).
+**Evidence:** audit §10 potential-defects (RefreshPlan fingerprints only file
+metadata; class dimensions supplied only on the Stale arm); §15 plan item T3b.1
+(§14 recommendation item 19). **Defect class:** potential product defect
+(decide, don't fix, don't pin).
 
 ## Comments
 
@@ -121,17 +127,17 @@ re-trust warns when a persisted index exists; (b) re-trust triggers a rebuild;
 
 ### Maintainer ruling (2026-10-09)
 
-**Correct-as-designed.** The maintainer accepted the proposed disposition:
-no product change; the healing contract stands (`traces index` rebuilds
+**Correct-as-designed.** The maintainer accepted the proposed disposition: no
+product change; the healing contract stands (`traces index` rebuilds
 selector-derived rows; re-trust only clears the load block). The narrowest
 regression was added in the ticket-04 worktree, in-crate at the
 refresh/freshness seam:
 `index::service::tests::class_field::fresh_refresh_serves_persisted_class_axes_unchanged_when_class_field_config_changes`
-— it pins the Fresh arm's metadata-scoped freshness only (persisted class
-axes served unchanged, zero rows re-derived, empty `RefreshReport` when only
+— it pins the Fresh arm's metadata-scoped freshness only (persisted class axes
+served unchanged, zero rows re-derived, empty `RefreshReport` when only
 `class_field` differs) and never the stale-row symptom. No separate spec
-required; the residual-risk mitigations above remain recorded for future
-product consideration.
+required; the residual-risk mitigations above remain recorded for future product
+consideration.
 
 ### Repro recipe is forbidden as an assertion
 

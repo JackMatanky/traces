@@ -23,11 +23,12 @@ incrementality and fingerprinting. Record which guarantees those changes would
 stress (feeds ticket 10).
 
 **Deliverable**: candidate-guarantee inventory in
-`.scratch/bdd-strategy/research/03-index-note.md`, same entry format and citation
-convention as ticket 01. Distinguish persistence-level guarantees (durability,
-schema evolution, refresh-state transitions) from parsing-level guarantees (what
-a note's AST must contain for a given markdown). Flag behaviors guaranteed only
-by accident of redb/logos internals (refactor-hostile). Max ~400 lines.
+`.scratch/bdd-strategy/research/03-index-note.md`, same entry format and
+citation convention as ticket 01. Distinguish persistence-level guarantees
+(durability, schema evolution, refresh-state transitions) from parsing-level
+guarantees (what a note's AST must contain for a given markdown). Flag behaviors
+guaranteed only by accident of redb/logos internals (refactor-hostile). Max ~400
+lines.
 
 ## Answer
 

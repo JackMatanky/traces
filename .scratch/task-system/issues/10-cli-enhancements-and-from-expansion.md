@@ -46,37 +46,24 @@ direct Markdown file paths.
 
 ## Key Interfaces and Models
 
-- **Output Fidelity & Marker Preservation:**
-  Add list accessors to [`QueryRow`](crate::query::QueryRow) in
-  `src/query/results.rs`:
-  pub fn status_symbol(&self) -> Option<TaskStatusSymbol> {
-      self.list_item()
-          .and_then(|item| item.kind().as_task())
-          .map(|task| task.status().symbol())
-  }
+- **Output Fidelity & Marker Preservation:** Add list accessors to
+  [`QueryRow`](crate::query::QueryRow) in `src/query/results.rs`: pub fn
+  status_symbol(&self) -> Option<TaskStatusSymbol> { self.list_item()
+  .and_then(|item| item.kind().as_task()) .map(|task| task.status().symbol()) }
 
-  /// Returns 0-indexed list item depth, or 0 for non-list rows.
-  #[inline]
-  #[must_use]
-  pub fn depth(&self) -> u8 {
-      self.list_item().map_or(0, ListItem::depth)
-  }
+  /// Returns 0-indexed list item depth, or 0 for non-list
+  rows. #[inline] #[must_use] pub fn depth(&self) -> u8 {
+  self.list_item().map_or(0, ListItem::depth) }
 
-  /// Returns 1-indexed source line number, or None for non-list rows.
-  #[inline]
-  #[must_use]
-  pub fn line(&self) -> Option<SourceLine> {
-      self.list_item().map(ListItem::line)
-  }
+  /// Returns 1-indexed source line number, or None for non-list
+  rows. #[inline] #[must_use] pub fn line(&self) -> Option<SourceLine> {
+  self.list_item().map(ListItem::line) }
 
-  /// Returns the parent list item's 1-indexed source line number, or None
-  /// if top-level or not a list row.
-  #[inline]
-  #[must_use]
-  pub fn parent(&self) -> Option<SourceLine> {
-      self.list_item().and_then(ListItem::parent)
-  }
-  ```
+  /// Returns the parent list item's 1-indexed source line number, or None ///
+  if top-level or not a list row. #[inline] #[must_use] pub fn parent(&self) ->
+  Option<SourceLine> { self.list_item().and_then(ListItem::parent) }
+
+  ```text
 
   In `src/query/format.rs`, update `TaskPathStyle` to support line coordinates:
 
@@ -89,8 +76,8 @@ direct Markdown file paths.
   }
   ```
 
-  Update `render_task_list` in `src/query/format.rs` to format exact
-  marker character, depth indentation, and coordinate suffixes:
+  Update `render_task_list` in `src/query/format.rs` to format exact marker
+  character, depth indentation, and coordinate suffixes:
 
   ```rust
   let indent = "  ".repeat(usize::from(row.depth()));
@@ -145,7 +132,8 @@ direct Markdown file paths.
   - `--table` renders an ASCII table via `outcome.table(&headers, &columns)`.
   - When passed without `--column`, defaults to:
     - Headers: `["Task", "Status", "Due", "Priority", "File"]`
-    - Columns: `["list.text", "list.status", "list.due", "list.priority", "file.path"]`
+    - Columns:
+      `["list.text", "list.status", "list.due", "list.priority", "file.path"]`
   - Custom `--column <path>` specifies custom columns; headers match columns.
 
 - **Count Flag:**
@@ -154,6 +142,7 @@ direct Markdown file paths.
   `Task::render`, when `self.count` is enabled, returns
   `Ok((format!("{count}\n"), count))` so unit tests can directly assert on
   rendered count output without capturing process stdout.
+
 - **Expanded Source Selectors:**
   In `src/query/grammar/source.rs`:
   - In `SourceGrammar::parse_atom`, normalize leading `./` and `.\\` from path
@@ -162,6 +151,7 @@ direct Markdown file paths.
   In `src/cli/mod.rs:parse_source`:
   - If an unadorned relative path without extension exists on disk as a `.md`
     file under `root`, normalize by appending `.md`.
+
 ## Comments
 
 > *Triage verification report (2026-09-18):*
@@ -170,19 +160,20 @@ direct Markdown file paths.
 >    `Status: done` and merged into `main` at commit `dccc340`. Ticket 10 is
 >    fully unblocked.
 > 2. **Worktree & Branch State:** Ticket 09 is currently implemented in
->    `.worktrees/task-09-template-tasks-namespace` (`feat/task-09-template-tasks-namespace`).
->    Ticket 09 touches template query ops and list rows (`src/template/engine/query.rs`,
->    `src/query/service.rs`). Ticket 10 touches CLI task formatting, CLI args,
->    and source grammar (`src/query/format.rs`, `src/query/results.rs`,
->    `src/cli/task.rs`, `src/cli/mod.rs`, `src/query/grammar/source.rs`). There
->    are no overlapping file edits or merge conflicts between 09 and 10.
+>    `.worktrees/task-09-template-tasks-namespace`
+>    (`feat/task-09-template-tasks-namespace`). Ticket 09 touches template query
+>    ops and list rows (`src/template/engine/query.rs`, `src/query/service.rs`).
+>    Ticket 10 touches CLI task formatting, CLI args, and source grammar
+>    (`src/query/format.rs`, `src/query/results.rs`, `src/cli/task.rs`,
+>    `src/cli/mod.rs`, `src/query/grammar/source.rs`). There are no overlapping
+>    file edits or merge conflicts between 09 and 10.
 > 3. **Spec Alignment:** Verified against `spec.md` User Stories 42-50 and
 >    Implementation Decisions 268-280. All acceptance criteria match spec
 >    mandates.
-> 4. **Sort Order Capabilities:** Verified `SortOrder` and `QueryRow::resolve_ref`
->    already support sorting across all `list.*` fields (`list.due`,
->    `list.priority`, `list.status`, `list.text`, etc.). Wiring `order` through
->    `refresh_task_query` is straightforward.
+> 4. **Sort Order Capabilities:** Verified `SortOrder` and
+>    `QueryRow::resolve_ref` already support sorting across all `list.*` fields
+>    (`list.due`, `list.priority`, `list.status`, `list.text`, etc.). Wiring
+>    `order` through `refresh_task_query` is straightforward.
 
 ## Agent Brief
 
@@ -200,6 +191,7 @@ flags, count-only output, and table view defaults. `--from` does not normalize
 `./` or resolve direct file paths cleanly.
 
 **Desired behavior:**
+
 1. `render_task_list` formats the exact `TaskStatusSymbol` character inside
    `"- [{symbol}] "` and indents by `row.depth() * 2` spaces.
 2. `TaskPathStyle::Coordinates` formats clickable `({path}:{line})` suffix
@@ -215,6 +207,7 @@ flags, count-only output, and table view defaults. `--from` does not normalize
    paths.
 
 **Implementation Steps:**
+
 1. **QueryRow accessors (`src/query/results.rs`):**
    Add `pub fn status_symbol(&self) -> Option<TaskStatusSymbol>`,
    `pub fn depth(&self) -> u8`, `pub fn line(&self) -> Option<SourceLine>`,
@@ -242,5 +235,6 @@ flags, count-only output, and table view defaults. `--from` does not normalize
 Refer to the single Acceptance Criteria checklist at the top of this ticket.
 
 **Out of scope:**
+
 - Machine-readable `--json` and `--plain` flags (deferred to CLI format ticket).
 - Benchmarking sorting or memory footprint (addressed in Issue 12).

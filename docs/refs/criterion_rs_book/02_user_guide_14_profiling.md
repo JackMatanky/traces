@@ -4,12 +4,13 @@ When optimizing code, it's often helpful to profile it to help understand why
 it produces the measured performance characteristics. Criterion.rs has several
 features to assist with profiling benchmarks.
 
-### Note on running benchmark executables directly
+## Note on running benchmark executables directly
 
-Because of how Cargo passes certain command-line flags (see the FAQ for more details) when running
-benchmarks, Criterion.rs benchmark executables expect a `--bench` argument on their command line.
-Cargo adds this automatically, but when running the executables directly (eg. in a profiler) you
-will need to add the `--bench` argument.
+Because of how Cargo passes certain command-line flags (see the FAQ for more
+details) when running benchmarks, Criterion.rs benchmark executables expect a
+`--bench` argument on their command line. Cargo adds this automatically, but
+when running the executables directly (eg. in a profiler) you will need to add
+the `--bench` argument.
 
 ### `--profile-time`
 
@@ -26,12 +27,13 @@ For users of in-process profilers such as Google's `cpuprofiler`, read on.
 
 ### Implementing In-Process Profiling Hooks
 
-For developers who wish to use profiling hooks provided by an existing crate, skip to
-["Enabling In-Process Profiling"](#enabling-in-process-profiling) below.
+For developers who wish to use profiling hooks provided by an existing crate,
+skip to ["Enabling In-Process Profiling"](#enabling-in-process-profiling) below.
 
 Since version 0.3.0, Criterion.rs has supported adding hooks to start and stop
-an in-process profiler such as [cpuprofiler](https://crates.io/crates/cpuprofiler).
-This hook takes the form of a trait, `criterion::profiler::Profiler`.
+an in-process profiler such as
+[cpuprofiler](https://crates.io/crates/cpuprofiler). This hook takes the form of
+a trait, `criterion::profiler::Profiler`.
 
 ```rust
 pub trait Profiler {
@@ -47,9 +49,10 @@ profiling instrumentation affect regular benchmark measurements.
 
 ### Enabling In-Process Profiling
 
-Once you (or an external crate) have defined a profiler hook, using it is relatively easy.
-You will need to override the `Criterion` struct (which defaults to `ExternalProfiler`) by providing your
-own measurement using the `with_profiler` function and overriding the default `Criterion` object
+Once you (or an external crate) have defined a profiler hook, using it is
+relatively easy. You will need to override the `Criterion` struct (which
+defaults to `ExternalProfiler`) by providing your own measurement using the
+`with_profiler` function and overriding the default `Criterion` object
 configuration.
 
 ```rust

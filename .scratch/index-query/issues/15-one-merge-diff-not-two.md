@@ -82,14 +82,12 @@ not reconciliation-algorithm shape).
 
 ## `RefreshCache` gains methods (`IndexBuilder` stops reaching into its fields)
 
-- [x] `RefreshCache` (fields, the `cache` field name on `IndexBuilder`,
-      and `load` constructor already land via ticket 14) gains:
+- [x] `RefreshCache` (fields, the `cache` field name on `IndexBuilder`, and
+      `load` constructor already land via ticket 14) gains:
       ```rust
-      impl<'a> RefreshCache<'a> {
-          /// Diffs `current` against the previous scan.
-          fn diff_bases(&self, current: &[FileBase]) -> (Vec<PathBuf>, Vec<PathBuf>, bool) {
-              delta::diff_bases(current, &self.previous)
-          }
+      impl<'a> RefreshCache<'a> { /// Diffs `current` against the previous scan.
+      fn diff_bases(&self, current: &[FileBase]) -> (Vec<PathBuf>, Vec<PathBuf>,
+      bool) { delta::diff_bases(current, &self.previous) }
 
           /// Reuses `base`'s Note via point lookup when unchanged;
           /// otherwise reparses, then backdates (see below). Returns
@@ -151,12 +149,12 @@ not reconciliation-algorithm shape).
 - [x] Three outcomes for the reparse branch, each returning `(Note, bool)`
       where `bool` is "outlinks changed":
       - Previous Note exists at this path, target sets match →
-        `(new_note, false)` — backdated; the Note's row is still
-        upserted (its content did change), but it does not force an
-        inlink recompute.
+      `(new_note, false)` — backdated; the Note's row is still
+      upserted (its content did change), but it does not force an
+      inlink recompute.
       - Previous Note exists, target sets differ → `(new_note, true)`.
       - No previous Note at this path (a genuinely new file) →
-        `(new_note, true)` — nothing to backdate against, always counts.
+      `(new_note, true)` — nothing to backdate against, always counts.
 - [x] **Backdating's point lookup fails open, never hard-errors the
       refresh.** If loading the previous Note for comparison errors for
       any reason other than "not found" (e.g. a corrupted or
@@ -170,17 +168,14 @@ not reconciliation-algorithm shape).
       the "can we skip the inlink recompute" decision is at stake, never
       correctness of the returned `WorkspaceIndex`.
 - [x] `IndexBuilder::build_with_cache` (renamed from `build_with_reuse`)
-      assembles `stale` starting from `diff_bases`'s `has_deleted_note`,
-      then `|=`s in each reconciled Note's `outlinks_changed`:
+      assembles `stale` starting from `diff_bases`'s `has_deleted_note`, then
+      `|=`s in each reconciled Note's `outlinks_changed`:
       ```rust
-      fn build_with_cache(
-          bases: Vec<FileBase>,
-          root: &Path,
-          cache: RefreshCache<'a>,
-      ) -> Result<WorkspaceIndex, IndexBuilderError> {
-          let (upserted, deleted, mut stale) = cache.diff_bases(&bases);
-          let mut upserted_iter = upserted.iter().peekable();
-          let mut notes = Vec::with_capacity(bases.len());
+      fn build_with_cache( bases: Vec<FileBase>, root: &Path, cache:
+      RefreshCache<'a>, ) -> Result<WorkspaceIndex, IndexBuilderError> { let
+      (upserted, deleted, mut stale) = cache.diff_bases(&bases); let mut
+      upserted_iter = upserted.iter().peekable(); let mut notes =
+      Vec::with_capacity(bases.len());
 
           for base in &bases {
               let is_upserted =
@@ -219,32 +214,30 @@ not reconciliation-algorithm shape).
       once already.
 - [x] Tests, each isolating one signal:
       - A Note's frontmatter/body/tasks change but its outlinks stay
-        identical (same target set) → `refresh()`'s delta has
-        `links_upserted: None` (inlinks reused, not recomputed) — proves
-        backdating actually skips the recompute, not just that it's
-        *possible* to skip it.
+      identical (same target set) → `refresh()`'s delta has
+      `links_upserted: None` (inlinks reused, not recomputed) — proves
+      backdating actually skips the recompute, not just that it's
+      *possible* to skip it.
       - A Note's outlinks change (link added, removed, or retargeted) →
-        `links_upserted`/`links_deleted` reflect it, same as before this
-        ticket.
+      `links_upserted`/`links_deleted` reflect it, same as before this
+      ticket.
       - A Note's outlinks are reordered, or a wikilink's display text
-        changes, with the same *target* set → still backdates (proves
-        the comparison is target-set-based, not raw `Link`/`Vec` order
-        equality).
+      changes, with the same *target* set → still backdates (proves
+      the comparison is target-set-based, not raw `Link`/`Vec` order
+      equality).
       - A brand-new Note (no previous entry at its path) → always
-        contributes to `stale`, never backdated.
+      contributes to `stale`, never backdated.
       - Simulate a corrupted previous-Note row at a changed path (write
-        invalid bytes directly into the `NOTES` table, bypassing normal
-        persist) → `refresh()` still succeeds, with `stale` set (fail-open
-        confirmed, not just assumed from the code).
+      invalid bytes directly into the `NOTES` table, bypassing normal
+      persist) → `refresh()` still succeeds, with `stale` set (fail-open
+      confirmed, not just assumed from the code).
 
 ## `IndexBuilder` becomes a proper builder; scanning moves out
 
 - [x] `IndexBuilder` gains a lifetime parameter threading `RefreshCache`'s:
       ```rust
-      pub(super) struct IndexBuilder<'a> {
-          bases: Vec<FileBase>,
-          cache: Option<Box<RefreshCache<'a>>>,
-      }
+      pub(super) struct IndexBuilder<'a> { bases: Vec<FileBase>, cache:
+      Option<Box<RefreshCache<'a>>>, }
 
       impl<'a> IndexBuilder<'a> {
           pub(super) fn new(bases: Vec<FileBase>) -> Self {
@@ -287,10 +280,8 @@ not reconciliation-algorithm shape).
       drops `mod scan;`.
 - [x] `IndexerService::build`/`refresh` are rewritten to the final shape:
       ```rust
-      pub fn build(&self) -> Result<WorkspaceIndex, IndexError> {
-          let bases = self.scan()?;
-          Ok(builder::IndexBuilder::new(bases).build(&self.root)?)
-      }
+      pub fn build(&self) -> Result<WorkspaceIndex, IndexError> { let bases =
+      self.scan()?; Ok(builder::IndexBuilder::new(bases).build(&self.root)?) }
 
       pub fn refresh(&self) -> Result<WorkspaceIndex, IndexError> {
           let store = IndexStore::open(&self.root)?;
@@ -483,8 +474,10 @@ Implemented on branch `one-merge-diff-not-two` (branched from
 `d4d64f7`, ticket 14's integration commit) in three commits:
 
 - `2891575` — `feat(index): rebuild builder as cache-driven, backdate staleness`
-- `5699c3b` — `docs(index): comprehensive doc revision for crates.io publication`
-- `37cf3b9` — `fix(index): restore diff_files/diff_inlinks as pure functions in delta.rs`
+- `5699c3b` —
+  `docs(index): comprehensive doc revision for crates.io publication`
+- `37cf3b9` —
+  `fix(index): restore diff_files/diff_inlinks as pure functions in delta.rs`
 
 ### Delivered shape
 
@@ -566,9 +559,9 @@ ticket's checklist found six issues in the initial implementation
    delegations once (1) landed.
 3. `service.rs`'s `refresh()` doc comment overclaimed inlink recompute
    conditions (see Delivered shape above).
-4. A stale test comment in `resolves_stale_ambiguous_wikilink_after_unrelated_deletion`
-   still described the pre-backdating "gated on whether anything
-   changed" behavior.
+4. A stale test comment in
+   `resolves_stale_ambiguous_wikilink_after_unrelated_deletion` still described
+   the pre-backdating "gated on whether anything changed" behavior.
 5. `builder.rs`'s `from_scan_produces_sorted_records`/
    `from_scan_parses_markdown_notes` test names referenced the deleted
    `from_scan` API; renamed to `new_produces_sorted_records`/

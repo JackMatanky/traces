@@ -1285,11 +1285,11 @@ The review runs small counterexample models, not the target query engine.
 
 ### Candidate proofs
 
-`9007199254740992` and `9007199254740993` share an f64 encoding [V per Stress29].
-An equality probe can therefore return both while the exact predicate matches one.
-That set is Inexact. Its complement can lose a valid row.
-Exact now means matching-set equality under the pinned row mode and frame.
-Closed lossy bounds prove only a superset.
+`9007199254740992` and `9007199254740993` share an f64 encoding [V per
+Stress29]. An equality probe can therefore return both while the exact predicate
+matches one. That set is Inexact. Its complement can lose a valid row. Exact now
+means matching-set equality under the pinned row mode and frame. Closed lossy
+bounds prove only a superset.
 
 Temporal probes need operator-specific bounds for every eligible temporal kind.
 Point-period membership is not period identity order. Unproved mappings scan.
@@ -1322,10 +1322,10 @@ Task display depth uses active preceding ancestors. Orphans start at zero.
 Do not reorder explicitly sorted rows. Keep source `list.depth` unchanged.
 
 Group labels escape terminal controls and directional formatting controls.
-Ordinary RTL letters and combining marks stay intact.
-Normalize before marking a non-null `(none)` or leading-backslash label.
-Then apply output escaping once. Typed templates retain complete keys.
-Printed Number `5` and String `5` labels can coincide; labels are not serialization.
+Ordinary RTL letters and combining marks stay intact. Normalize before marking a
+non-null `(none)` or leading-backslash label. Then apply output escaping once.
+Typed templates retain complete keys. Printed Number `5` and String `5` labels
+can coincide; labels are not serialization.
 
 Tests must separate terminal safety from Markdown structure. Cover control
 characters, bidi formatting, sentinel collisions, nested keys, scoped notices

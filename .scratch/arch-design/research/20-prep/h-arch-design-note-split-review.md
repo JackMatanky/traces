@@ -1,10 +1,14 @@
 # Arch-Design Review: Note Representation Split, Source Spans, and Schema Validation
 
-A rigorous, full-text architectural review of the arch-design effort for ticket 20 preparation. Evaluates the note document model, source span retention, and schema validation against decisions, research evidence, and live codebase state.
+A rigorous, full-text architectural review of the arch-design effort for ticket
+20 preparation. Evaluates the note document model, source span retention, and
+schema validation against decisions, research evidence, and live codebase state.
 
 - Date: 2026-10-20
-- Target Deliverable: `.scratch/arch-design/research/20-prep/h-arch-design-note-split-review.md`
-- Status: Research input for ticket 20 grilling. Planning only; no code modified.
+- Target Deliverable:
+  `.scratch/arch-design/research/20-prep/h-arch-design-note-split-review.md`
+- Status: Research input for ticket 20 grilling. Planning only; no code
+  modified.
 
 ---
 
@@ -29,29 +33,68 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
 
 ### 1.2 Analysis of Decisions and Leans
 
-1. **Splitting Note Types [OPEN, leaning split]**:
-   Ticket 17 explicitly reopened the prior LSP decision (`.scratch/md-pkm-lsp/issues/20`) that mandated a single shared `Note` AST (`issues/17:45-47` [V]). Ticket 18 further segregated semantic values from editor occurrences by splitting `Link` (root semantic data: target, display, embedded) and `NoteLink` (editor occurrence carrying syntax kind and span), assigning `NoteLink` strictly to the editor-side model (`issues/18:87-91, 484-490` [V]).
-2. **Span Retention Policy [OPEN]**:
-   Ticket 17 ruled that editor features require source positions (`issues/17:43, 67-68` [V]), but whether spans belong in the shared `Note` or a separate transient representation was explicitly deferred to ticket 23 (`issues/17:83-85` [V]).
-3. **Noyalib CST & Frontmatter Spans [DECIDED (REJECTED)]**:
-   Ticket 18 investigated Noyalib 0.0.53/0.0.57 CST (`cst::parse_document_with_config` and `Document::span_at`) and rejected it for runtime value classification (`issues/18:201-224, 467-470` [V]). CST parsing adds +59% CPU overhead per note (2.6x on notes with dates) and path-based span lookup is unsound for dotted keys, tags (`!!str`), block scalars (`|`), and duplicate keys (`issues/18:283-288` [V]). Frontmatter parsing remains direct AST conversion (`issues/18:492-498` [V]).
-4. **Lossless Tree Alternative [LEANING (REJECTED)]**:
-   Research 10 concluded that Roslyn-style green/red trees (`rowan`) carry heavy pointer overhead and cannot be efficiently persisted in redb (`research/10:53, 98-99` [V]). Ticket 23 records this as expected to be rejected (`issues/23:24-25` [V]).
-5. **Infallible Parser [DECIDED (FROZEN)]**:
-   Vault parsing compatibility is frozen (`issues/16:30` [V]). `parse_markdown` never returns `Result` or panics (`src/note/parser.rs:106` [V]; `issues/23:16` [V]).
-6. **Multi-Valued Fields [OPEN, leaning collapse/slice]**:
-   `Note.inline_fields` stores `IndexMap<FieldKey, Box<[NoteFieldValue]>>` (`src/note/model.rs:31` [V]), but query resolution only reads `first()` (`src/query/results.rs:328` [V]). Ticket 16 marks this defect unpreserved (`issues/16:44` [V]); ticket 23 settles element-wise classification and representation (`issues/23:12-13, 43` [V]).
+1. **Splitting Note Types [OPEN, leaning split]**: Ticket 17 explicitly reopened
+   the prior LSP decision (`.scratch/md-pkm-lsp/issues/20`) that mandated a
+   single shared `Note` AST (`issues/17:45-47` [V]). Ticket 18 further
+   segregated semantic values from editor occurrences by splitting `Link` (root
+   semantic data: target, display, embedded) and `NoteLink` (editor occurrence
+   carrying syntax kind and span), assigning `NoteLink` strictly to the
+   editor-side model (`issues/18:87-91, 484-490` [V]).
+2. **Span Retention Policy [OPEN]**: Ticket 17 ruled that editor features
+   require source positions (`issues/17:43, 67-68` [V]), but whether spans
+   belong in the shared `Note` or a separate transient representation was
+   explicitly deferred to ticket 23 (`issues/17:83-85` [V]).
+3. **Noyalib CST & Frontmatter Spans [DECIDED (REJECTED)]**: Ticket 18
+   investigated Noyalib 0.0.53/0.0.57 CST (`cst::parse_document_with_config` and
+   `Document::span_at`) and rejected it for runtime value classification
+   (`issues/18:201-224, 467-470` [V]). CST parsing adds +59% CPU overhead per
+   note (2.6x on notes with dates) and path-based span lookup is unsound for
+   dotted keys, tags (`!!str`), block scalars (`|`), and duplicate keys
+   (`issues/18:283-288` [V]). Frontmatter parsing remains direct AST conversion
+   (`issues/18:492-498` [V]).
+4. **Lossless Tree Alternative [LEANING (REJECTED)]**: Research 10 concluded
+   that Roslyn-style green/red trees (`rowan`) carry heavy pointer overhead and
+   cannot be efficiently persisted in redb (`research/10:53, 98-99` [V]). Ticket
+   23 records this as expected to be rejected (`issues/23:24-25` [V]).
+5. **Infallible Parser [DECIDED (FROZEN)]**: Vault parsing compatibility is
+   frozen (`issues/16:30` [V]). `parse_markdown` never returns `Result` or
+   panics (`src/note/parser.rs:106` [V]; `issues/23:16` [V]).
+6. **Multi-Valued Fields [OPEN, leaning collapse/slice]**: `Note.inline_fields`
+   stores `IndexMap<FieldKey, Box<[NoteFieldValue]>>` (`src/note/model.rs:31`
+   [V]), but query resolution only reads `first()` (`src/query/results.rs:328`
+   [V]). Ticket 16 marks this defect unpreserved (`issues/16:44` [V]); ticket 23
+   settles element-wise classification and representation (`issues/23:12-13, 43`
+   [V]).
 
 ### 1.3 Hidden Coupling: Ticket 20 vs Ticket 23
 
-- **Ticket 23's Mandate** (`issues/23:9-16` [V]): Decides the internal shape of parsed `Note`: byte-span policy; whether list/task items remain children of `Note` or separate entities; duplication of item fields/tags into note collections; multi-valued inline field semantics; per-task status representation (interned symbol vs owned string); single vs dual markdown pass.
+- **Ticket 23's Mandate** (`issues/23:9-16` [V]): Decides the internal shape of
+  parsed `Note`: byte-span policy; whether list/task items remain children of
+  `Note` or separate entities; duplication of item fields/tags into note
+  collections; multi-valued inline field semantics; per-task status
+  representation (interned symbol vs owned string); single vs dual markdown
+  pass.
 - **The Bidirectional Coupling**:
-  - *Coupling 20 -> 23*: Ticket 20 asks whether schemas drive validation and what module owns the validator (`issues/20:11-14` [V]). If ticket 20 specifies a validator `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>` where diagnostics require `ByteSpan` (essential for LSP `Diagnostic.range`, `research/10:59` [V]), it **forces ticket 23** to attach byte spans to the shared `Note` struct. This forecloses ticket 23 from choosing a span-free index model (`NoteFacts`).
-  - *Coupling 23 -> 20*: If ticket 23 runs first and strips spans from `Note` to optimize the index cache, ticket 20 is left unable to generate byte-located diagnostics without re-parsing the file or inventing an uncoordinated sidecar.
+  - *Coupling 20 -> 23*: Ticket 20 asks whether schemas drive validation and
+    what module owns the validator (`issues/20:11-14` [V]). If ticket 20
+    specifies a validator `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`
+    where diagnostics require `ByteSpan` (essential for LSP `Diagnostic.range`,
+    `research/10:59` [V]), it **forces ticket 23** to attach byte spans to the
+    shared `Note` struct. This forecloses ticket 23 from choosing a span-free
+    index model (`NoteFacts`).
+  - *Coupling 23 -> 20*: If ticket 23 runs first and strips spans from `Note` to
+    optimize the index cache, ticket 20 is left unable to generate byte-located
+    diagnostics without re-parsing the file or inventing an uncoordinated
+    sidecar.
 - **Resolution Order**:
-  - Ticket 20 does NOT need to wait on Ticket 23 if Ticket 20 defines the validation interface against an **abstract source-aware target** rather than the concrete index `Note` struct.
-  - Specifically, Ticket 20 decides: (1) validation is advisory, on-demand, and non-gating; (2) validator signature takes an editor-facing document / buffer target with field spans; (3) schema text-override semantics.
-  - Ticket 23 then resolves whether that editor-facing target is a unified `Note` or a separate `NoteDocument` paired with a span-free `NoteFacts`.
+  - Ticket 20 does NOT need to wait on Ticket 23 if Ticket 20 defines the
+    validation interface against an **abstract source-aware target** rather than
+    the concrete index `Note` struct.
+  - Specifically, Ticket 20 decides: (1) validation is advisory, on-demand, and
+    non-gating; (2) validator signature takes an editor-facing document / buffer
+    target with field spans; (3) schema text-override semantics.
+  - Ticket 23 then resolves whether that editor-facing target is a unified
+    `Note` or a separate `NoteDocument` paired with a span-free `NoteFacts`.
 
 ---
 
@@ -59,21 +102,62 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
 
 ### 2.1 Span Coordinate Primitives & LineIndex
 
-- **[V] `ByteSpan` is 8 bytes**: `struct ByteSpan { start: u32, end: u32 }` (`src/position.rs:18-35` [V]; `research/10:52` [V]). It is isomorphic to `ruff_text_size::TextRange`. It replaces 48-byte coordinate structs like `markdown-rs` `unist::Position` (`Point { line, col, offset }` = 24B; `start + end` = 48B; `Option<Position>` = 56B; `research/10:43-45` [V]). `ByteSpan` is **84% smaller** (`research/10:78` [V]). For a 50,000-node vault, storing `Position` wastes 2.4 MB on redundant line/column numbers (`research/10:101` [V]).
-- **[V] `LineIndex` is 4 bytes per line**: Stores `line_starts: Vec<TextSize>` plus an ASCII/UTF-8 flag (`research/10:57` [V]). Line lookups take $O(\log n)$ binary search. LSP UTF-16 character offsets are computed on demand in $O(\text{line\_len})$ (`research/10:58, 79` [V]). Batch indexing pays **zero UTF-16 conversion overhead**.
-- **[V] LineIndex must not be persisted**: `LineIndex` is an ephemeral document utility used during indexing/LSP; storing it in redb would waste space (`research/10:89` [V]).
+- **[V] `ByteSpan` is 8 bytes**: `struct ByteSpan { start: u32, end: u32 }`
+  (`src/position.rs:18-35` [V]; `research/10:52` [V]). It is isomorphic to
+  `ruff_text_size::TextRange`. It replaces 48-byte coordinate structs like
+  `markdown-rs` `unist::Position` (`Point { line, col, offset }` = 24B;
+  `start + end` = 48B; `Option<Position>` = 56B; `research/10:43-45` [V]).
+  `ByteSpan` is **84% smaller** (`research/10:78` [V]). For a 50,000-node vault,
+  storing `Position` wastes 2.4 MB on redundant line/column numbers
+  (`research/10:101` [V]).
+- **[V] `LineIndex` is 4 bytes per line**: Stores `line_starts: Vec<TextSize>`
+  plus an ASCII/UTF-8 flag (`research/10:57` [V]). Line lookups take $O(\log n)$
+  binary search. LSP UTF-16 character offsets are computed on demand in
+  $O(\text{line\_len})$ (`research/10:58, 79` [V]). Batch indexing pays
+  **zero UTF-16 conversion overhead**.
+- **[V] LineIndex must not be persisted**: `LineIndex` is an ephemeral document
+  utility used during indexing/LSP; storing it in redb would waste space
+  (`research/10:89` [V]).
 
 ### 2.2 Parser Execution Overhead
 
-- **[V] pulldown-cmark spans are free**: `Parser::into_offset_iter()` is already called in production (`src/note/parser.rs:109` [V]). In `ParserInner::next_event_range` (`src/parse.rs:2410-2428` [V]; `research/10:48` [V]), pulldown-cmark *already* computes `start..end` for all events. `Parser::next()` simply discards the range (`src/parse.rs:2403` [V]). Keeping `ByteSpan` adds **0.0% parser CPU overhead** (`research/10:48, 87` [V]).
-- **[V] Heading pass wastes 20% to 38% CPU**: `collect_headings` runs a redundant second pulldown-cmark pass solely to strip math syntax (`src/note/parser.rs:118-162` [V]). It accounts for **20.2%** (1 KB note), **26.0%** (5 KB note), and **38.0%** (50-heading note) of total note parse time (`research/11:160-165, 195` [V]). Fusing it saves 20–35% parser CPU.
-- **[V] Noyalib CST cost**: Parsing YAML frontmatter with Noyalib CST adds **+59% parse time** per note, and 2.6x on notes with dates (`issues/19:64-65` [V]; `research/11:227-230` [V]).
+- **[V] pulldown-cmark spans are free**: `Parser::into_offset_iter()` is already
+  called in production (`src/note/parser.rs:109` [V]). In
+  `ParserInner::next_event_range` (`src/parse.rs:2410-2428` [V];
+  `research/10:48` [V]), pulldown-cmark *already* computes `start..end` for all
+  events. `Parser::next()` simply discards the range (`src/parse.rs:2403` [V]).
+  Keeping `ByteSpan` adds **0.0% parser CPU overhead** (`research/10:48, 87`
+  [V]).
+- **[V] Heading pass wastes 20% to 38% CPU**: `collect_headings` runs a
+  redundant second pulldown-cmark pass solely to strip math syntax
+  (`src/note/parser.rs:118-162` [V]). It accounts for **20.2%** (1 KB note),
+  **26.0%** (5 KB note), and **38.0%** (50-heading note) of total note parse
+  time (`research/11:160-165, 195` [V]). Fusing it saves 20–35% parser CPU.
+- **[V] Noyalib CST cost**: Parsing YAML frontmatter with Noyalib CST adds
+  **+59% parse time** per note, and 2.6x on notes with dates (`issues/19:64-65`
+  [V]; `research/11:227-230` [V]).
 
 ### 2.3 Memory Footprint & Deserialization Bottleneck
 
-- **[V] `ListItem` footprint**: Struct size is **160 bytes** (`src/note/lists.rs:41-50` [V]; `research/11:170` [V]). Currently stores `line: SourceLine` (4B) and `parent: Option<SourceLine>` (8B), but discards byte offsets. Each task item embeds `TaskStatus` with owned `name: String` (24B) (`src/task.rs:53` [V]), causing 10,000 heap string allocations ($\ge 234$ KB) in a 10k-task vault (`research/11:181-185` [V]). Interning status symbols shrinks `ListItem` from 160 to ~128 bytes (`research/11:200` [V]).
-- **[V] The 97.3% note deserialization cliff**: On path-set changes at 5,000 notes, total refresh takes 35.17 ms (`research/11:85` [V]). Note deserialization from redb (`store.read_all_notes()`) takes **18.48 ms (97.3% of in-memory work)**, while link re-resolution (`InlinkMap::new`) takes only **0.52 ms (2.7%)** (`research/11:91-95, 106-107` [V]).
-- **[H] Impact of spans on index cache**: Serializing extra span fields into redb's `NOTES` table via `postcard` (`src/index/store.rs:42, 1051` [V]) directly expands record size. In an 18.5 ms deserialization bottleneck, adding 8 bytes per heading, list item, link, and frontmatter value directly regresses vault refresh and query startup.
+- **[V] `ListItem` footprint**: Struct size is **160 bytes**
+  (`src/note/lists.rs:41-50` [V]; `research/11:170` [V]). Currently stores
+  `line: SourceLine` (4B) and `parent: Option<SourceLine>` (8B), but discards
+  byte offsets. Each task item embeds `TaskStatus` with owned `name: String`
+  (24B) (`src/task.rs:53` [V]), causing 10,000 heap string allocations
+  ($\ge 234$ KB) in a 10k-task vault (`research/11:181-185` [V]). Interning
+  status symbols shrinks `ListItem` from 160 to ~128 bytes (`research/11:200`
+  [V]).
+- **[V] The 97.3% note deserialization cliff**: On path-set changes at 5,000
+  notes, total refresh takes 35.17 ms (`research/11:85` [V]). Note
+  deserialization from redb (`store.read_all_notes()`) takes
+  **18.48 ms (97.3% of in-memory work)**, while link re-resolution
+  (`InlinkMap::new`) takes only **0.52 ms (2.7%)** (`research/11:91-95, 106-107`
+  [V]).
+- **[H] Impact of spans on index cache**: Serializing extra span fields into
+  redb's `NOTES` table via `postcard` (`src/index/store.rs:42, 1051` [V])
+  directly expands record size. In an 18.5 ms deserialization bottleneck, adding
+  8 bytes per heading, list item, link, and frontmatter value directly regresses
+  vault refresh and query startup.
 
 ---
 
@@ -96,13 +180,18 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
   ```
 
 - **Existing Line Fields in Code**:
-  - `Heading.line: SourceLine` (`src/note/heading.rs:13` [V]) = `NonZeroU32` (4 bytes).
-  - `ListItem.line: SourceLine` and `ListItem.parent: Option<SourceLine>` (`src/note/lists.rs:45-46` [V]) = 4 bytes and 8 bytes.
-- **Redb Persistence (`src/index/tables.rs:20-80` [V]; `src/index/codec.rs:27-54` [V])**:
+  - `Heading.line: SourceLine` (`src/note/heading.rs:13` [V]) = `NonZeroU32` (4
+    bytes).
+  - `ListItem.line: SourceLine` and `ListItem.parent: Option<SourceLine>`
+    (`src/note/lists.rs:45-46` [V]) = 4 bytes and 8 bytes.
+- **Redb Persistence (`src/index/tables.rs:20-80` [V];
+  `src/index/codec.rs:27-54` [V])**:
   - `FILES`: path `&[u8]` -> serialized `FileMeta` (postcard).
-  - `NOTES`: path `&[u8]` -> serialized `Note` (postcard). **Whole `Note` is serialized!**
+  - `NOTES`: path `&[u8]` -> serialized `Note` (postcard).
+    **Whole `Note` is serialized!**
   - `LINKS`: multimap target path `&[u8]` -> source path `&[u8]`.
-  - Secondary multimap tables: `PATHS_BY_TAG`, `PATHS_BY_FILE_CLASS`, `TAGS_BY_PATH`, `FILE_CLASSES_BY_PATH`.
+  - Secondary multimap tables: `PATHS_BY_TAG`, `PATHS_BY_FILE_CLASS`,
+    `TAGS_BY_PATH`, `FILE_CLASSES_BY_PATH`.
   - `META`: `version` (b"1"), `fingerprint` (raw blake3 bytes).
 
 ### 3.2 Concrete Candidate Shapes Compared
@@ -121,23 +210,38 @@ A rigorous, full-text architectural review of the arch-design effort for ticket 
 ### 3.3 Evaluation of Shapes
 
 - **Shape A (Single Shared `Note` with Spans)**:
-  - *Mechanism*: Replace `SourceLine` on `Heading` (`src/note/heading.rs:13` [V]) and `ListItem` (`src/note/lists.rs:45` [V]) with `ByteSpan` (8B). Add `span: ByteSpan` to `Link` and frontmatter fields.
-  - *Failure Mode*: Pollutes redb index cache with editor byte spans that CLI queries never use. Direct violation of Ousterhout's information hiding: index persistence pays for editor concerns.
-- **Shape B (Dual Representation: `NoteFacts` Index + `NoteDocument` Editor) [RECOMMENDED]**:
-  - *Mechanism*: Single parser engine can emit `NoteDocument` (spans on all syntax occurrences, `NoteLink`, field spans). For batch indexing, `NoteDocument` projects into compact `NoteFacts` (no spans, interned statuses, no display/embed trivia).
-  - *Validator*: `SchemaValidator::validate(&NoteDocument, &Schema) -> Vec<SchemaDiagnostic>`.
+  - *Mechanism*: Replace `SourceLine` on `Heading` (`src/note/heading.rs:13`
+    [V]) and `ListItem` (`src/note/lists.rs:45` [V]) with `ByteSpan` (8B). Add
+    `span: ByteSpan` to `Link` and frontmatter fields.
+  - *Failure Mode*: Pollutes redb index cache with editor byte spans that CLI
+    queries never use. Direct violation of Ousterhout's information hiding:
+    index persistence pays for editor concerns.
+- **Shape B (Dual Representation: `NoteFacts` Index + `NoteDocument` Editor)
+  [RECOMMENDED]**:
+  - *Mechanism*: Single parser engine can emit `NoteDocument` (spans on all
+    syntax occurrences, `NoteLink`, field spans). For batch indexing,
+    `NoteDocument` projects into compact `NoteFacts` (no spans, interned
+    statuses, no display/embed trivia).
+  - *Validator*:
+    `SchemaValidator::validate(&NoteDocument, &Schema) -> Vec<SchemaDiagnostic>`.
   - *Failure Mode*: Two structs to maintain; conversion code required.
 - **Shape C (Lossless CST)**:
-  - *Verdict*: **REJECTED**. Rowan CSTs cannot be efficiently serialized in redb (`research/10:53, 98-99` [V]); Noyalib CST is unsound for YAML scalars (`issues/18:283-288` [V]).
+  - *Verdict*: **REJECTED**. Rowan CSTs cannot be efficiently serialized in redb
+    (`research/10:53, 98-99` [V]); Noyalib CST is unsound for YAML scalars
+    (`issues/18:283-288` [V]).
 - **Shape D (Shared Model + On-Demand Reparse)**:
-  - *Mechanism*: Keep `Note` span-free. Schema validation runs as a text-linter on raw frontmatter string: `validate_frontmatter_str(yaml_str: &str, schema: &Schema)`.
-  - *Failure Mode*: Disconnects validation from parsed note semantics; fails if inline fields also require schema validation.
+  - *Mechanism*: Keep `Note` span-free. Schema validation runs as a text-linter
+    on raw frontmatter string:
+    `validate_frontmatter_str(yaml_str: &str, schema: &Schema)`.
+  - *Failure Mode*: Disconnects validation from parsed note semantics; fails if
+    inline fields also require schema validation.
 
 ---
 
 ## 4. Real Subsystem Topology and Dependency Edges
 
-Verification of `survey/cross-cutting.md:35, 96-124` [V] against live source code:
+Verification of `survey/cross-cutting.md:35, 96-124` [V] against live source
+code:
 
 ```text
 Tier 0-2:  [path, position, hash, tag, temporal, dirtree, strsim, yaml, delimiter, dirs, env_vars]
@@ -170,22 +274,36 @@ Tier 9:     [cli] ──► (composition root: imports all services)
 1. **`src/schema/` -> `src/note/` [ZERO EDGES]**:
    - `src/schema/` has **0 imports of `crate::note`** (`src/schema/*` [V]).
    - `src/schema/` has **0 uses of `NoteFieldValue`** (`src/schema/*` [V]).
-   - `src/schema/` imports only root primitives: `crate::{FieldKey, FieldName, FieldValue}` (`src/field.rs:45, 596` [V]), `crate::BaseNameRef` (`src/file.rs:18` [V]), `crate::{DirTree, DirTreeError}`, `crate::strsim::closest_match`, `crate::path::{PathError, SafeRelativePath}` (`src/schema/builder.rs:30`, `src/schema/service.rs:19`, `src/schema/fields/select.rs:22` [V]).
+   - `src/schema/` imports only root primitives:
+     `crate::{FieldKey, FieldName, FieldValue}` (`src/field.rs:45, 596` [V]),
+     `crate::BaseNameRef` (`src/file.rs:18` [V]),
+     `crate::{DirTree, DirTreeError}`, `crate::strsim::closest_match`,
+     `crate::path::{PathError, SafeRelativePath}` (`src/schema/builder.rs:30`,
+     `src/schema/service.rs:19`, `src/schema/fields/select.rs:22` [V]).
 2. **`src/note/` -> `src/schema/` [ZERO EDGES]**:
    - `src/note/` has **0 imports of `crate::schema`** (`src/note/*` [V]).
-   - `src/note/` imports `crate::field::FieldValueRef` (`src/note/metadata.rs:12, 71` [V]), `crate::config::{FrontmatterConfig, TaskConfig}` (`src/note/parser/input.rs:9` [V]), and temporal/position primitives.
+   - `src/note/` imports `crate::field::FieldValueRef`
+     (`src/note/metadata.rs:12, 71` [V]),
+     `crate::config::{FrontmatterConfig, TaskConfig}`
+     (`src/note/parser/input.rs:9` [V]), and temporal/position primitives.
 3. **`src/field.rs`**:
-   - Imports `Blake3Hasher` and temporal types (`src/field.rs:39` [V]). Zero imports of `note` or `schema`.
+   - Imports `Blake3Hasher` and temporal types (`src/field.rs:39` [V]). Zero
+     imports of `note` or `schema`.
 4. **`src/file_class_expander.rs`**:
-   - Explicit bridge module at Tier 8 (`src/file_class_expander.rs:1-13` [V]): implements `query::FileClassExpander` for `schema::SchemaService`. Neither `query` nor `schema` imports the other.
+   - Explicit bridge module at Tier 8 (`src/file_class_expander.rs:1-13` [V]):
+     implements `query::FileClassExpander` for `schema::SchemaService`. Neither
+     `query` nor `schema` imports the other.
 
 ### 4.2 Architectural Consequence for Ticket 20
 
 - `schema` sits at **Tier 4**; `note` sits at **Tier 5**.
-- `src/schema/` CANNOT validate `Note` directly without creating a Tier 4 -> Tier 5 cyclic inversion.
+- `src/schema/` CANNOT validate `Note` directly without creating a Tier 4 ->
+  Tier 5 cyclic inversion.
 - Therefore, schema validation logic MUST live either:
-  - In a new bridge module/service at **Tier 6+** (e.g. `src/schema_validator/` or `src/validation/`), mirroring `file_class_expander`.
-  - Or inside the consumer at **Tier 8/9** (LSP diagnostics worker or CLI `check` runner).
+  - In a new bridge module/service at **Tier 6+** (e.g. `src/schema_validator/`
+    or `src/validation/`), mirroring `file_class_expander`.
+  - Or inside the consumer at **Tier 8/9** (LSP diagnostics worker or CLI
+    `check` runner).
 
 ---
 
@@ -212,39 +330,78 @@ Tier 9:     [cli] ──► (composition root: imports all services)
 The previous reviewer recommended:
 
 1. Retain a **span-free kernel** as a hedge to protect index performance.
-2. Assert that **spans belong entirely to ticket 23** and should be excluded from ticket 20.
-3. Treat schema validation as a future LSP concern that can be deferred without affecting current design.
+2. Assert that **spans belong entirely to ticket 23** and should be excluded
+   from ticket 20.
+3. Treat schema validation as a future LSP concern that can be deferred without
+   affecting current design.
 
 ### 6.2 Why That Hedge Fails (Adversarial Assessment)
 
-- **Flaw 1: LSP is committed, not speculative**: Ticket 17 explicitly resolved that the LSP is the next committed consumer and that editor features require source-aware capabilities (`issues/17:37-43` [V]). Designing a validator today against a span-free `Note` produces a CLI-only toy that cannot populate LSP `Diagnostic.range` (`research/10:59` [V]).
-- **Flaw 2: The False Dichotomy of Spans**: The hedge assumed that introducing spans meant bloating `Note` and regressing redb deserialization (the 18.48 ms cliff in `research/11:93` [V]). But Ticket 17 reopened the dual-model architecture (`issues/17:45-47` [V]) and Ticket 18 split `Link`/`NoteLink` (`issues/18:484-490` [V]). By separating an editor-shape `NoteDocument` (with `ByteSpan`) from an index-shape `NoteFacts` (span-free), we achieve zero-overhead indexing AND byte-accurate validation.
-- **Flaw 3: Frontmatter Spans Cannot Be Deferred Indefinitely**: Frontmatter is parsed directly from YAML into `NoteFieldValue` (`src/note/metadata.rs:71-72` [V]). Without spans, a diagnostic for `status: "Invalid"` can only point to the whole file. If ticket 20 ignores spans, any validation diagnostic design will be immediately obsolete when editor integration begins.
-- **Flaw 4: Circular Deadlock**: Deferring spans to ticket 23 while trying to decide ticket 20 leaves ticket 20 paralyzed: it cannot specify `validate(&Note, &Schema) -> Vec<Diagnostic>` because it does not know what `Note` provides.
+- **Flaw 1: LSP is committed, not speculative**: Ticket 17 explicitly resolved
+  that the LSP is the next committed consumer and that editor features require
+  source-aware capabilities (`issues/17:37-43` [V]). Designing a validator today
+  against a span-free `Note` produces a CLI-only toy that cannot populate LSP
+  `Diagnostic.range` (`research/10:59` [V]).
+- **Flaw 2: The False Dichotomy of Spans**: The hedge assumed that introducing
+  spans meant bloating `Note` and regressing redb deserialization (the 18.48 ms
+  cliff in `research/11:93` [V]). But Ticket 17 reopened the dual-model
+  architecture (`issues/17:45-47` [V]) and Ticket 18 split `Link`/`NoteLink`
+  (`issues/18:484-490` [V]). By separating an editor-shape `NoteDocument` (with
+  `ByteSpan`) from an index-shape `NoteFacts` (span-free), we achieve
+  zero-overhead indexing AND byte-accurate validation.
+- **Flaw 3: Frontmatter Spans Cannot Be Deferred Indefinitely**: Frontmatter is
+  parsed directly from YAML into `NoteFieldValue` (`src/note/metadata.rs:71-72`
+  [V]). Without spans, a diagnostic for `status: "Invalid"` can only point to
+  the whole file. If ticket 20 ignores spans, any validation diagnostic design
+  will be immediately obsolete when editor integration begins.
+- **Flaw 4: Circular Deadlock**: Deferring spans to ticket 23 while trying to
+  decide ticket 20 leaves ticket 20 paralyzed: it cannot specify
+  `validate(&Note, &Schema) -> Vec<Diagnostic>` because it does not know what
+  `Note` provides.
 
 ### 6.3 Failure Modes Compared
 
 - **Failure Mode of "Validator on Span-Free Note"**:
   - *Short-term*: Clean and simple in ticket 20.
-  - *Long-term*: When LSP is wired up, `validate(&Note)` cannot produce LSP `Range`s. The team is forced to either: (a) re-parse the file with an ad-hoc scanner, (b) bolt on an uncoordinated `spans` sidecar, or (c) rewrite the validator from scratch.
+  - *Long-term*: When LSP is wired up, `validate(&Note)` cannot produce LSP
+    `Range`s. The team is forced to either: (a) re-parse the file with an ad-hoc
+    scanner, (b) bolt on an uncoordinated `spans` sidecar, or (c) rewrite the
+    validator from scratch.
 - **Failure Mode of "Validator on Editor-Shape NoteDocument"**:
-  - *Short-term*: Requires ticket 20 to accept that `Note` will split (or that validation consumes an abstract source target), anticipating ticket 23.
-  - *Long-term*: If ticket 23 unexpectedly rejects the split, the editor validator simply falls back to an on-demand buffer reparse (Shape D, standard in Taplo/rumdl), which still works cleanly and requires zero index cache changes.
+  - *Short-term*: Requires ticket 20 to accept that `Note` will split (or that
+    validation consumes an abstract source target), anticipating ticket 23.
+  - *Long-term*: If ticket 23 unexpectedly rejects the split, the editor
+    validator simply falls back to an on-demand buffer reparse (Shape D,
+    standard in Taplo/rumdl), which still works cleanly and requires zero index
+    cache changes.
 
 ---
 
 ## 7. Not Verified
 
-1. **[H] Exact memory overhead of `ByteSpan` on `NoteDocument`**: While `ByteSpan` is verified at 8 bytes (`src/position.rs:18` [V]), the total in-memory size of a heap-allocated `NoteDocument` retaining spans on every frontmatter key/value was not measured with a Criterion benchmark.
-2. **[H] Single-pass YAML span extraction**: Noyalib 0.0.53's private event scanner was not benchmarked against a custom Logos-based YAML frontmatter scanner for recovering key/value byte spans without the full CST overhead.
-3. **[H] Performance of on-demand buffer validation**: The exact latency of validating an open 500-line markdown buffer against 10 schemas on every keystroke was not micro-benchmarked (inferred to be $<50$ µs based on 9 µs frontmatter parse in `research/11:229` [V]).
+1. **[H] Exact memory overhead of `ByteSpan` on `NoteDocument`**: While
+   `ByteSpan` is verified at 8 bytes (`src/position.rs:18` [V]), the total
+   in-memory size of a heap-allocated `NoteDocument` retaining spans on every
+   frontmatter key/value was not measured with a Criterion benchmark.
+2. **[H] Single-pass YAML span extraction**: Noyalib 0.0.53's private event
+   scanner was not benchmarked against a custom Logos-based YAML frontmatter
+   scanner for recovering key/value byte spans without the full CST overhead.
+3. **[H] Performance of on-demand buffer validation**: The exact latency of
+   validating an open 500-line markdown buffer against 10 schemas on every
+   keystroke was not micro-benchmarked (inferred to be $<50$ µs based on 9 µs
+   frontmatter parse in `research/11:229` [V]).
 
 ---
 
 ## 8. What This Changes for Ticket 20
 
-1. **Decouple Validation from Index Storage [P]**: Schema validation must be strictly **advisory and on-demand** (following `research/03:110-115` [V] Taplo/Metadata Menu precedent). Validation MUST NOT gate indexing or run during `IndexerService::parse_note`. `index.redb` remains an invariant-free facts cache; `.traces/schemas/` remains excluded from `IndexFingerprint`.
-2. **Define Validator Interface on an Abstract Source Target [P]**: Ticket 20 should define the validator signature as:
+1. **Decouple Validation from Index Storage [P]**: Schema validation must be
+   strictly **advisory and on-demand** (following `research/03:110-115` [V]
+   Taplo/Metadata Menu precedent). Validation MUST NOT gate indexing or run
+   during `IndexerService::parse_note`. `index.redb` remains an invariant-free
+   facts cache; `.traces/schemas/` remains excluded from `IndexFingerprint`.
+2. **Define Validator Interface on an Abstract Source Target [P]**: Ticket 20
+   should define the validator signature as:
 
    ```rust
    pub trait NoteSourceTarget {
@@ -255,7 +412,17 @@ The previous reviewer recommended:
    ```
 
    This unblocks ticket 20 without dictating ticket 23's choice:
-   - If ticket 23 chooses Candidate B (`NoteDocument`), `NoteDocument` implements `NoteSourceTarget`.
-   - If ticket 23 chooses Candidate D (Span-free `Note` + reparse), an ephemeral buffer adapter implements `NoteSourceTarget`.
-3. **Place Validator in a Dedicated Bridge Module (Tier 6+) [P]**: Because `src/schema/` (Tier 4) has zero dependencies on `src/note/` (Tier 5), the validator should NOT be placed inside `src/schema/model.rs`. It belongs in a dedicated analysis/validation service (e.g. `src/schema_validator/` or `src/validation/`), maintaining the clean acyclic module DAG.
-4. **Settle Schema Type Override for Text [P]**: Per ticket 19 (`issues/19:104-105` [V]), frontmatter parsing is quote-insensitive. Ticket 20 must ratify the rule that a schema field declared as `type = "string"` overrides heuristic date/duration promotion, preserving text truthfulness without quote hacks.
+   - If ticket 23 chooses Candidate B (`NoteDocument`), `NoteDocument`
+     implements `NoteSourceTarget`.
+   - If ticket 23 chooses Candidate D (Span-free `Note` + reparse), an ephemeral
+     buffer adapter implements `NoteSourceTarget`.
+3. **Place Validator in a Dedicated Bridge Module (Tier 6+) [P]**: Because
+   `src/schema/` (Tier 4) has zero dependencies on `src/note/` (Tier 5), the
+   validator should NOT be placed inside `src/schema/model.rs`. It belongs in a
+   dedicated analysis/validation service (e.g. `src/schema_validator/` or
+   `src/validation/`), maintaining the clean acyclic module DAG.
+4. **Settle Schema Type Override for Text [P]**: Per ticket 19
+   (`issues/19:104-105` [V]), frontmatter parsing is quote-insensitive. Ticket
+   20 must ratify the rule that a schema field declared as `type = "string"`
+   overrides heuristic date/duration promotion, preserving text truthfulness
+   without quote hacks.

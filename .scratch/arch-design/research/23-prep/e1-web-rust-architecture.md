@@ -24,8 +24,8 @@ it.
   (`docs.rs/serde_spanned/1.1.0/src/serde_spanned/spanned.rs.html:27`).
 - [V] Ruff, Biome and Oxc use two `u32` offsets. A `TextRange` or `Span` is 8
   bytes (`docs.rs/ruff_text_size`, `docs.rs/oxc_span`).
-- [V] rustc packs a span in 8 bytes: `lo_or_index: u32`, `len: u16`, `ctxt:
-  u16`. A side table holds the 16-byte `SpanData` for large spans
+- [V] rustc packs a span in 8 bytes: `lo_or_index: u32`, `len: u16`,
+  `ctxt: u16`. A side table holds the 16-byte `SpanData` for large spans
   (`doc.rust-lang.org/nightly/nightly-rustc/rustc_span/span_encoding/struct.Span.html`).
 - [V] The `jsonschema` crate addresses an error with a logical `instance_path`.
   It maps to a byte span at the reporting edge only

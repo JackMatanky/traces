@@ -82,10 +82,10 @@ overload — two selection methods with different return types invite the
 ambiguous one to be used by mistake.
 
 Empty-list contract: `select` on empty `items` returns
-`DialogError::EmptySelectionInput` (guard runs before the TTY check); `multi_select`
-on empty yields an empty `Vec`. Non-TTY fallback: index `0` (guarded) / empty
-selection. `TerminalDialogProvider` reads indices via inquire's `raw_prompt()`
--> `ListOption.index`.
+`DialogError::EmptySelectionInput` (guard runs before the TTY check);
+`multi_select` on empty yields an empty `Vec`. Non-TTY fallback: index `0`
+(guarded) / empty selection. `TerminalDialogProvider` reads indices via
+inquire's `raw_prompt()` -> `ListOption.index`.
 
 Naming: we use our own vocabulary (`select` / `multi_select`), not Templater's
 `suggester`.

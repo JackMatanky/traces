@@ -35,8 +35,8 @@ Porting these conventions directly to Rust causes several critical defects:
    names while also supporting Obsidian Tasks emojis creates an inconsistent
    hybrid.
 6. **Ticket backlog invalidation:** Tickets 08 through 11 were drafted against
-   an invented type (`QueryRecord`), an unread persistence layer, and an obsolete
-   `task.<field>` model.
+   an invented type (`QueryRecord`), an unread persistence layer, and an
+   obsolete `task.<field>` model.
 
 By adopting a Rust-native architecture centered on flat contiguous storage,
 borrowed positional indexing, memory compaction, and a unified `list.<field>`
@@ -48,7 +48,8 @@ and significantly reduced memory usage.
 
 ## 2. Upstream Precedent Analysis
 
-Research across `docs/digests/obsidian_blacksmithgu-obsidian-dataview-digest.txt`,
+Research across
+`docs/digests/obsidian_blacksmithgu-obsidian-dataview-digest.txt`,
 `docs/digests/obsidian_obsidian-tasks-digest.txt`, and
 `docs/digests/dataview-sql-precedent-research.md` reveals two distinct
 architectural paradigms:
@@ -111,18 +112,18 @@ must align with:
 - **Unified Date System (`src/date.rs`):** `DateValue` wraps `NaiveDate` in a
   transparent, 4-byte, `Copy` newtype with ISO-8601 enforcement. `DateTimeValue`
   provides a 12-byte `Copy` UTC timestamp.
-- **Typed Values & Borrowed Projections (`src/note/field.rs`):** `NoteFieldValue`
-  provides 10 strongly typed variants. `NoteFieldValueRef<'a>` enables
-  zero-allocation borrowed views.
+- **Typed Values & Borrowed Projections (`src/note/field.rs`):**
+  `NoteFieldValue` provides 10 strongly typed variants. `NoteFieldValueRef<'a>`
+  enables zero-allocation borrowed views.
 - **Zero-Allocation Sorting (`src/query/sort.rs`):** `SortKey<'a>` and
   `SortKeys<'a>` project sort terms without heap allocations by borrowing string
   slices directly.
 - **Positional Query Rows (`src/query/results.rs`):** `QueryRow` holds an
-  `Arc<WorkspaceIndex>` and a `RowIndex`, resolving file metadata via $O(1)$ index
-  lookups.
-- **In-Memory Store (`src/index/`):** `WorkspaceIndex` holds all indexed files in
-  memory as `Box<[FileEntry]>`, assembled from the `NOTES`, `FILES`, and `LINKS`
-  tables.
+  `Arc<WorkspaceIndex>` and a `RowIndex`, resolving file metadata via $O(1)$
+  index lookups.
+- **In-Memory Store (`src/index/`):** `WorkspaceIndex` holds all indexed files
+  in memory as `Box<[FileEntry]>`, assembled from the `NOTES`, `FILES`, and
+  `LINKS` tables.
 
 ---
 
@@ -322,16 +323,16 @@ pending tickets cannot be implemented as drafted:
 - **`file.<field>`:** Resolves parent file properties (`file.path`,
   `file.folder`, `file.cdate`, `file.mdate`, `file.size`, `file.tags`).
 - **Bare Metadata Keys (`<key>`):**
-  - On a `List` row: First inspects the item's own inline fields (`item.fields`).
-    If present, returns that value. If absent, falls back to the parent note's
-    frontmatter and page-level inline fields.
+  - On a `List` row: First inspects the item's own inline fields
+    (`item.fields`). If present, returns that value. If absent, falls back to
+    the parent note's frontmatter and page-level inline fields.
   - On a `Page` row: Resolves against the note's frontmatter and page-level
     inline fields.
 - **Tags Resolution:**
   - `list.tags`: Item-level tags scanned from bullet text.
   - `file.tags`: Note-level tags from frontmatter and note body.
-  - Bare `tags`: On list rows, resolves to `list.tags`. On page rows, resolves to
-    `file.tags`.
+  - Bare `tags`: On list rows, resolves to `list.tags`. On page rows, resolves
+    to `file.tags`.
 
 ---
 

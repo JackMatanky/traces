@@ -27,9 +27,9 @@ interactive functions during render.
 
 ## Decision
 
-Use minijinja for template rendering. Register interactive and utility helpers as
-namespace globals using add_global with the Object trait, exposing methods via
-get_value dispatch. The ui namespace provides four interactive functions:
+Use minijinja for template rendering. Register interactive and utility helpers
+as namespace globals using add_global with the Object trait, exposing methods
+via get_value dispatch. The ui namespace provides four interactive functions:
 text_input, confirm, select, and multi_select. All interactive functions are
 routed through a DialogProvider trait (object-safe, Send + Sync) that separates
 interactive prompting from template rendering. Two implementations:
@@ -49,7 +49,8 @@ Good, because:
 - No new scripting language for template authors to learn
 - DialogProvider abstraction enables test, MCP, and CI without a TTY
 - Architecture naturally extends to MCP mode: AI provides all variables upfront
-- Object trait dispatch allows namespaced access (ui.\*, file.\*, query.\*, etc.)
+- Object trait dispatch allows namespaced access (ui.\*, file.\*, query.\*,
+  etc.)
 
 Bad, because:
 

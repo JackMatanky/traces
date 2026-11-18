@@ -1,8 +1,15 @@
 # 10: Slice 5: config scope, tracking and template
 
-**What to build:** Config scope, tracked paths and template rendering are scenarios. Rows: 01-G7, 01-G11 to 01-G16, 01-G18, 01-G21, 01-G22, 01-G25 to 01-G27, 02-G10 to 02-G12, 02-G18, 05-G7, and the 05 directory-tree, env-var and file-tracker rows. This is the largest slice. If it will not finish in one branch, split it and record the split in the amendment log. Follow spec section 9.3 for the rows and the converted tests, section 7 for each deletion, and section 6.4 for review.
+**What to build:** Config scope, tracked paths and template rendering are
+scenarios. Rows: 01-G7, 01-G11 to 01-G16, 01-G18, 01-G21, 01-G22, 01-G25 to
+01-G27, 02-G10 to 02-G12, 02-G18, 05-G7, and the 05 directory-tree, env-var and
+file-tracker rows. This is the largest slice. If it will not finish in one
+branch, split it and record the split in the amendment log. Follow spec section
+9.3 for the rows and the converted tests, section 7 for each deletion, and
+section 6.4 for review.
 
-**Current state:** The guarantees of the owned rows have no scenario. Some Rust e2e tests cover part of them.
+**Current state:** The guarantees of the owned rows have no scenario. Some Rust
+e2e tests cover part of them.
 
 **Spec:** `.scratch/bdd-testing/spec.md`
 
@@ -10,14 +17,25 @@
 
 **Category:** enhancement
 
-**Status:** done (slice closed 2026-11-03 with four exceptions; the six-condition review of spec section 3.2 is in the ledger, 2026-11-05)
+**Status:** done (slice closed 2026-11-03 with four exceptions; the
+six-condition review of spec section 3.2 is in the ledger, 2026-11-05)
 
-- [x] Every row the slice owns has a scenario of the class that spec section 4 assigns, except four rows. Rows 01-G12 and 01-G16 stay pinned to unit tests. Row 05-dirtree stays pinned. Row 05-G7 stays a gap. The amendment log of 2026-11-03 gives the reasons.
-- [x] The Status of each owned row in the invariance map reads `covered`, except the four rows above.
-  - 05-G7 reads `gap`: the scenarios do not pin every filesystem path to the root. Rows 03-P25 and 05-file_tracker read `pinned-elsewhere` after the tracker mutant escaped.
-- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring rules of spec section 5.
-  - The review of 2026-11-05 checks every owned scenario against the six conditions and the authoring rules. The record with the per-scenario verdicts is in the ledger. All scenarios pass, and no feature file changes.
-- [x] Review the row placement with the user at entry. Spec section 9.3 lists the rows that were placed by domain affinity.
+- [x] Every row the slice owns has a scenario of the class that spec section 4
+      assigns, except four rows. Rows 01-G12 and 01-G16 stay pinned to unit
+      tests. Row 05-dirtree stays pinned. Row 05-G7 stays a gap. The amendment
+      log of 2026-11-03 gives the reasons.
+- [x] The Status of each owned row in the invariance map reads `covered`, except the
+  four rows above.
+  - 05-G7 reads `gap`: the scenarios do not pin every filesystem path to the
+    root. Rows 03-P25 and 05-file_tracker read `pinned-elsewhere` after the
+    tracker mutant escaped.
+- [x] Each scenario passes the six conditions of spec section 3.2 and the authoring
+  rules of spec section 5.
+  - The review of 2026-11-05 checks every owned scenario against the six
+    conditions and the authoring rules. The record with the per-scenario
+    verdicts is in the ledger. All scenarios pass, and no feature file changes.
+- [x] Review the row placement with the user at entry. Spec section 9.3 lists the
+  rows that were placed by domain affinity.
   - The amendment log of 2026-11-03 records the user confirmation.
 - [x] A converted test is deleted only when this slice completes its last row.
 - [x] Each deletion has the proof of spec section 7.

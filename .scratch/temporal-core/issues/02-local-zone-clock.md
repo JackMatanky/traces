@@ -1,21 +1,54 @@
 # 02: Local-zone clock & DST doctrine
 
-**What to build:** Writing a naive datetime in a note means what a human means: it's interpreted in the reader's local zone and stored as UTC, so it compares correctly against file timestamps. Date-only values stay zone-free civil dates. All "now"-style reads come from one declared doctrine (local clock for display, UTC for storage) instead of an accidental mix. Ambiguous and nonexistent DST times resolve deterministically; only a tz-data/OS lookup failure may error.
+**What to build:** Writing a naive datetime in a note means what a human means:
+it's interpreted in the reader's local zone and stored as UTC, so it compares
+correctly against file timestamps. Date-only values stay zone-free civil dates.
+All "now"-style reads come from one declared doctrine (local clock for display,
+UTC for storage) instead of an accidental mix. Ambiguous and nonexistent DST
+times resolve deterministically; only a tz-data/OS lookup failure may error.
 
 **Blocked by:** None (can start immediately).
 
 **Status:** resolved — merged into `main` (`90696f25`)
 
-Skills: `rust-skills`, `rust-unit-testing`. Rules: `num-overflow-explicit`, `conv-tryfrom-fallible`, `err-source-chain` (N4); `MappedLocalTime` (not the old name `LocalResult`) is the resolver's type; zone conversions are named and direction-explicit — local→UTC via `and_utc()`/`naive_utc()`; UTC→local wall clock for calendar application (spec D12) via offset-based checked arithmetic (`Local.offset_from_utc_datetime(&naive_utc)` then `naive_utc.checked_add_offset(offset.fix())`, `None` → out-of-range error — panic-safe because `checked_add_offset` returns `Option` where `naive_local()` would `expect`); never `.naive_local()` (documented `# Panics` when the offset overflows `NaiveDateTime` — chrono `datetime/mod.rs` `expect("Local time out of range…")`) and never `.naive_utc()` where the local wall clock is wanted (wrong frame); doctrine = data + docs, no `Clock`/`TimeZone` traits (review §5.7). Design record: `../review.md` §4 (B1 + DST), §2.1 (D9, N4).
+Skills: `rust-skills`, `rust-unit-testing`. Rules: `num-overflow-explicit`,
+`conv-tryfrom-fallible`, `err-source-chain` (N4); `MappedLocalTime` (not the old
+name `LocalResult`) is the resolver's type; zone conversions are named and
+direction-explicit — local→UTC via `and_utc()`/`naive_utc()`; UTC→local wall
+clock for calendar application (spec D12) via offset-based checked arithmetic
+(`Local.offset_from_utc_datetime(&naive_utc)` then
+`naive_utc.checked_add_offset(offset.fix())`, `None` → out-of-range error —
+panic-safe because `checked_add_offset` returns `Option` where `naive_local()`
+would `expect`); never `.naive_local()` (documented `# Panics` when the offset
+overflows `NaiveDateTime` — chrono `datetime/mod.rs`
+`expect("Local time out of range…")`) and never `.naive_utc()` where the local
+wall clock is wanted (wrong frame); doctrine = data + docs, no
+`Clock`/`TimeZone` traits (review §5.7). Design record: `../review.md` §4 (B1 +
+DST), §2.1 (D9, N4).
 
-- [x] Naive datetime input parses in the local zone → stored UTC; date-only input attaches no zone
-- [x] DST policy implemented and pinned: ambiguous fall-back → earliest occurrence; spring-forward gap → shifted forward by the gap; no invalid-input failure — ambiguity and DST gaps never fail to parse, only a tz-data/OS lookup failure may error (spec D14)
-- [x] Clock reads follow the doctrine: `now`/`today`/file-stat display from local clock, storage always UTC; engine's mixed clock sites unified (D9)
+- [x] Naive datetime input parses in the local zone → stored UTC; date-only
+      input attaches no zone
+- [x] DST policy implemented and pinned: ambiguous fall-back → earliest
+      occurrence; spring-forward gap → shifted forward by the gap; no
+      invalid-input failure — ambiguity and DST gaps never fail to parse, only a
+      tz-data/OS lookup failure may error (spec D14)
+- [x] Clock reads follow the doctrine: `now`/`today`/file-stat display from
+      local clock, storage always UTC; engine's mixed clock sites unified (D9)
 - [x] Error source chains preserved across engine parse paths (N4)
-- [x] Engine out-of-range shift magnitudes return an error instead of panicking — `chrono::Duration::seconds` → `try_seconds` at `src/template/engine/date.rs:432` (N1)
-- [x] Tests inject `TZ` per test (fresh fixtures, no shared/global time); ambiguity, gap, and offset assertions all run deterministically
-- [x] One named local→UTC resolver: exhaustive `MappedLocalTime::{Single, Ambiguous, None}` match — ambiguous → earliest, true gap → shift forward by the gap, and `None` caused by tz-data/OS error surfaces as an error (gap verified by probing adjacent local times), never a silent shift (spec D14)
-- [x] Resolver rustdoc cites Temporal `'compatible'` (RFC 5545) and jiff `Disambiguation::Compatible` as the adopted convention; wasm caveat (chrono #1701, `Local` returns only `Single` on wasm) documented as out-of-scope
+- [x] Engine out-of-range shift magnitudes return an error instead of panicking
+      — `chrono::Duration::seconds` → `try_seconds` at
+      `src/template/engine/date.rs:432` (N1)
+- [x] Tests inject `TZ` per test (fresh fixtures, no shared/global time);
+      ambiguity, gap, and offset assertions all run deterministically
+- [x] One named local→UTC resolver: exhaustive
+      `MappedLocalTime::{Single, Ambiguous, None}` match — ambiguous → earliest,
+      true gap → shift forward by the gap, and `None` caused by tz-data/OS error
+      surfaces as an error (gap verified by probing adjacent local times), never
+      a silent shift (spec D14)
+- [x] Resolver rustdoc cites Temporal `'compatible'` (RFC 5545) and jiff
+      `Disambiguation::Compatible` as the adopted convention; wasm caveat
+      (chrono #1701, `Local` returns only `Single` on wasm) documented as
+      out-of-scope
 - [x] `mise run verify` green
 
 ## Comments
@@ -24,21 +57,56 @@ Skills: `rust-skills`, `rust-unit-testing`. Rules: `num-overflow-explicit`, `con
 
 **Triage confirmation (verification pass, no state change):**
 
-- **Category:** `bug` — naive datetimes silently compare wrong-by-hours against file timestamps, engine clock reads are an accidental Local/UTC mix, an out-of-range shift magnitude panics, and parse failures drop their source chain: all broken-today defects.
-- **State:** confirmed `ready-for-agent` (unchanged). No grilling needed — spec D9/D12/D14 decisions are settled and the brief already pins exact chrono APIs and resolver semantics.
-- **Redundancy check:** grepped `src/` for `Local.offset_from_utc_datetime`, `MappedLocalTime`/`LocalResult`, `naive_local()`, and local→UTC conversion paths — no resolver or local-zone interpretation exists anywhere; only `and_utc()` UTC promotions and `Local::now()` display reads. Not already implemented.
-- **Prior-rejection check:** no `.out-of-scope/` knowledge base exists in the repo — nothing resembling this request was previously rejected.
-- **Claims re-verified against current code and the chrono-0.4.45 source (`Cargo.toml:106`):**
-  - N1 live at the exact cited line: `src/template/engine/date.rs:432` calls the panicking `chrono::Duration::seconds(...)`; `secs.checked_mul(n)?` guards i64 overflow but not chrono's `TimeDelta` range.
-  - N4 live: `ParsedDate::parse` (`src/template/engine/date.rs:189`) discards `DateValue::parse_iso(s).ok()` — no `Error::source` chain survives.
-  - D9 live: `Local::now()` ×4 (`date.rs:92/99/107/117`) vs `Utc::now()` (`date.rs:699, 709`); `review.md` §2.1 counts ×3 `Utc::now` — I find 2 non-test + 1 test; immaterial.
-  - Never-`.naive_local()` rule holds against upstream: chrono `datetime/mod.rs:576-580` ends in `.expect("Local time out of range for `NaiveDateTime`")`; `NaiveDateTime::checked_add_offset` returns `Option` (`naive/datetime/mod.rs:578`) — the ticket's prescribed panic-safe pattern is real. `MappedLocalTime` is the current name in 0.4.45.
-  - Naive input is UTC-today: `ParsedDate::parse` takes `value.into_inner().naive_utc()` (`date.rs:185`); the `timestamp` filter rustdoc explicitly says "treating a naive (timezone-less) input as UTC" (`date.rs:319`).
-- **Sequencing:** ticket 01 is merged into `main` (`c990f6c9`); the only active worktree (`quality-gates`) touches no date/duration files (`git diff main...quality-gates --name-only` shows docs/tooling only). `Blocked by: None` is accurate.
+- **Category:** `bug` — naive datetimes silently compare wrong-by-hours against
+  file timestamps, engine clock reads are an accidental Local/UTC mix, an
+  out-of-range shift magnitude panics, and parse failures drop their source
+  chain: all broken-today defects.
+- **State:** confirmed `ready-for-agent` (unchanged). No grilling needed — spec
+  D9/D12/D14 decisions are settled and the brief already pins exact chrono APIs
+  and resolver semantics.
+- **Redundancy check:** grepped `src/` for `Local.offset_from_utc_datetime`,
+  `MappedLocalTime`/`LocalResult`, `naive_local()`, and local→UTC conversion
+  paths — no resolver or local-zone interpretation exists anywhere; only
+  `and_utc()` UTC promotions and `Local::now()` display reads. Not already
+  implemented.
+- **Prior-rejection check:** no `.out-of-scope/` knowledge base exists in the
+  repo — nothing resembling this request was previously rejected.
+- **Claims re-verified against current code and the chrono-0.4.45 source
+  (`Cargo.toml:106`):**
+  - N1 live at the exact cited line: `src/template/engine/date.rs:432` calls the
+    panicking `chrono::Duration::seconds(...)`; `secs.checked_mul(n)?` guards
+    i64 overflow but not chrono's `TimeDelta` range.
+  - N4 live: `ParsedDate::parse` (`src/template/engine/date.rs:189`) discards
+    `DateValue::parse_iso(s).ok()` — no `Error::source` chain survives.
+  - D9 live: `Local::now()` ×4 (`date.rs:92/99/107/117`) vs `Utc::now()`
+    (`date.rs:699, 709`); `review.md` §2.1 counts ×3 `Utc::now` — I find 2
+    non-test + 1 test; immaterial.
+  - Never-`.naive_local()` rule holds against upstream: chrono
+    `datetime/mod.rs:576-580` ends in
+    `.expect("Local time out of range for `NaiveDateTime`")`;
+    `NaiveDateTime::checked_add_offset` returns `Option`
+    (`naive/datetime/mod.rs:578`) — the ticket's prescribed panic-safe pattern
+    is real. `MappedLocalTime` is the current name in 0.4.45.
+  - Naive input is UTC-today: `ParsedDate::parse` takes
+    `value.into_inner().naive_utc()` (`date.rs:185`); the `timestamp` filter
+    rustdoc explicitly says "treating a naive (timezone-less) input as UTC"
+    (`date.rs:319`).
+- **Sequencing:** ticket 01 is merged into `main` (`c990f6c9`); the only active
+  worktree (`quality-gates`) touches no date/duration files
+  (`git diff main...quality-gates --name-only` shows docs/tooling only).
+  `Blocked by: None` is accurate.
 - **Scope notes for the agent brief (minor, not blockers):**
-  1. `src/template/engine/date.rs:319` — the `timestamp` filter's "treated as UTC" rustdoc must be rewritten when naive parse becomes local-zone.
-  2. `src/template/engine/date.rs:136` — `from_timestamp` formats via `.naive_utc()`; per the ticket's own "never `.naive_utc()` where the local wall clock is wanted" rule this display path is a candidate, but the checklist names only `now`/`today`/file-stat — clarify whether it's in scope.
-- **Rust-skills rules cited all exist** (`num-overflow-explicit`, `conv-tryfrom-fallible`, `err-source-chain`); additionally applicable: `err-result-over-panic` (N1), `anti-over-abstraction` (no `Clock`/`TimeZone` traits, review §5.7).
+  1. `src/template/engine/date.rs:319` — the `timestamp` filter's "treated as
+     UTC" rustdoc must be rewritten when naive parse becomes local-zone.
+  2. `src/template/engine/date.rs:136` — `from_timestamp` formats via
+     `.naive_utc()`; per the ticket's own "never `.naive_utc()` where the local
+     wall clock is wanted" rule this display path is a candidate, but the
+     checklist names only `now`/`today`/file-stat — clarify whether it's in
+     scope.
+- **Rust-skills rules cited all exist** (`num-overflow-explicit`,
+  `conv-tryfrom-fallible`, `err-source-chain`); additionally applicable:
+  `err-result-over-panic` (N1), `anti-over-abstraction` (no `Clock`/`TimeZone`
+  traits, review §5.7).
 - **2026-09-29 (agent, branch `02-local-zone-clock`, worktree
   `.worktrees/02-local-zone-clock`):** Implemented per spec. Commit
   `6a065411` (6 files, +854 −98). Core: `src/date.rs` gains the named
@@ -218,7 +286,6 @@ Skills: `rust-skills`, `rust-unit-testing`. Rules: `num-overflow-explicit`, `con
     display (civil wall result is the D14 date-only guarantee), so a
     wall shifted into a gap displays civilly until the calendar owner
     lands.
-
 - **2026-09-29 (agent, adversarial rs-review-spec pass, commit
   `b6e6f63b`):** Full-diff review (`b2662ffc..6a065411`) against spec
   D9/D12/D14 and the ticket checklist, cross-checked with `review.md`

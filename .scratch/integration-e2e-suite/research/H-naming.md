@@ -21,18 +21,31 @@ No files outside this report were modified.
 | **Schema** (`src/schema/`) | "Schema resolution, field merging, and hierarchy queries" — reads `.traces/schemas/*.toml`, linearizes the `extends` DAG | `src/schema/mod.rs:1-8` |
 | **Template** (`src/template/`) | "Resolve, render, and write Markdown templates" — Validate → Resolve → Render → Write, honoring `WriteMode`/`CommitPolicy` | `src/template/mod.rs:1-10`, `:24-27` |
 
-Cross-subsystem seams (`GLOSSARY-MAP.md:28-65`): CLI is "the process composition root, delegating to `ConfigService`, `IndexerService`, `QueryService`, `TemplateService`, and `DialogProvider`" (`:52-54`); "Query evaluates source expressions against `WorkspaceIndex`" (`:60-62`).
+Cross-subsystem seams (`GLOSSARY-MAP.md:28-65`): CLI is "the process composition
+root, delegating to `ConfigService`, `IndexerService`, `QueryService`,
+`TemplateService`, and `DialogProvider`" (`:52-54`); "Query evaluates source
+expressions against `WorkspaceIndex`" (`:60-62`).
 
 ### 1.2 The real dispatch surface (`src/cli/mod.rs`)
 
-- `struct Cli` with `command: Option<Commands>` and the tri-state `input: Option<Option<PathBuf>>` — `src/cli/mod.rs:89-111`.
-- `Cli::run` (`:121-144`): subcommand → `command.run(...)`, else `-i <name>` → `template::Template::new`, bare `-i` → interactive picker, else `CliError::NoCommand`.
-- `enum Commands` — **10 variants**: `Init`, `Trust`, `Untrust`, `Index`, `List`, `Table`, `Task`, `Template` (alias `tmpl`), `Completions` (alias `completion`), `Tracked` — `src/cli/mod.rs:147-173`.
+- `struct Cli` with `command: Option<Commands>` and the tri-state
+  `input: Option<Option<PathBuf>>` — `src/cli/mod.rs:89-111`.
+- `Cli::run` (`:121-144`): subcommand → `command.run(...)`, else `-i <name>` →
+  `template::Template::new`, bare `-i` → interactive picker, else
+  `CliError::NoCommand`.
+- `enum Commands` — **10 variants**: `Init`, `Trust`, `Untrust`, `Index`,
+  `List`, `Table`, `Task`, `Template` (alias `tmpl`), `Completions` (alias
+  `completion`), `Tracked` — `src/cli/mod.rs:147-173`.
 - `Commands::run` — the routing match — `src/cli/mod.rs:175-199`.
 - Process entry `pub fn run()` — `src/cli/mod.rs:214-218`.
-- Shared query glue used by three subcommands: `refresh_query` (`:303`), `refresh_page_query` (`:346`), `refresh_task_query` (`:370`), `parse_source` (`:387`).
+- Shared query glue used by three subcommands: `refresh_query` (`:303`),
+  `refresh_page_query` (`:346`), `refresh_task_query` (`:370`), `parse_source`
+  (`:387`).
 
-**Consequence for naming:** the routing concern is *already* unit-tested in-process (`mod parse` `src/cli/mod.rs:588-775`, `mod dispatch_end_to_end` `:985-1061`, `mod query_workflows` `:1083+`). Any `tests/e2e` file named after "dispatch" therefore cannot mean routing — see §5.
+**Consequence for naming:** the routing concern is *already* unit-tested
+in-process (`mod parse` `src/cli/mod.rs:588-775`, `mod dispatch_end_to_end`
+`:985-1061`, `mod query_workflows` `:1083+`). Any `tests/e2e` file named after
+"dispatch" therefore cannot mean routing — see §5.
 
 ---
 
@@ -55,7 +68,10 @@ From `benches/README.md:88-103` plus each file's own header comment:
 | `query_sort.rs` | Sort/TopK (`README:103`) | glossary **Sort Order** (incl. sort-limit → top-k, `src/query/mod.rs:21-22`) |
 | `template_render.rs` | `TemplateService` render, `DryRun` (`README:104`) | exact type + **Write Mode** |
 
-All 12 names are glossary-consistent. `index_build` / `index_refresh` / `index_store` are three *distinct* IndexerService/IndexStore responsibilities and are named distinctly — the clearest in-repo precedent for one-file-one-operation naming.
+All 12 names are glossary-consistent. `index_build` / `index_refresh` /
+`index_store` are three *distinct* IndexerService/IndexStore responsibilities
+and are named distinctly — the clearest in-repo precedent for
+one-file-one-operation naming.
 
 ---
 
@@ -116,18 +132,30 @@ Evaluation of every candidate named in the brief against the real architecture.
 
 ### 4.2 `tests/e2e/dispatch.rs` — split rationale
 
-The file's four inner modules are four different subsystems, and the split follows seams the file *already declares*, not file size:
+The file's four inner modules are four different subsystems, and the split
+follows seams the file *already declares*, not file size:
 
-1. `trust_and_diagnostics` mixes index persistence (2 tests) with untrusted rejection (1) with grammar diagnostics (2) — and, per Subagent C, asserts no `trust` *command* behaviour at all (`dispatch.rs:18,39,79,105` use `Sandbox::trusted()` as fixture only; `support.rs:215-218` spawns `traces trust` inside the fixture).
-2. `query_commands` is a genuine single responsibility (**Query Commands**, `src/cli/GLOSSARY.md:34-38`) that merely has 2 diagnostics tests embedded (`dispatch.rs:217,442`).
-3. `template` = 1 `WriteMode::DryRun` assertion + 1 diagnostic code — the diagnostic moves out, the mode assertion joins its `Commit` twin in `template_write.rs`.
+1. `trust_and_diagnostics` mixes index persistence (2 tests) with untrusted
+   rejection (1) with grammar diagnostics (2) — and, per Subagent C, asserts no
+   `trust` *command* behaviour at all (`dispatch.rs:18,39,79,105` use
+   `Sandbox::trusted()` as fixture only; `support.rs:215-218` spawns
+   `traces trust` inside the fixture).
+2. `query_commands` is a genuine single responsibility (**Query Commands**,
+   `src/cli/GLOSSARY.md:34-38`) that merely has 2 diagnostics tests embedded
+   (`dispatch.rs:217,442`).
+3. `template` = 1 `WriteMode::DryRun` assertion + 1 diagnostic code — the
+   diagnostic moves out, the mode assertion joins its `Commit` twin in
+   `template_write.rs`.
 4. `completions` = one command = one file.
 
 ### 4.3 Gaps the naming map exposes (for other subagents, not actioned here)
 
 - `inlinks`: zero `tests/` coverage of a glossary term that has its own bench.
-- `index_refresh`: incremental refresh only covered by a unit test + `dispatch.rs:38`'s existence-only assertion.
-- No `tests/` file covers `ConfigService::load` (config TOML → behavior) — hence `config_trust` cannot be confused with config *loading*, but neither is loading named anywhere.
+- `index_refresh`: incremental refresh only covered by a unit test +
+  `dispatch.rs:38`'s existence-only assertion.
+- No `tests/` file covers `ConfigService::load` (config TOML → behavior) — hence
+  `config_trust` cannot be confused with config *loading*, but neither is
+  loading named anywhere.
 
 ---
 
@@ -146,13 +174,20 @@ The file's four inner modules are four different subsystems, and the split follo
 | 9 | "default output path" (`template_write.rs:16`) | **Template Output Path** / "configured default output directory" | `src/template/GLOSSARY.md` |
 | 10 | "test_project_manages_trust_and_untrust_lifecycle" (`config_lifecycle.rs:42`) | "Trust Management" (grant / inspect / revoke) | `src/cli/GLOSSARY.md:22-26` |
 
-Non-issues (checked and attested): **dispatch**, **completions**, **tracked**, **untrust**, **init**, **inlinks**, **refresh**, **render**, **resolution**, **classification**, **trust**, **scaffold**.
+Non-issues (checked and attested): **dispatch**, **completions**, **tracked**,
+**untrust**, **init**, **inlinks**, **refresh**, **render**, **resolution**,
+**classification**, **trust**, **scaffold**.
 
 ---
 
 ## 6. Proposed target trees
 
-Naming rule applied: *file = one glossary-attested responsibility (noun + operation); the same responsibility keeps the same name in both directories — the boundary is expressed by the directory, not the filename. A bare subcommand noun is acceptable when the subcommand **is** the responsibility (`init`, `tracked`). Meta/process words (`dispatch`, `golden_path`, `roundtrip`, `lifecycle`, `misc`) are not.*
+Naming rule applied: *file = one glossary-attested responsibility (noun +
+operation); the same responsibility keeps the same name in both directories —
+the boundary is expressed by the directory, not the filename. A bare subcommand
+noun is acceptable when the subcommand **is** the responsibility (`init`,
+`tracked`). Meta/process words (`dispatch`, `golden_path`, `roundtrip`,
+`lifecycle`, `misc`) are not.*
 
 ### `tests/integration/<file>.rs` — library-boundary, `test-utils` public surface
 
@@ -165,7 +200,10 @@ Naming rule applied: *file = one glossary-attested responsibility (noun + operat
 | `task_classification.rs` *(rename ← `task_tag_filters`)* | Config-driven classification of status-marked list items into **Task** vs non-task, incl. custom markers and completion counting | `config_with_tag_filters_classifies_tasks_and_checkboxes_correctly`, `config_without_tag_filters_classifies_all_status_marked_items_as_tasks`, `classifies_multi_note_vault_lifecycle_with_custom_markers_and_computes_completion` *(rename recommended — see §5.5)* | `src/config/mod.rs:22` (`TaskConfig`) + `src/task.rs`/`src/note/mod.rs:24-29` (task processing) |
 | `template_render.rs` *(keep)* | `TemplateService::render_to_file` composition across template + index + note, incl. `query`/`lists`/`tasks` helper validation | all 5 | `src/template/mod.rs:1-10` (Render stage + helper namespaces) |
 
-Not proposed as files (no tests would land in them): `index_build`, `index_refresh`, `query_parsing`, `note_parsing`, `inlinks`, `class_expansion` — each is a real vocabulary term but currently has zero `tests/` tests; adding an empty file would encode aspiration, not architecture (see §4.3).
+Not proposed as files (no tests would land in them): `index_build`,
+`index_refresh`, `query_parsing`, `note_parsing`, `inlinks`, `class_expansion` —
+each is a real vocabulary term but currently has zero `tests/` tests; adding an
+empty file would encode aspiration, not architecture (see §4.3).
 
 ### `tests/e2e/<file>.rs` — process boundary (spawns `traces`)
 
@@ -181,14 +219,34 @@ Not proposed as files (no tests would land in them): `index_build`, `index_refre
 | `tracked.rs` *(keep)* | **Tracked Config Path** store inspection and cleanup | `list_prints_every_tracked_config_path`, `clean_removes_a_stale_tracked_entry_and_reports_the_count` | `src/cli/tracked.rs:1-7` |
 | `workspace_workflow.rs` *(rename ← `golden_path.rs`)* | Multi-command chain sharing one Project Root: `init` → `trust` → `index` → `list`/`table`/`task` → `template` | `init_trust_index_list_table_task_and_template_chain_through_one_project` | `src/cli/mod.rs:175-199` (`Commands::run` across the full chain) |
 
-Rejected for the e2e tree: `command_dispatch` (routing lives in `src/cli/mod.rs` unit tests), `init_workspace` (duplicates `init.rs`), `index_build`/`index_refresh`/`inlinks`/`note_parsing`/`query_parsing` (no process-boundary tests exist).
+Rejected for the e2e tree: `command_dispatch` (routing lives in `src/cli/mod.rs`
+unit tests), `init_workspace` (duplicates `init.rs`),
+`index_build`/`index_refresh`/`inlinks`/`note_parsing`/`query_parsing` (no
+process-boundary tests exist).
 
 ### Shared support files
 
-- **`tests/e2e/support.rs` — keep as-is.** Justified: it is the only place encoding the two isolation env vars (`TRACES_STATE_DIR`, `XDG_CONFIG_HOME`, `support.rs:5-15`) and the "diagnostic text is wrap-fragile" assertion rule (`:17-20`), plus `Sandbox`, `Run`, `plain`, `CwdGuard`. It contains no tests, so the name cannot be mistaken for a responsibility.
-- **`tests/integration/support.rs` — do NOT create.** Integration fixtures already live in the crate's gated public surface: `TestProject` (`src/lib.rs:224`), `fixture_service` (`src/lib.rs:577`), `create_trusted_project` (`src/lib.rs:592`). A second support file would duplicate that seam; today every integration file imports from `traces_pkm::{TestProject, …}` directly.
-- Optional (only if a file ever needs shared assertions): mirror e2e's convention and name it after what it provides, not "helpers" — e.g. `tests/integration/fixtures.rs`.
+- **`tests/e2e/support.rs` — keep as-is.** Justified: it is the only place
+  encoding the two isolation env vars (`TRACES_STATE_DIR`, `XDG_CONFIG_HOME`,
+  `support.rs:5-15`) and the "diagnostic text is wrap-fragile" assertion rule
+  (`:17-20`), plus `Sandbox`, `Run`, `plain`, `CwdGuard`. It contains no tests,
+  so the name cannot be mistaken for a responsibility.
+- **`tests/integration/support.rs` — do NOT create.** Integration fixtures
+  already live in the crate's gated public surface: `TestProject`
+  (`src/lib.rs:224`), `fixture_service` (`src/lib.rs:577`),
+  `create_trusted_project` (`src/lib.rs:592`). A second support file would
+  duplicate that seam; today every integration file imports from
+  `traces_pkm::{TestProject, …}` directly.
+- Optional (only if a file ever needs shared assertions): mirror e2e's
+  convention and name it after what it provides, not "helpers" — e.g.
+  `tests/integration/fixtures.rs`.
 
 ### Note on test-function names inside files
 
-Two function names violate the glossary today and should be renamed regardless of the file layout: `classifies_multi_note_vault_lifecycle_…` (**"vault" is an explicit `*Avoid*`, `src/index/GLOSSARY.md:14`**) and `task_prints_a_checkbox_line_per_task` (**"checkbox line" is an explicit `*Avoid*`, `src/note/GLOSSARY.md:61`** — glossary says *task checklist*). Likewise `…_round_trips_…` / `…_lifecycle` should become persist/revoke wording (§5.1, §5.2).
+Two function names violate the glossary today and should be renamed regardless
+of the file layout: `classifies_multi_note_vault_lifecycle_…`
+(**"vault" is an explicit `*Avoid*`, `src/index/GLOSSARY.md:14`**) and
+`task_prints_a_checkbox_line_per_task`
+(**"checkbox line" is an explicit `*Avoid*`, `src/note/GLOSSARY.md:61`** —
+glossary says *task checklist*). Likewise `…_round_trips_…` / `…_lifecycle`
+should become persist/revoke wording (§5.1, §5.2).

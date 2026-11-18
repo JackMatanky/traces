@@ -1,8 +1,11 @@
 # 09 — Task-Level Queries
 
-**What to build:** Task-level queries operate on individual tasks instead of pages. The CLI and Template surfaces can query tasks while preserving task status and parent Note metadata.
+**What to build:** Task-level queries operate on individual tasks instead of
+pages. The CLI and Template surfaces can query tasks while preserving task
+status and parent Note metadata.
 
-**Blocked by:** 03 — Dataview Inline Fields, Tags, and Frontmatter Key-Value Parsing, 05 — QueryOutcome Filtering and Ordering
+**Blocked by:** 03 — Dataview Inline Fields, Tags, and Frontmatter Key-Value
+Parsing, 05 — QueryOutcome Filtering and Ordering
 
 **Status:** completed
 
@@ -11,7 +14,8 @@
 - [x] Task records retain parent Note metadata for filtering and display.
 - [x] `traces task` runs task-level queries and prints task output.
 - [x] Templates can use a task-level query source.
-- [x] Task query tests prove task-level filtering does not operate on page rows by mistake.
+- [x] Task query tests prove task-level filtering does not operate on page rows
+      by mistake.
 
 ## Comments
 
@@ -48,14 +52,13 @@
   tests assert on rendered content without capturing process stdout.
   `CliError::Query` added for `--where` filter-parse failures, mirroring
   the existing `CliError::Index` pattern.
-- **`tasks` template namespace** (`src/template/engine/query_ops.rs`):
-  `TaskOps` mirrors `QueryOps` exactly (`all()`/`from_tags()`/
-  `from_folder()`, same trusted-root plumbing) but calls
-  `WorkspaceIndex::query_tasks` instead of `WorkspaceIndex::query`. `record.task.*`
-  resolves through a `TaskFields` wrapper mirroring `FileFields`, needed
-  because minijinja resolves a dotted attribute path one segment at a
-  time. Registered as the `tasks` global in `TemplateEngine::new` alongside
-  `query`.
+- **`tasks` template namespace** (`src/template/engine/query_ops.rs`): `TaskOps`
+  mirrors `QueryOps` exactly (`all()`/`from_tags()`/ `from_folder()`, same
+  trusted-root plumbing) but calls `WorkspaceIndex::query_tasks` instead of
+  `WorkspaceIndex::query`. `record.task.*` resolves through a `TaskFields`
+  wrapper mirroring `FileFields`, needed because minijinja resolves a dotted
+  attribute path one segment at a time. Registered as the `tasks` global in
+  `TemplateEngine::new` alongside `query`.
 - **Task-row-not-page-row test coverage** (satisfying the ticket's own
   acceptance criterion 6): tests at every layer prove a two-task Note
   produces two task rows (not one page row), and that `.filter()`/`.where()`
@@ -70,15 +73,15 @@
   cases, reorganized template task tests into the existing concern-based
   modules, split `QueryError` display tests to satisfy strict test-target
   Clippy, removed an unused nested test import, and made task iteration lazy.
-- **Verification**: current branch verification is clean with
-  `mise run fmt`, `mise run check`, `mise run clippy`, `mise run doc`, and
-  `mise run test` (**1024/1024 passing**). Also verified the stricter
-  nightly/mise lint surface with
+- **Verification**: current branch verification is clean with `mise run fmt`,
+  `mise run check`, `mise run clippy`, `mise run doc`, and `mise run test`
+  (**1024/1024 passing**). Also verified the stricter nightly/mise lint surface
+  with
   `MISE_EXPERIMENTAL=1 mise exec -- cargo clippy --workspace --tests --all-features -- -D warnings`.
   Smoke-tested earlier during implementation: `traces task`,
-  `traces task --from "#tag" --where "task.completed == false"`, and a
-  rendered `{% for t in tasks.all() %}...{% endfor %}` template all behaved
-  as expected end to end.
+  `traces task --from "#tag" --where "task.completed == false"`, and a rendered
+  `{% for t in tasks.all() %}...{% endfor %}` template all behaved as expected
+  end to end.
 - **Out of scope, deliberately not touched**: `table`/`list`/`task_list`/
   `count` terminal renderers and their pipeline-filter forms (#07, which
   was blocked on this ticket landing first), and `traces list`/`traces

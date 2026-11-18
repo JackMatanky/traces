@@ -43,8 +43,9 @@ not-now list. Resolution of this ticket is followed immediately by writing
 ## Answer
 
 Resolved in a grilling session on 2026-11-03. The user confirmed each decision.
-The full text is in [spec.md](../../bdd-testing/spec.md), section 9 (roadmap) and section 8
-(agent policy). This Answer records the decisions and the evidence.
+The full text is in [spec.md](../../bdd-testing/spec.md), section 9 (roadmap)
+and section 8 (agent policy). This Answer records the decisions and the
+evidence.
 
 Evidence: eight external research files, tags A to H:
 [A adoption](../research/14-bdd-adoption-evidence.md),
@@ -60,9 +61,9 @@ The research found no reason to reopen ticket 06.
 ### Mechanics
 
 - One worktree and one branch per slice. Merge locally when the slice closes.
-- CI runs only on push to `main` and on `pull_request`. Push the slice branch and
-  open a draft PR as a CI trigger only. In ticket 13, "PR" reads "slice branch
-  with its draft PR".
+- CI runs only on push to `main` and on `pull_request`. Push the slice branch
+  and open a draft PR as a CI trigger only. In ticket 13, "PR" reads "slice
+  branch with its draft PR".
 - Slice 1 has two commits. A three-OS gate sits between them.
 - Foundation extras: only a nextest `[profile.ci]` with JUnit output and no
   retries, wired in `ci.yml`. All other research gaps are on the not-now list.
@@ -99,8 +100,9 @@ Spec.md section 9.4 holds the full dossier. Summary:
   five feature-text checks, `.gitattributes`, the CI profile, and two task
   fixes. It deletes nothing.
 - Commit 2 deletes the old test after the kill demonstration and a relative
-  mutation compare on `src/config/trust.rs`. It adds the first ledger, the Status
-  columns, the sixth gate check, the first gap recompute and the profraw check.
+  mutation compare on `src/config/trust.rs`. It adds the first ledger, the
+  Status columns, the sixth gate check, the first gap recompute and the profraw
+  check.
 
 ### (c) Sequencing rationale
 
@@ -112,12 +114,12 @@ moving domain first. The research supports a vertical first slice [D].
 
 ### (d) Not-now list
 
-Spec.md section 9.9 lists twelve items with reasons and owners. Real-TTY dialogs,
-the mtime canary, plan and store internals, gate-owned rows, glossary-only
-claims, known defects, 04-B1 until arch ticket 20 is implemented, facade-seam
-scenarios, new workspace entry points, mutation and coverage in CI, unit tests
-on three OS, and the foundation gaps. The fog items of the map graduated into
-this list.
+Spec.md section 9.9 lists twelve items with reasons and owners. Real-TTY
+dialogs, the mtime canary, plan and store internals, gate-owned rows,
+glossary-only claims, known defects, 04-B1 until arch ticket 20 is implemented,
+facade-seam scenarios, new workspace entry points, mutation and coverage in CI,
+unit tests on three OS, and the foundation gaps. The fog items of the map
+graduated into this list.
 
 ### Policies
 
@@ -125,8 +127,8 @@ this list.
   weakening or deleting an existing scenario needs a `spec change: <reason>`
   line in the PR, confirmed at review. An agent never deletes a scenario outside
   ticket 13's die rule. A behavior change is red-first. A characterization
-  scenario records one break demonstration. Review enforces this. No gate can see
-  authorship.
+  scenario records one break demonstration. Review enforces this. No gate can
+  see authorship.
 - **Pilot rubric.** Three yes or no questions, no numbers. Questions 1 and 2 are
   due at slice 1 close. Question 3 (a second cold session writes a scenario from
   the spec alone) is due at slice 2 close. The review checklist of ticket 12
@@ -149,10 +151,10 @@ found and fixed these items:
 - Arch ticket 38 rejects `cargo-semver-checks`. Ticket 20 owns the
   `FileClassExpander` removal.
 
-The smoke run on macOS confirmed both scenario premises: exit 1, empty stdout and
-the code on the first stderr line. The mutation run found that `-f
-src/config/trust.rs` has 20 mutants and runs longer than 30 minutes, because the
-task runs the whole suite per mutant.
+The smoke run on macOS confirmed both scenario premises: exit 1, empty stdout
+and the code on the first stderr line. The mutation run found that
+`-f src/config/trust.rs` has 20 mutants and runs longer than 30 minutes, because
+the task runs the whole suite per mutant.
 
 ### Open and unverified
 
@@ -167,7 +169,7 @@ task runs the whole suite per mutant.
 ## Comments
 
 - 2026-11-03: Claimed. Eight research files written and committed (`dd163371`).
-  Round 1: shape of slice 1, foundation scope, agent policy, rubric. Round 2: gate
-  evidence, worktree scope, pilot domain, order, hygiene owner. Round 3: dossier,
-  not-now list, unit items. A final stress test applied the fixes above. Status:
-  resolved. `spec.md` written.
+  Round 1: shape of slice 1, foundation scope, agent policy, rubric. Round 2:
+  gate evidence, worktree scope, pilot domain, order, hygiene owner. Round 3:
+  dossier, not-now list, unit items. A final stress test applied the fixes
+  above. Status: resolved. `spec.md` written.

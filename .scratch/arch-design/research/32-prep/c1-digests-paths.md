@@ -44,8 +44,8 @@ digest or the fetched source.
 6. **CockroachDB column encoding.** [V] Each SQL type has a canonical byte
    encoding with an order property; the datastore stays architecture-neutral
    (`https://www.cockroachlabs.com/blog/cockroachdb-cross-platform-portability/`).
-   Lesson for 32: C5 — portability comes from one canonical encoding, which
-   also removes the platform-family identity part of ticket 25.
+   Lesson for 32: C5 — portability comes from one canonical encoding, which also
+   removes the platform-family identity part of ticket 25.
 
 7. **Deno advisory GHSA-8xpq-cjcf-3wh9 (CVE-2026-49401).** [V] On macOS APFS a
    denied path was reachable through an NFD spelling or different case, because

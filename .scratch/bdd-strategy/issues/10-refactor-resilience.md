@@ -44,8 +44,8 @@ HITL, grilling. Do not answer for the user. Reach these decisions:
 - (c) Refine ticket 07's moving-seam list. For each seam, choose one
   disposition: a scenario at the higher boundary that the seam feeds, or no
   scenario.
-- (d) Confirm or change the proptest growth list from ticket 08: path codec, note
-  wire format, `NoteFieldValue` order, table escaping and tag containment.
+- (d) Confirm or change the proptest growth list from ticket 08: path codec,
+  note wire format, `NoteFieldValue` order, table escaping and tag containment.
 - (e) Confirm the facade seams from ticket 08: `RefreshReport`, `DriftCause`,
   `InlinkMap` and `load()`.
 
@@ -70,13 +70,14 @@ HITL, grilling. Do not answer for the user. Reach these decisions:
 
 Resolved. The user confirmed this text.
 
-The full lists are in [research/10-invariance-map.md](../research/10-invariance-map.md).
+The full lists are in
+[research/10-invariance-map.md](../research/10-invariance-map.md).
 
-- **(a) Invariance list.** The map has 88 rows for guarantees that pass ticket 07
-  conditions 1 and 2. Three rows repeat items across inventories. Each row has
-  its inventory citation and its arch ticket 16 tier: F, M, F+M or D. D means
-  that arch ticket 16 does not list the surface. Treat D as Frozen. The map
-  holds the other guarantees at class level.
+- **(a) Invariance list.** The map has 88 rows for guarantees that pass ticket
+  07 conditions 1 and 2. Three rows repeat items across inventories. Each row
+  has its inventory citation and its arch ticket 16 tier: F, M, F+M or D. D
+  means that arch ticket 16 does not list the surface. Treat D as Frozen. The
+  map holds the other guarantees at class level.
 - **(b) Known defects.** A scenario never pins the closed-pipe panic, the `i64`
   to `f64` loss, or the `.first()`-only multi-valued inline fields.
 - **(c) Seam dispositions.** The map gives one disposition for each of the 12

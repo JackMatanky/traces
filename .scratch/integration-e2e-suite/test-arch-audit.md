@@ -13,7 +13,8 @@ lead's own re-verification).
 
 ## 1. Executive summary
 
-**Verdict: the architecture is sound; the defects are over-claiming and gaps, not structure.**
+**Verdict: the architecture is sound; the defects are over-claiming and gaps,
+not structure.**
 
 > **Revision 4 (§16c):** a third external critique was adjudicated by four
 > review agents. Adopted: **never pin exit 101** (panic artifact — real contract
@@ -133,10 +134,10 @@ lead's own re-verification).
 
 ## 4. How tests actually compile and run (tooling)
 
-- **Canonical entry:** `mise run test` (alias `t`) = `cargo nextest run -p traces-pkm
-  --all-features` → `cargo test --workspace --all-features --doc`
-  (`_default:127-134`). Doctests are a separate phase because nextest cannot run
-  them.
+- **Canonical entry:** `mise run test` (alias `t`) =
+  `cargo nextest run -p traces-pkm --all-features` →
+  `cargo test --workspace --all-features --doc` (`_default:127-134`). Doctests
+  are a separate phase because nextest cannot run them.
 - **Feature matrix:** single feature `test-utils`, **no `default` feature**
   (`Cargo.toml:182-183`) ⇒ `--all-features ≡ --features test-utils`; `--features
   default` is a hard error (verified).
@@ -169,31 +170,38 @@ lead's own re-verification).
 (`TestProject`, `fixture_service`, `QueryService`, `TemplateService`,
 `SchemaService`), no process spawning (`tests/integration.rs:1-5`).
 
-1. **The suite's stated differentiator is mostly wasted.** Its constraint ("pub surface only") is
-   real, but in-crate unit twins reach the same functions from the other side of the `pub(crate)`
-   wall. The only genuinely different ingredient is *filesystem/DB through pub APIs* — of 30 tests,
-   only **4** (`index_persistence_roundtrip` #5/#6, `template_render` #26/#27) depend on it (B §1.5).
-2. **Byte-equivalent duplicate pair:** `config_lifecycle.rs::trust_then_untrust_round_trips…`
-   vs `::test_project_manages_trust_and_untrust_lifecycle` — same observable (config exists,
-   `untrust → 1`), same calls underneath (`TestProject::trusted` → `create_trusted_project`,
-   `TestProject::untrust` → `service.untrust`). The second also duplicates
-   `src/lib.rs:918::manages_trust_and_untrust_lifecycle`. **Verified by the lead** (file read).
-3. **`schema_field_resolution.rs` — 5 tests through a non-production constructor.** All call
-   `SchemaService::new` (`src/schema/service.rs:62`), which is `expect(dead_code)` in production
-   builds and only wraps `load_verbose` (`:78`), the path production uses via
-   `TemplateService::new` (`src/template/engine.rs:131`). **Lead's nuance:** because `new` delegates
-   straight to `load_verbose`, the tests are not testing *wrong behavior* — but the file's uniqueness
-   claim ("only test through `SchemaService::new` + `get` + `field`") is circular (B §1.4). Also:
-   zero `assert*` calls (early-return `Result` style) and hard-coded `".traces/schemas"` instead of
+1. **The suite's stated differentiator is mostly wasted.** Its constraint ("pub
+   surface only") is real, but in-crate unit twins reach the same functions from
+   the other side of the `pub(crate)` wall. The only genuinely different
+   ingredient is *filesystem/DB through pub APIs* — of 30 tests, only **4**
+   (`index_persistence_roundtrip` #5/#6, `template_render` #26/#27) depend on it
+   (B §1.5).
+2. **Byte-equivalent duplicate pair:**
+   `config_lifecycle.rs::trust_then_untrust_round_trips…` vs
+   `::test_project_manages_trust_and_untrust_lifecycle` — same observable
+   (config exists, `untrust → 1`), same calls underneath (`TestProject::trusted`
+   → `create_trusted_project`, `TestProject::untrust` → `service.untrust`). The
+   second also duplicates `src/lib.rs:918::manages_trust_and_untrust_lifecycle`.
+   **Verified by the lead** (file read).
+3. **`schema_field_resolution.rs` — 5 tests through a non-production
+   constructor.** All call `SchemaService::new` (`src/schema/service.rs:62`),
+   which is `expect(dead_code)` in production builds and only wraps
+   `load_verbose` (`:78`), the path production uses via `TemplateService::new`
+   (`src/template/engine.rs:131`). **Lead's nuance:** because `new` delegates
+   straight to `load_verbose`, the tests are not testing *wrong behavior* — but
+   the file's uniqueness claim ("only test through `SchemaService::new` +
+   `get` + `field`") is circular (B §1.4). Also: zero `assert*` calls
+   (early-return `Result` style) and hard-coded `".traces/schemas"` instead of
    `DEFAULT_SCHEMAS_DIR`.
-4. **Seam mixing:** `index_query.rs` alone spans ≥5 seams (query modes, sort, diagnostics,
-   frontmatter inheritance, reuse) — the worst offender; `template_render.rs` is the only file with
-   a coherent single boundary (B §2).
-5. **Every `Config` in this suite is fixture-computed.** `TestProject::config()` returns
-   `Config::test_default` (+`with_templates()` if the dir exists) — it never goes through
-   discovery + merge + trust gate (B G-B4, E C2).
-6. **Duplication vs units is extensive but cheap:** the twin table (B §1.3) maps ~14 of 30 tests to
-   exact in-crate twins (e.g. `sorts_pages_descending_by_text_field` = literally the same fixture as
+4. **Seam mixing:** `index_query.rs` alone spans ≥5 seams (query modes, sort,
+   diagnostics, frontmatter inheritance, reuse) — the worst offender;
+   `template_render.rs` is the only file with a coherent single boundary (B §2).
+5. **Every `Config` in this suite is fixture-computed.** `TestProject::config()`
+   returns `Config::test_default` (+`with_templates()` if the dir exists) — it
+   never goes through discovery + merge + trust gate (B G-B4, E C2).
+6. **Duplication vs units is extensive but cheap:** the twin table (B §1.3) maps
+   ~14 of 30 tests to exact in-crate twins (e.g.
+   `sorts_pages_descending_by_text_field` = literally the same fixture as
    `src/query/sort.rs::sort::orders_descending_when_requested`).
 
 ## 6. E2E suite (`tests/e2e/`) — findings
@@ -268,8 +276,8 @@ Other findings:
   nobody uses: **45 in `results.rs`, 22 in `grammar/filter.rs`, 7 in `sort.rs`**
   (D2 §2.1 REPLACE).
 - **Exact duplicate across the crate wall:**
-  `src/schema/service.rs::descendants::returns_a_
-  transitive_descendant_through_an_intermediate_schema` (`:825`) ≡
+  `src/schema/service.rs::descendants::returns_a_ transitive_descendant_through_an_intermediate_schema`
+  (`:825`) ≡
   `tests/integration/schema_field_resolution.rs::descendants_of_returns_transitive_extenders`
   (`:103`) — same files, same chain, same assertion (verified by lead). DELETE
   the unit copy (or the integration file, per §10-D4).
@@ -286,10 +294,11 @@ Other findings:
    - `TestProject::config()` *looks* like an accessor but selects bypass
      semantics (no discovery,
      no trust) and flips config based on directory existence (`lib.rs:319`).
-2. **Hidden couplings** (E §6): 24 integration sites call `TestProject::trusted` yet never consult
-   the trust store (trust is decorative there — a trust change breaks unrelated tests; a weakened
-   `trusted()` would *not* be caught); config TOML literal hard-coded in 3 places
-   (`lib.rs:271,:602`, `support.rs:145`); `write_template` requires `write_config` first.
+2. **Hidden couplings** (E §6): 24 integration sites call `TestProject::trusted`
+   yet never consult the trust store (trust is decorative there — a trust change
+   breaks unrelated tests; a weakened `trusted()` would *not* be caught); config
+   TOML literal hard-coded in 3 places (`lib.rs:271,:602`, `support.rs:145`);
+   `write_template` requires `write_config` first.
 3. **Environment isolation gaps:**
    - `Sandbox::command` sets `TRACES_STATE_DIR` + `XDG_CONFIG_HOME` only
      (`support.rs:187-194`, verified). **`TRACES_CEILING_DIRS` /
@@ -311,12 +320,13 @@ Other findings:
      child saw the var.
    - `TzGuard` is unreachable from `tests/` (`#[cfg(test)] pub(crate)`); no `TZ`
      pin in Sandbox.
-4. **Zero shared fixture code between integration and E2E** — they independently re-implement
-   config TOML, write helpers, dir constants (E §8). Rightly so for *behavior* constructors; share
-   only pure arrangement (path constants, config const, safe-path join — E2E currently has no path
-   guard at all).
-5. **`impl Default for ConfigService` is `pub` under `test-utils`** and points at the *real* OS
-   state dirs (`src/config/service.rs:578`) — gate or remove (E #8).
+4. **Zero shared fixture code between integration and E2E** — they independently
+   re-implement config TOML, write helpers, dir constants (E §8). Rightly so for
+   *behavior* constructors; share only pure arrangement (path constants, config
+   const, safe-path join — E2E currently has no path guard at all).
+5. **`impl Default for ConfigService` is `pub` under `test-utils`** and points
+   at the *real* OS state dirs (`src/config/service.rs:578`) — gate or remove
+   (E #8).
 
 ## 9. Duplication analysis (F, cross-checked)
 
@@ -379,11 +389,12 @@ cross-process state) = keep.
 - **G2 — Inlinks: 46 unit tests, zero `tests/` coverage** of a public query
   field (`rg -rin "inlink" tests/` → no matches; the sole wikilink fixture
   `[[todo]]` at `index_query.rs:148` is unasserted).
-  **Demoted (Revision 3, lead-verified):** `src/cli/mod.rs:1342::derived_inlinks_are_queryable…`
-  already asserts both the `list("inlinks")` query string (`:1364`) and the
-  identical template render — a plain integration `list("inlinks")` test would
-  near-duplicate it. The real residue is **inlinks on the persisted/cold path**
-  (`LINKS` reconstruction) → fold into G-B1's differential (§14 P1.14).
+  **Demoted (Revision 3, lead-verified):**
+  `src/cli/mod.rs:1342::derived_inlinks_are_queryable…` already asserts both the
+  `list("inlinks")` query string (`:1364`) and the identical template render — a
+  plain integration `list("inlinks")` test would near-duplicate it. The real
+  residue is **inlinks on the persisted/cold path** (`LINKS` reconstruction) →
+  fold into G-B1's differential (§14 P1.14).
 - **No numeric exit-code assertion anywhere** (C matrix row 1) + **argv failure
   contract (usage + exit 2) has zero process coverage**.
 
@@ -444,13 +455,14 @@ cross-process state) = keep.
   exercised at process level, and its in-crate tests *skip* when stdin is a TTY
   (`src/dialog/terminal.rs:123-131`). Catches CI hangs and TTY-guard
   regressions.
-- **E-8 — config error paths (R4 arrangement correction):** `ConfigService::build`
-  verifies trust **before** parsing (`src/config/service.rs:238-256`, typestate
-  `LocalConfigFile<Parsed>` only from `Trusted`, `src/config/file.rs:290-297`),
-  and trust hashes **without parsing** (`service.rs:322-336`). So the naive
-  arrangement (write malformed config, spawn untrusted) fails with
-  `config_build_untrusted`, **not** a parse failure. Reachable stages, each with
-  its own code (`src/cli/error.rs:540-555`):
+- **E-8 — config error paths (R4 arrangement correction):**
+  `ConfigService::build` verifies trust **before** parsing
+  (`src/config/service.rs:238-256`, typestate `LocalConfigFile<Parsed>` only
+  from `Trusted`, `src/config/file.rs:290-297`), and trust hashes
+  **without parsing** (`service.rs:322-336`). So the naive arrangement (write
+  malformed config, spawn untrusted) fails with `config_build_untrusted`,
+  **not** a parse failure. Reachable stages, each with its own code
+  (`src/cli/error.rs:540-555`):
 
   | Stage | Arrangement from spawned process | stderr code |
   |---|---|---|
@@ -468,22 +480,22 @@ cross-process state) = keep.
   `config_build_config_file_failed`, or `config_discovery_failed` anywhere in
   `tests/`. Codes asserted in-process only (`src/cli/error.rs:806,:846`).
 - **I-1 — store-backed query parity differential (absorbs G-B1's store legs;
-  renamed from "cold/warm" in R4):** the same
-  `SourceSelector`s (`#tag`, nested tags, paths, `(#a or notes/b.md)`, `not #t`)
-  × modes through `QueryService::run` vs `sync_and_run`, assert structural
-  equality (`QueryRow::eq`, `src/query/results.rs:422,:695`). **R4 fixes:**
-  (a) pin the arrangement — persist first, then `sync_and_run` with an
-  unchanged workspace, so the `RefreshState::Fresh` from-disk branch
-  (`src/index/refresh.rs:277-301`) is guaranteed; otherwise the differential
-  degenerates into querying rows written in the same call. (b) `sync_and_run`
-  = `refresh_store()` + `run_from_store()` (`src/query/service.rs:178-185`) —
-  it proves *in-memory vs refreshed-store* parity, hence the rename. (c) it
-  does **not** absorb G-B1's `ConfigService::load` or `with_class_expander`
-  legs (those → P1.7a / P1.9). The only unit twin
-  is All-source-lists-only (`src/query/service.rs:1235`). Catches `SourceResolver`
-  prefilter false-negatives (silent wrong answers,
-  `src/query/service.rs:354-384`), stale `PATHS_BY_TAG`/`FILE_CLASS`, codec
-  drift, and **cold-path inlinks** (the real residue of G2).
+  renamed from "cold/warm" in R4):** the same `SourceSelector`s (`#tag`, nested
+  tags, paths, `(#a or notes/b.md)`, `not #t`) × modes through
+  `QueryService::run` vs `sync_and_run`, assert structural equality
+  (`QueryRow::eq`, `src/query/results.rs:422,:695`). **R4 fixes:** (a) pin the
+  arrangement — persist first, then `sync_and_run` with an unchanged workspace,
+  so the `RefreshState::Fresh` from-disk branch (`src/index/refresh.rs:277-301`)
+  is guaranteed; otherwise the differential degenerates into querying rows
+  written in the same call. (b) `sync_and_run` = `refresh_store()` +
+  `run_from_store()` (`src/query/service.rs:178-185`) — it proves
+  *in-memory vs refreshed-store* parity, hence the rename. (c) it does **not**
+  absorb G-B1's `ConfigService::load` or `with_class_expander` legs (those →
+  P1.7a / P1.9). The only unit twin is All-source-lists-only
+  (`src/query/service.rs:1235`). Catches `SourceResolver` prefilter
+  false-negatives (silent wrong answers, `src/query/service.rs:354-384`), stale
+  `PATHS_BY_TAG`/`FILE_CLASS`, codec drift, and **cold-path inlinks** (the real
+  residue of G2).
 - **I-4 — cross-render freshness:** the regression is *named in code* with no
   guard — a cached field "would wrongly persist across independent renders"
   (`src/template/engine/query.rs:97-100`, `src/template/engine.rs:128`); all 5
@@ -494,25 +506,27 @@ cross-process state) = keep.
 
 **POTENTIAL PRODUCT DEFECTS surfaced (not just test gaps):**
 
-- **Config-change staleness:** `RefreshPlan::collect` (`src/index/refresh.rs:277-295`,
-  lead-read) fingerprints **only file metadata** — no config hash — and
-  `is_fresh()` short-circuits on an empty file delta (`:299-301`).
-  `IndexDimensions::for_class_field` is supplied **only on the Stale arm**
-  (`src/index/service.rs:234-236`), so config changes never reach the store
-  while the plan is Fresh. **R4 sharpened repro (R4, traced end-to-end,
-  deterministically failing today):** config A → `traces trust` → `traces
-  index` → edit `class_field` (or a tag key / task filter) → **`traces trust`
-  again** (mandatory — a stale config blocks all loads with
-  `config_build_untrusted`, `service.rs:232-233`) → query *untouched* notes.
-  Symptom shape depends on selector: class-field changes give false
+- **Config-change staleness:** `RefreshPlan::collect`
+  (`src/index/refresh.rs:277-295`, lead-read) fingerprints
+  **only file metadata** — no config hash — and `is_fresh()` short-circuits on
+  an empty file delta (`:299-301`). `IndexDimensions::for_class_field` is
+  supplied **only on the Stale arm** (`src/index/service.rs:234-236`), so config
+  changes never reach the store while the plan is Fresh. **R4 sharpened repro
+  (R4, traced end-to-end, deterministically failing today):** config A →
+  `traces trust` → `traces index` → edit `class_field` (or a tag key / task
+  filter) → **`traces trust` again** (mandatory — a stale config blocks all
+  loads with `config_build_untrusted`, `service.rs:232-233`) → query *untouched*
+  notes. Symptom shape depends on selector: class-field changes give false
   **negatives** (stale rows masked by `is_match`'s current-field re-check,
   `src/query/grammar/source.rs:221-227`); tag/task-filter changes give false
-  **positives** (persisted `note.tags()` trusted, `:217-219`; task parsing
-  bakes config at index time, `src/index/service.rs:277-282`). **Untested at
-  any layer.** Early reproduction ticket (T3b.1) → then narrowest regression.
-- **`refresh()` fail-open has no test at any layer** (`src/index/service.rs:84-108`
-  documents it) — but it is *not inducible from the public API* (`IndexStore::open`
-  re-creates the file). Disposition: **in-crate unit**, not integration.
+  **positives** (persisted `note.tags()` trusted, `:217-219`; task parsing bakes
+  config at index time, `src/index/service.rs:277-282`).
+  **Untested at any layer.** Early reproduction ticket (T3b.1) → then narrowest
+  regression.
+- **`refresh()` fail-open has no test at any layer**
+  (`src/index/service.rs:84-108` documents it) — but it is
+  *not inducible from the public API* (`IndexStore::open` re-creates the file).
+  Disposition: **in-crate unit**, not integration.
 - **EPIPE/exit-101 on `traces list | head`:** no signal handling anywhere in
   `src/`; Rust's default `print!` panics on EPIPE → exit 101. **Open question,
   not a ticket** — decide the intended contract first.
@@ -575,17 +589,18 @@ Claims that exceed what the test executes (all lead-verified unless noted):
   trees "keep everything" is expected: H was produced pre-pruning.)
 - **Integration target shape (post-pruning, ~5-6 files):** `index_persistence` ·
   `index_refresh` (fs mutation → delta → redb → query-visible — a genuine seam,
-  not benchmark naming) ·   `index_query` (only high-value composition canaries:
-  real fs → query, store-backed `sync_and_run` parity differential, cold-path inlinks,
-  typed data after reload) · `task_classification` **conditional (R4):** all 3
-  current tests (`tests/integration/task_tag_filters.rs`) have unit twins (B
-  rows 23–25; parser `src/note/parser/task.rs:717,910`, pipeline
+  not benchmark naming) · `index_query` (only high-value composition canaries:
+  real fs → query, store-backed `sync_and_run` parity differential, cold-path
+  inlinks, typed data after reload) · `task_classification`
+  **conditional (R4):** all 3 current tests
+  (`tests/integration/task_tag_filters.rs`) have unit twins (B rows 23–25;
+  parser `src/note/parser/task.rs:717,910`, pipeline
   `src/query/service.rs:1168`) and the real gap — config-TOML→classification —
-  moves to E2E (P1.7a); default disposition per D3/F-row-14 is **fold into
-  `index_query`**, retain as a file only if a post-T3 test keeps a failure
-  boundary not unit-twin'd · `template_render` · + **one**
-  config file *if and only if* the config-TOML→behavior test (§14 P1.7) lands
-  here rather than in E2E.
+  moves to E2E (P1.7a); default disposition per D3/F-row-14 is
+  **fold into `index_query`**, retain as a file only if a post-T3 test keeps a
+  failure boundary not unit-twin'd · `template_render` · + **one** config file
+  *if and only if* the config-TOML→behavior test (§14 P1.7) lands here rather
+  than in E2E.
 - **E2E target shape (R4: complete capability set):** capability files
   (`query`, `template`, `trust`, `tracked`, `completions`, `init`, **`index`**,
   **`config`**) + `support.rs` + a *generic process-contract* file (exit
@@ -652,18 +667,22 @@ Claims that exceed what the test executes (all lead-verified unless noted):
 
 **P0 — correctness & invariants (small, immediate)**
 
-1. **FIX** `table_reflects_a_note_edit…`: assert via `IndexerService::…load()`, not
-   `refresh_store()` (D1 §3.2). Same-shape check for `indexing_then_page_and_task_queries…`.
-2. **REWRITE the overclaiming doc comments** per §11 (dispatch.rs ×3, golden_path ×3, support.rs ×2,
-   `create_trusted_project`, stale `index_persistence_roundtrip` pointer).
-3. **Guard against silent 0-test runs (R4 mechanism):** `[[test]] name="integration"
-   required-features=["test-utils"]` (repo precedent — all 12 benches already do
-   this, `Cargo.toml:43-98`; hard-errors on explicit `cargo test --test integration`)
-   **plus** a CI assertion that the canonical run is non-empty (F3). `compile_error!`
-   rejected — only it is loud on bare `cargo test`, at the cost of breaking
-   featureless `cargo test`/rust-analyzer.
-4. **E2E INVARIANT — compiled binary only, no exceptions (critique #1):** every test under
-   `tests/e2e/**` executes product behavior only through the spawned `traces-pkm` binary.
+1. **FIX** `table_reflects_a_note_edit…`: assert via `IndexerService::…load()`,
+   not `refresh_store()` (D1 §3.2). Same-shape check for
+   `indexing_then_page_and_task_queries…`.
+2. **REWRITE the overclaiming doc comments** per §11 (dispatch.rs ×3,
+   golden_path ×3, support.rs ×2, `create_trusted_project`, stale
+   `index_persistence_roundtrip` pointer).
+3. **Guard against silent 0-test runs (R4 mechanism):**
+   `[[test]] name="integration" required-features=["test-utils"]` (repo
+   precedent — all 12 benches already do this, `Cargo.toml:43-98`; hard-errors
+   on explicit `cargo test --test integration`) **plus** a CI assertion that the
+   canonical run is non-empty (F3). `compile_error!` rejected — only it is loud
+   on bare `cargo test`, at the cost of breaking featureless
+   `cargo test`/rust-analyzer.
+4. **E2E INVARIANT — compiled binary only, no exceptions (critique #1):** every
+   test under `tests/e2e/**` executes product behavior only through the spawned
+   `traces-pkm` binary.
    - Move the 3 in-process `Init.run` calls (`init.rs:34,45,58`) out:
      preset/custom-path assertions become a **component test in `src/cli/`**
      (spawning can't reproduce them — `TerminalDialogProvider` ignores stdin on
@@ -676,10 +695,11 @@ Claims that exceed what the test executes (all lead-verified unless noted):
      cds in-process — children already use `.current_dir()` (`support.rs:190`).
      This **supersedes R1's P3#16/T4.3 mutex proposal**: remove the mutator
      instead of locking it.
-5. **Layer-enforcement checks (critique #12, missed by R1):** a cheap `rg`-based mise task + CI
-   step enforcing: `tests/e2e/**` has zero `use traces_pkm::` and zero `std::process` bypasses
-   outside `support.rs`; `tests/integration/**` has zero `std::process::Command` /
-   `CARGO_BIN_EXE`; no `env::set_current_dir` anywhere (`clippy.toml` disallow-methods too).
+5. **Layer-enforcement checks (critique #12, missed by R1):** a cheap `rg`-based
+   mise task + CI step enforcing: `tests/e2e/**` has zero `use traces_pkm::` and
+   zero `std::process` bypasses outside `support.rs`; `tests/integration/**` has
+   zero `std::process::Command` / `CARGO_BIN_EXE`; no `env::set_current_dir`
+   anywhere (`clippy.toml` disallow-methods too).
 
 **P1 — close HIGH gaps (new tests, highest defect-class value)**
 
@@ -703,11 +723,11 @@ Claims that exceed what the test executes (all lead-verified unless noted):
    `src/lib.rs:62`, exports at `:89`). **Do not widen the production API.**
    Ranked routes:
    a. **Preferred:** E2E — spawn `traces` in a sandbox whose `.traces/config.toml`
-      carries `[tasks] tag_filters` / `[schemas] class_field` / `[templates]
+   carries `[tasks] tag_filters` / `[schemas] class_field` / `[templates]
       directory` and assert the behavior difference (config loading is on the
-      production composition path there; visibility is irrelevant when spawning).
+   production composition path there; visibility is irrelevant when spawning).
    b. Fallback: narrow explicitly test-only adapter under `test-utils` exposing
-      *only* the loaded-and-resolved outcome, not error/typestate internals.
+   *only* the loaded-and-resolved outcome, not error/typestate internals.
    c. Rejected: exporting `load`/`ConfigLoadError` for tests.
    **R4:** split by pipeline stage with per-stage arrangements (full table in
    §10 E-8) — discovery / trust (3 statuses) / parse local (trust the
@@ -798,7 +818,8 @@ Claims that exceed what the test executes (all lead-verified unless noted):
     open question**, not a ticket.
 20. **E-9 (optional):** `trust ../project` positional from outside the root —
     guards a trust-scope safety class (positional silently ignored → trusting
-    cwd); low priority since durability is already implied by `Sandbox::trusted()`.
+    cwd); low priority since durability is already implied by
+    `Sandbox::trusted()`.
 
 **P2 — consolidation (delete/merge, §9)**
 
@@ -808,59 +829,74 @@ Claims that exceed what the test executes (all lead-verified unless noted):
 > `index_persistence_roundtrip.rs:309`; new config E2Es may finish off
 > `task_tag_filters.rs`).
 
-21. D1, D2, D4, D6, D7-pair, D9, D12-collapse; DELETE the `schema::descendants` unit dup and the
-    D1 `src/lib.rs:918` fixture dup; REPLACE the ~74 dead tempdirs (drop `_temp` param).
-22. **DELETE `schema_field_resolution.rs` entirely** (§12 — stronger than R1's dup-only deletion;
-    its 5 tests have source twins through a test-only ctor; **lands with P1.9** per §12 caveat).
-23. **ELIMINATE integration `config_trust`/`config_lifecycle`** (§12 — resolve D10's hedge; keep at
-    most one `pub fn untrust` smoke assertion if that API is intended).
+21. D1, D2, D4, D6, D7-pair, D9, D12-collapse; DELETE the `schema::descendants`
+    unit dup and the D1 `src/lib.rs:918` fixture dup; REPLACE the ~74 dead
+    tempdirs (drop `_temp` param).
+22. **DELETE `schema_field_resolution.rs` entirely** (§12 — stronger than R1's
+    dup-only deletion; its 5 tests have source twins through a test-only ctor;
+    **lands with P1.9** per §12 caveat).
+23. **ELIMINATE integration `config_trust`/`config_lifecycle`** (§12 — resolve
+    D10's hedge; keep at most one `pub fn untrust` smoke assertion if that API
+    is intended).
 24. Fix `tracked.rs:49` `stderr.contains('1')` → assert on a structured message.
 
 **P3 — harness & facade redesign (critique #5, #13, #14, #15)**
 
-25. **`pub mod testing` facade (critique #5, missed by R1):** replace the flat root-pub export
-    block (`src/lib.rs:88-162`, 44 names) with `#[cfg(feature = "test-utils")] pub mod testing { … }`
-    so integration tests import `traces_pkm::testing::{TestProject, QueryService, …}` and the
-    architectural status of the surface is unambiguous. Keep paired root `pub(crate)` aliases for
-    in-crate use; re-path ~5 doctests, 12 bench modules, 6 integration files. Expose **only the
-    seams integration deliberately needs**, not automatic internal exports. (R3 note: this is also
-    the natural place to expose `TemplateService` composition for the P1.9 test.)
-26. **`tests/common/` for pure arrangement (critique #13):** config TOML literal (currently
-    triplicated: `lib.rs:271,:602`, `support.rs:145`), dir constants, safe-path join — shared via
-    `mod common;` in both roots (feature-independent literals only; `integration.rs` is gated,
-    `e2e.rs` is not). **Behavior constructors stay layer-local** (`TestProject` in facade,
-    `Sandbox` in e2e): integration trusts via facade, e2e trusts only by spawning `traces trust`
-    (already true — zero facade trust in `tests/e2e`).
+25. **`pub mod testing` facade (critique #5, missed by R1):** replace the flat
+    root-pub export block (`src/lib.rs:88-162`, 44 names) with
+    `#[cfg(feature = "test-utils")] pub mod testing { … }` so integration tests
+    import `traces_pkm::testing::{TestProject, QueryService, …}` and the
+    architectural status of the surface is unambiguous. Keep paired root
+    `pub(crate)` aliases for in-crate use; re-path ~5 doctests, 12 bench
+    modules, 6 integration files. Expose
+    **only the seams integration deliberately needs**, not automatic internal
+    exports. (R3 note: this is also the natural place to expose
+    `TemplateService` composition for the P1.9 test.)
+26. **`tests/common/` for pure arrangement (critique #13):** config TOML literal
+    (currently triplicated: `lib.rs:271,:602`, `support.rs:145`), dir constants,
+    safe-path join — shared via `mod common;` in both roots (feature-independent
+    literals only; `integration.rs` is gated, `e2e.rs` is not).
+    **Behavior constructors stay layer-local** (`TestProject` in facade,
+    `Sandbox` in e2e): integration trusts via facade, e2e trusts only by
+    spawning `traces trust` (already true — zero facade trust in `tests/e2e`).
 27. **Explicit fixtures (critique #14):** `write_minimal_config(root)` / a small
-    `ConfigFixture{tasks,schemas,templates}.write()` builder; a test must *declare* "this scenario
-    has task filters" instead of `TestProject::config()` flipping behavior on directory existence
-    (`src/lib.rs:317-324`) or `Sandbox::write_config` silently creating `templates/`
-    (`support.rs:141-147`).
-28. Split `create_trusted_project` (arrange vs trust); fix its `templates/` doc/behavior divergence;
-    rename `TestProject::config`; gate `impl Default for ConfigService`.
-29. **Scope `expect_used` properly (critique #15, corrected):** the blanket allow
-    (`tests/integration.rs:6-11`) is *vestigial* — `clippy.toml:86-87` already allows
-    expect/unwrap in all tests, so removing the attribute changes nothing (the critique's remedy
-    is a no-op). The real fix is **style**: convert test-body `.expect` on behavior-under-test
-    (e.g. `index_persistence_roundtrip.rs:32,65,210`) to `Result`-returning tests or assertions;
-    keep `expect` only in fixture construction. R1 never ticketed this despite B §4.4.1.
-30. Decouple integration fixtures from trust where trust is never consulted; drop
-    `Sandbox::trusted()` from the 3 completions tests.
+    `ConfigFixture{tasks,schemas,templates}.write()` builder; a test must
+    *declare* "this scenario has task filters" instead of
+    `TestProject::config()` flipping behavior on directory existence
+    (`src/lib.rs:317-324`) or `Sandbox::write_config` silently creating
+    `templates/` (`support.rs:141-147`).
+28. Split `create_trusted_project` (arrange vs trust); fix its `templates/`
+    doc/behavior divergence; rename `TestProject::config`; gate
+    `impl Default for ConfigService`.
+29. **Scope `expect_used` properly (critique #15, corrected):** the blanket
+    allow (`tests/integration.rs:6-11`) is *vestigial* — `clippy.toml:86-87`
+    already allows expect/unwrap in all tests, so removing the attribute changes
+    nothing (the critique's remedy is a no-op). The real fix is **style**:
+    convert test-body `.expect` on behavior-under-test (e.g.
+    `index_persistence_roundtrip.rs:32,65,210`) to `Result`-returning tests or
+    assertions; keep `expect` only in fixture construction. R1 never ticketed
+    this despite B §4.4.1.
+30. Decouple integration fixtures from trust where trust is never consulted;
+    drop `Sandbox::trusted()` from the 3 completions tests.
 
 **P4 — runner & CI (§13, critique #6):**
 
-31. **Feature-separated phases:** unit/component on the production configuration; integration with
-    `--features test-utils`; **E2E without `test-utils`** (spawned binary = shipped config);
-    doctests appropriate to default. `mise run test` becomes an aggregate over the phases. Rationale
-    is the *guarantee*, not current behavior (zero behavior-affecting cfg branches today).
-32. F1 (`mise watch` → nextest), F2 (`--feature default`), F4 (nextest timeouts + status-level),
-    F5 (default-feature run + non-Linux E2E — now *blocked on* the Windows `APPDATA` fix in P1.13),
-    F6 (split CI test job), F7 (`-m`/`test:unit` docs), F8 (coverage/mutation decision +
-    **R4 targeted post-redesign mutation runs** on the modules the new E2E seams protect —
-    `src/cli` stays excluded, so CLI-covered seams need process-level fault injection).
+31. **Feature-separated phases:** unit/component on the production
+    configuration; integration with `--features test-utils`;
+    **E2E without `test-utils`** (spawned binary = shipped config); doctests
+    appropriate to default. `mise run test` becomes an aggregate over the
+    phases. Rationale is the *guarantee*, not current behavior (zero
+    behavior-affecting cfg branches today).
+32. F1 (`mise watch` → nextest), F2 (`--feature default`), F4 (nextest
+    timeouts + status-level), F5 (default-feature run + non-Linux E2E — now
+    *blocked on* the Windows `APPDATA` fix in P1.13), F6 (split CI test job), F7
+    (`-m`/`test:unit` docs), F8 (coverage/mutation decision +
+    **R4 targeted post-redesign mutation runs** on the modules the new E2E seams
+    protect — `src/cli` stays excluded, so CLI-covered seams need process-level
+    fault injection).
 
-**P5 — naming/taxonomy (§12):** pruning-first trees, glossary renames, `golden_path` disposition
-evaluated only after P1.10 lands.
+**P5 — naming/taxonomy (§12):** pruning-first trees, glossary renames,
+`golden_path` disposition evaluated only after P1.10 lands.
 
 ---
 
@@ -884,14 +920,16 @@ file trees (§12) are instantiated at T7 from the surviving inventory.
 | **T6 — runner & CI** | 6.1 feature-separated phases (unit default / integration `test-utils` / **E2E no test-utils** / doctests) with `mise run test` as aggregate · 6.2 `mise watch` → nextest · 6.3 `--feature default` fix · 6.4 nextest timeouts + status-level · 6.5 CI: default-feature run, non-Linux e2e (after `APPDATA` fix), split test job · 6.6 `-m`/`test:unit` docs · 6.7 stale-pointer cleanup · 6.8 coverage/mutation decision + **targeted post-redesign `test:mutants -m` runs** (R4, F8) | 3.7 (Windows fix before OS-matrix e2e) | CI green on a branch; each phase's command re-verified |
 | **T7 — naming** | 7.1 instantiate §12 post-pruning trees (split `dispatch.rs` → capability files incl. **`index`/`config`** + process-contract file, R4) · 7.2 glossary renames (`vault`, `checkbox line`, `roundtrip`/`lifecycle`, `golden_path`) · 7.3 `golden_path` delete-vs-rename decision (needs 3.5 evidence) · 7.4 `task_classification` final disposition per §12 R4 clause (fold vs retain) | T4 (prune first) | `mise run test`; `rg` for old names returns 0 |
 
-Each ticket is one PR-sized change with its evidence citation from this report; T3 tickets each
-carry a "defect class prevented" note (the audit's evidence standard applied forward).
+Each ticket is one PR-sized change with its evidence citation from this report;
+T3 tickets each carry a "defect class prevented" note (the audit's evidence
+standard applied forward).
 
 ---
 
 ## 16. External critique adjudication (Revision 2)
 
-Four review agents checked an external critique of R1 against the code. Verdicts:
+Four review agents checked an external critique of R1 against the code.
+Verdicts:
 
 **Adopted (critique correct, R1 missed or got wrong):**
 
@@ -948,11 +986,12 @@ being folded into §10/§12/§14/§15.
 
 **New candidates adopted:** E-1 overwrite refusal (highest blast radius — only
 in-crate struct-level tests exist, `src/cli/template.rs:464-505`), E-2
-corrupt-index self-heal (code admits the fixture gap, `src/index/store.rs:1818-1821`),
-E-4 non-TTY stdin, E-5 mutating-command stdout split, E-6 delete/rename
-path-set branch, E-7 global config, E-8 config error paths, E-9 (optional),
-I-1 parity differential, I-4 cross-render freshness (regression *named in code*,
-`src/template/engine/query.rs:97-100`), I-5 template-output re-enters index.
+corrupt-index self-heal (code admits the fixture gap,
+`src/index/store.rs:1818-1821`), E-4 non-TTY stdin, E-5 mutating-command stdout
+split, E-6 delete/rename path-set branch, E-7 global config, E-8 config error
+paths, E-9 (optional), I-1 parity differential, I-4 cross-render freshness
+(regression *named in code*, `src/template/engine/query.rs:97-100`), I-5
+template-output re-enters index.
 
 **Potential product defects (new, escalated to T3b):** config-change staleness
 (`RefreshPlan::collect` fingerprints file metadata only,

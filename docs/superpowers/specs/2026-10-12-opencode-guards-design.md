@@ -23,7 +23,7 @@ Decision record (from brainstorming):
 
 ## Architecture
 
-```
+```text
 ~/.config/opencode/plugins/
   rust-guard.js    # Rust rules (auto-discovered by opencode)
   py-guard.js      # Python rules (auto-discovered by opencode)

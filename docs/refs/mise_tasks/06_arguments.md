@@ -1,14 +1,20 @@
 # Task Arguments
 
-Task arguments allow you to pass parameters to tasks, making them more flexible and reusable. There are three ways to define task arguments in mise, but only two are recommended for current use.
+Task arguments allow you to pass parameters to tasks, making them more flexible
+and reusable. There are three ways to define task arguments in mise, but only
+two are recommended for current use.
 
 ## Recommended Methods
 
 ### 1. Usage Field (Preferred) {#usage-field}
 
-The **usage field** is the recommended approach for defining task arguments. It provides a clean, declarative syntax that works with both TOML tasks and file tasks.
+The **usage field** is the recommended approach for defining task arguments. It
+provides a clean, declarative syntax that works with both TOML tasks and file
+tasks.
 
-See [Complete Usage Specification Reference](#complete-usage-specification-reference) for more details.
+See
+[Complete Usage Specification Reference](#complete-usage-specification-reference)
+for more details.
 
 #### Quick Example
 
@@ -30,7 +36,8 @@ echo "Deploying to ${usage_environment?} in ${usage_region?}"
 '''
 ```
 
-Arguments defined in the usage field are automatically available as environment variables prefixed with `usage_`:
+Arguments defined in the usage field are automatically available as environment
+variables prefixed with `usage_`:
 
 ```shell
 # Execute with arguments
@@ -86,9 +93,8 @@ used with Tera's `for` loops and filters like `length`. The `usage` map is
 the same task.
 
 `{{usage.*}}` templates can also be used in `depends`, `depends_post`, and
-`wait_for` to forward arguments to dependency tasks. See [Passing parent task
-arguments to
-dependencies](./07_configuration.md#passing-parent-task-arguments-to-dependencies)
+`wait_for` to forward arguments to dependency tasks. See
+[Passing parent task arguments to dependencies](./07_configuration.md#passing-parent-task-arguments-to-dependencies)
 for details.
 
 **Help output example:**
@@ -136,8 +142,8 @@ fi
 
 > [!tip] Syntax Options
 >
-> Use `#MISE` (uppercase, recommended) or `#USAGE` for defining arguments in file
-> tasks. `# [MISE]` or `# [USAGE]` are also accepted as workarounds for
+> Use `#MISE` (uppercase, recommended) or `#USAGE` for defining arguments in
+> file tasks. `# [MISE]` or `# [USAGE]` are also accepted as workarounds for
 > formatters.
 
 #### Mounting Generated Specs

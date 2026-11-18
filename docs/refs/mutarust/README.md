@@ -67,8 +67,9 @@ mutarust --baseline mutarust-baseline.json --fail-on-escaped .
 ## Suppress one intentional exception
 
 Blacklist a known false positive by checksum, or skip source lines with config
-patterns. Each mutant result shows its `Blacklist checksum:` value. See [docs/cli.md](docs/cli.md) (`--blacklist`) and
-[docs/config.md](docs/config.md) (`ignore_source_lines`, `disable_mutators`).
+patterns. Each mutant result shows its `Blacklist checksum:` value. See
+[docs/cli.md](docs/cli.md) (`--blacklist`) and [docs/config.md](docs/config.md)
+(`ignore_source_lines`, `disable_mutators`).
 
 ## Drop it into CI
 

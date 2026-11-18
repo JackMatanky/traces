@@ -2,7 +2,9 @@
 
 Resolves performance-targets research task.
 
-Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests, web search results (GitHub issues, forum posts, official benchmarks, blog posts).
+Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
+web search results (GitHub issues, forum posts, official benchmarks, blog
+posts).
 
 ---
 
@@ -11,28 +13,43 @@ Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
 ### Markdown Oxide
 
 **Known bottlenecks:**
-- **Full vault rebuild on filesystem events** (`did_change_watched_files` → `reconstruct_vault` drops entire vault and rebuilds from disk). Documented bug where external FS events wipe unsaved buffer state.
-- **Runaway CPU usage** reported in Zed (#23296) — process eats increasingly large amounts of CPU even after closing all editor windows.
-- **No persistence** — every editor restart pays the full WalkDir + parallel parse cost. No cold-start cache.
-- **Regex-only parsing** (no formal AST) — every feature re-runs regex extraction from raw text.
-- **MAX_INDEXED_LINES = 10,000 per file** (added v0.25.12 as a performance band-aid for large files).
+
+- **Full vault rebuild on filesystem events** (`did_change_watched_files` →
+  `reconstruct_vault` drops entire vault and rebuilds from disk). Documented bug
+  where external FS events wipe unsaved buffer state.
+- **Runaway CPU usage** reported in Zed (#23296) — process eats increasingly
+  large amounts of CPU even after closing all editor windows.
+- **No persistence** — every editor restart pays the full WalkDir + parallel
+  parse cost. No cold-start cache.
+- **Regex-only parsing** (no formal AST) — every feature re-runs regex
+  extraction from raw text.
+- **MAX_INDEXED_LINES = 10,000 per file** (added v0.25.12 as a performance
+  band-aid for large files).
 
 **Concrete numbers:**
+
 - No published benchmarks or latency numbers found.
 - 10k line cap suggests files beyond that cause noticeable slowdown.
 
 **Memory:**
-- In-memory: `Vault` struct = `HashMap<PathBuf, MDFile>` + `HashMap<PathBuf, Rope>` per note. No cap on total vault size.
 
-**Patterns to adopt:** PKM-specific features (daily notes, block references, tag hierarchies).
-**Patterns to avoid:** Full vault rebuild on FS events, no persistence, regex-only parsing, no cancellation tokens.
+- In-memory: `Vault` struct = `HashMap<PathBuf, MDFile>` +
+  `HashMap<PathBuf, Rope>` per note. No cap on total vault size.
+
+**Patterns to adopt:** PKM-specific features (daily notes, block references, tag
+hierarchies). **Patterns to avoid:** Full vault rebuild on FS events, no
+persistence, regex-only parsing, no cancellation tokens.
 
 ---
 
 ### Marksman
 
 **Known bottlenecks:**
-- **Full re-parse per edited document** — no incremental parsing within a single document's AST. Workspace-level index is incremental (add/remove one document), but per-document catalog is rebuilt from scratch on each `didChange`.
+
+- **Full re-parse per edited document** — no incremental parsing within a single
+  document's AST. Workspace-level index is incremental (add/remove one
+  document), but per-document catalog is rebuilt from scratch on each
+  `didChange`.
 - **No persistence** — eager scan + full parse on every editor restart.
 - **F# / .NET runtime** — GC pauses possible on very large vaults.
 
@@ -51,19 +68,25 @@ Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
 - find-refs scales linearly with vault size (~1.4 µs/doc).
 - At 1000 docs: ~1.4ms for find-refs — still sub-5ms, acceptable.
 
-**Memory:** In-memory suffix tree + `docsBySlug` map. No published memory numbers.
+**Memory:** In-memory suffix tree + `docsBySlug` map. No published memory
+numbers.
 
-**Patterns to adopt:** Suffix-tree index for O(1) goto-def, MailboxProcessor actor model for concurrency.
-**Patterns to avoid:** Full re-parse per edit (no incremental parsing), no disk persistence.
+**Patterns to adopt:** Suffix-tree index for O(1) goto-def, MailboxProcessor
+actor model for concurrency. **Patterns to avoid:** Full re-parse per edit (no
+incremental parsing), no disk persistence.
 
 ---
 
 ### rumdl
 
 **Known bottlenecks:**
-- **LSP server re-scans entire workspace on initialization** — no disk cache used by the LSP (only the CLI has cache).
-- **Second independent file index** when running alongside another LSP — different processes, no shared index opportunity.
-- **Regex-heavy lint rules** — some rules (e.g., MD013 line length with block-building) can be quadratic on pathological input.
+
+- **LSP server re-scans entire workspace on initialization** — no disk cache
+  used by the LSP (only the CLI has cache).
+- **Second independent file index** when running alongside another LSP —
+  different processes, no shared index opportunity.
+- **Regex-heavy lint rules** — some rules (e.g., MD013 line length with
+  block-building) can be quadratic on pathological input.
 
 **Concrete numbers (from `rumdl.dev`, Rust Book repo, 478 files):**
 
@@ -75,40 +98,58 @@ Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
 
 - Cold start: 217ms for 478 files.
 - With caching: subsequent runs skip unchanged files (blake3 content hash).
-- LSP: in-memory `WorkspaceIndex` behind `Arc<RwLock<>>`, 100ms debounce on file changes.
+- LSP: in-memory `WorkspaceIndex` behind `Arc<RwLock<>>`, 100ms debounce on file
+  changes.
 
-**Benchmarks directory** (`benches/`): 8 dedicated benchmark files covering rule performance, link parsing, range operations, fix performance, config lookup, and a full perf audit.
+**Benchmarks directory** (`benches/`): 8 dedicated benchmark files covering rule
+performance, link parsing, range operations, fix performance, config lookup, and
+a full perf audit.
 
-**Memory:** Not published, but the binary is stripped and uses jemalloc/mimalloc.
+**Memory:** Not published, but the binary is stripped and uses
+jemalloc/mimalloc.
 
-**Patterns to adopt:** blake3 content hashing for cache invalidation, 100ms debounce on index updates, debounced `IndexUpdate` events, cross-file dependency tracking via heading/link diffs.
-**Patterns to avoid:** Running a second independent index alongside another LSP.
+**Patterns to adopt:** blake3 content hashing for cache invalidation, 100ms
+debounce on index updates, debounced `IndexUpdate` events, cross-file dependency
+tracking via heading/link diffs. **Patterns to avoid:** Running a second
+independent index alongside another LSP.
 
 ---
 
 ### rust-analyzer
 
 **Known bottlenecks:**
-- **Cold startup: 30s–10 minutes** depending on project size. First launch with no cache: "5-10 minutes using high CPU before it is at all usable" for large projects.
-- **Memory: 154MB–605MB** for the RA repo itself (226 KLOC); **2.5GB–13GB** for large workspaces with 800+ dependencies.
+
+- **Cold startup: 30s–10 minutes** depending on project size. First launch with
+  no cache: "5-10 minutes using high CPU before it is at all usable" for large
+  projects.
+- **Memory: 154MB–605MB** for the RA repo itself (226 KLOC); **2.5GB–13GB** for
+  large workspaces with 800+ dependencies.
 - **5 seconds per 100 crates** loading time (waiting on rustc).
-- **Blocking target directory** — cargo check during startup prevents user from running cargo commands.
-- **Macro-heavy projects** cause extreme memory usage (AttrsQuery: 6063MB in one report).
+- **Blocking target directory** — cargo check during startup prevents user from
+  running cargo commands.
+- **Macro-heavy projects** cause extreme memory usage (AttrsQuery: 6063MB in one
+  report).
 
 **Concrete numbers:**
-- Database loaded: 9.57s for a brand-new empty project on Windows (due to `Command::output` latency).
+
+- Database loaded: 9.57s for a brand-new empty project on Windows (due to
+  `Command::output` latency).
 - Cache warm-up disabled: 154MB for RA repo. Enabled: 605MB.
 - PGO optimization of editor builds: 15-20% performance improvement.
 - Parallel VFS loading prototype: 876 crates in 1.5s (vs. 1+ minute serial).
-- **Goal: sub-100ms autocomplete latency** on larger projects (stated in #17491).
+- **Goal: sub-100ms autocomplete latency** on larger projects (stated
+  in #17491).
 
 **Memory budget (industry knowledge):**
+
 - VS Code extension host: ~3072MB default (TSServer).
 - rust-analyzer typical: 500MB–2GB for medium projects.
 - RA self-reports: 154MB–605MB.
 
-**Patterns to adopt:** Salsa incremental computation graph, VFS with content hashing, LRU caching, parallel loading, PGO-optimized builds.
-**Patterns to avoid:** Serial VFS loading, repeated `Command::output` calls during startup.
+**Patterns to adopt:** Salsa incremental computation graph, VFS with content
+hashing, LRU caching, parallel loading, PGO-optimized builds.
+**Patterns to avoid:** Serial VFS loading, repeated `Command::output` calls
+during startup.
 
 ---
 
@@ -131,7 +172,8 @@ Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
 
 ### gopls (Go LSP) — completion budget
 
-- **Soft latency goal: 100ms** for completion requests. Dynamically reduces search scope as budget is consumed.
+- **Soft latency goal: 100ms** for completion requests. Dynamically reduces
+  search scope as budget is consumed.
 
 ### General community consensus (from forum posts, blog posts, VS Code docs)
 
@@ -149,10 +191,14 @@ Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
 
 ### VS Code constraints
 
-- **Extension host memory limit**: ~3072MB (hardcoded in Electron utilityProcess, not configurable at runtime).
-- **Large file threshold**: 50MB — above this, many editor features are disabled.
-- **Language servers run in separate processes** — avoids blocking the editor, but means the LSP has its own memory budget.
-- **TSServer memory**: defaults to 3072MB `max-old-space-size`, no dynamic pressure resolution.
+- **Extension host memory limit**: ~3072MB (hardcoded in Electron
+  utilityProcess, not configurable at runtime).
+- **Large file threshold**: 50MB — above this, many editor features are
+  disabled.
+- **Language servers run in separate processes** — avoids blocking the editor,
+  but means the LSP has its own memory budget.
+- **TSServer memory**: defaults to 3072MB `max-old-space-size`, no dynamic
+  pressure resolution.
 
 ---
 
@@ -198,14 +244,24 @@ Sources: Existing research in `.scratch/md-pkm-lsp/research/`, codebase digests,
 
 ### Patterns to adopt from research
 
-1. **rumdl**: blake3 content hashing for cache invalidation, 100ms debounce, cross-file dependency tracking via heading/link diffs, `Arc<RwLock<WorkspaceIndex>>` shared between server and background worker.
-2. **Marksman**: Suffix-tree or hash-map index for O(1) goto-def, MailboxProcessor/actor pattern for sequential state mutation.
-3. **rust-analyzer**: Salsa-style incremental computation (if complexity warrants it), parallel file loading, LRU caching, PGO-optimized builds.
-4. **Traces (existing)**: redb persistence (already ahead of all other PKM LSPs), `IndexDelta::compute` for incremental updates, `refresh()` warm-start path.
+1. **rumdl**: blake3 content hashing for cache invalidation, 100ms debounce,
+   cross-file dependency tracking via heading/link diffs,
+   `Arc<RwLock<WorkspaceIndex>>` shared between server and background worker.
+2. **Marksman**: Suffix-tree or hash-map index for O(1) goto-def,
+   MailboxProcessor/actor pattern for sequential state mutation.
+3. **rust-analyzer**: Salsa-style incremental computation (if complexity
+   warrants it), parallel file loading, LRU caching, PGO-optimized builds.
+4. **Traces (existing)**: redb persistence (already ahead of all other PKM
+   LSPs), `IndexDelta::compute` for incremental updates, `refresh()` warm-start
+   path.
 
 ### Patterns to avoid
 
-1. **Markdown Oxide**: Full vault rebuild on `did_change_watched_files`, no persistence, regex-only parsing, no cancellation.
-2. **Marksman**: Full re-parse per edit with no incremental parsing within a document.
-3. **rust-analyzer**: Serial VFS loading, repeated `Command::output` during startup, unbounded memory growth.
-4. **General**: Running a second independent file index alongside rumdl (coordinate via init_options instead).
+1. **Markdown Oxide**: Full vault rebuild on `did_change_watched_files`, no
+   persistence, regex-only parsing, no cancellation.
+2. **Marksman**: Full re-parse per edit with no incremental parsing within a
+   document.
+3. **rust-analyzer**: Serial VFS loading, repeated `Command::output` during
+   startup, unbounded memory growth.
+4. **General**: Running a second independent file index alongside rumdl
+   (coordinate via init_options instead).

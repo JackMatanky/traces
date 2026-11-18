@@ -1,15 +1,24 @@
 # Attack: Config Lifecycle (L0 vs L1 vs L3 and Alternatives)
 
-- **Target File**: `.scratch/arch-design/research/22-prep/l-attack-config-lifecycle.md`
-- **Subject**: Adversarial analysis and empirical evaluation of configuration lifecycle designs for Ticket 22 (Traces Wayfinder).
+- **Target File**:
+  `.scratch/arch-design/research/22-prep/l-attack-config-lifecycle.md`
+- **Subject**: Adversarial analysis and empirical evaluation of configuration
+  lifecycle designs for Ticket 22 (Traces Wayfinder).
 - **Designs Evaluated**:
-  - `L0`: Stateless reload (`ConfigService` held by adapter, `load(&self, cwd)` per request, digest comparison for service reuse).
-  - `L1`: Functional snapshot loader (`ConfigLoader::load(&HostInputs) -> Result<ConfigGeneration>`).
-  - `L3`: Stateful held workspace (`WorkspaceConfig` with `admit_request()` and `ConfigGeneration`).
-  - `L-Alt`: Separated admission gate (`ConfigSnapshot` with decoupled `check_admission` and `load`).
+  - `L0`: Stateless reload (`ConfigService` held by adapter, `load(&self, cwd)`
+    per request, digest comparison for service reuse).
+  - `L1`: Functional snapshot loader
+    (`ConfigLoader::load(&HostInputs) -> Result<ConfigGeneration>`).
+  - `L3`: Stateful held workspace (`WorkspaceConfig` with `admit_request()` and
+    `ConfigGeneration`).
+  - `L-Alt`: Separated admission gate (`ConfigSnapshot` with decoupled
+    `check_admission` and `load`).
 - **Baseline Git HEAD**: `8064cf76`
-- **Methodology**: Paper audit of source code, empirical benchmarking in `/tmp` (isolated Rust harness), and line-by-line verification against Ticket 21 lines 72-203 and Ticket 16 envelope rules.
-- **Claim Tags**: `[V]` verified by direct read/execution; `[H]` inference; `[P]` proposal.
+- **Methodology**: Paper audit of source code, empirical benchmarking in `/tmp`
+  (isolated Rust harness), and line-by-line verification against Ticket 21 lines
+  72-203 and Ticket 16 envelope rules.
+- **Claim Tags**: `[V]` verified by direct read/execution; `[H]` inference;
+  `[P]` proposal.
 
 ---
 
@@ -31,30 +40,62 @@
 
 ### 2.1 Theoretical Cost Breakdown (Paper Audit)
 
-Every execution of `ConfigService::load(&self, cwd)` (`src/config/service.rs:74-77`) executes four sequential phases:
+Every execution of `ConfigService::load(&self, cwd)`
+(`src/config/service.rs:74-77`) executes four sequential phases:
 
-1. **Discovery (`ConfigLocator::project`)** `[V: src/config/discovery.rs:73-84]`:
-   - Walks upward from `cwd` checking `ancestor.join(".traces/config.toml")`. Calls `is_config_file` (`fs::metadata`), issuing 1 `stat` call per ancestor directory level before a ceiling `[V: :102-110]`.
-   - Probes `global_dir.join("config.toml")` via `fs::metadata` (1 `stat` call) `[V: :78-79]`.
-2. **Trust & Tracking (`LocalConfigFile::into_trusted`)** `[V: src/config/file.rs:214-236]`:
-   - `tracker.record_best_effort(path)`: calls `StoreEntry::from_target(path)`, which invokes `fs::canonicalize(path)` (resolving all symlinks and path components), hashes the canonical path, and stats the tracker store `[V: src/file_tracker.rs:60-63, 444]`.
-   - `trust.config_file_trust_check(root, path)` `[V: src/config/trust.rs:240-260]`:
-     - Calls `self.store.contains(root)` -> `StoreEntry::from_target(root)` -> `fs::canonicalize(root)` (1 `canonicalize` call) + 1 `stat` on trust store `[V: :245]`.
-     - Calls `self.store.read_companion(root, ".blake3")` -> `StoreEntry::from_target(root)` -> `fs::canonicalize(root)` **a second time** + `fs::read_to_string` on `<hash>.blake3` `[V: :248-252]`.
-     - Calls `read_config(config_path)` -> `fs::read_to_string` on `.traces/config.toml` `[V: :253]`.
+1. **Discovery (`ConfigLocator::project`)**
+   `[V: src/config/discovery.rs:73-84]`:
+   - Walks upward from `cwd` checking `ancestor.join(".traces/config.toml")`.
+     Calls `is_config_file` (`fs::metadata`), issuing 1 `stat` call per ancestor
+     directory level before a ceiling `[V: :102-110]`.
+   - Probes `global_dir.join("config.toml")` via `fs::metadata` (1 `stat` call)
+     `[V: :78-79]`.
+2. **Trust & Tracking (`LocalConfigFile::into_trusted`)**
+   `[V: src/config/file.rs:214-236]`:
+   - `tracker.record_best_effort(path)`: calls `StoreEntry::from_target(path)`,
+     which invokes `fs::canonicalize(path)` (resolving all symlinks and path
+     components), hashes the canonical path, and stats the tracker store
+     `[V: src/file_tracker.rs:60-63, 444]`.
+   - `trust.config_file_trust_check(root, path)`
+     `[V: src/config/trust.rs:240-260]`:
+     - Calls `self.store.contains(root)` -> `StoreEntry::from_target(root)` ->
+       `fs::canonicalize(root)` (1 `canonicalize` call) + 1 `stat` on trust
+       store `[V: :245]`.
+     - Calls `self.store.read_companion(root, ".blake3")` ->
+       `StoreEntry::from_target(root)` -> `fs::canonicalize(root)`
+       **a second time** + `fs::read_to_string` on `<hash>.blake3`
+       `[V: :248-252]`.
+     - Calls `read_config(config_path)` -> `fs::read_to_string` on
+       `.traces/config.toml` `[V: :253]`.
      - Computes `Blake3Digest::from(content.as_str())` `[V: :254]`.
      - Formats hex string and checks equality `[V: :255]`.
 3. **TOML Deserialization** `[V: src/config/file.rs:260-270]`:
    - Calls `toml::from_str::<RawConfig>(&content)` for local config `[V]`.
-   - If global config exists, calls `fs::read_to_string` and `toml::from_str::<RawConfig>` for global config `[V: src/config/service.rs:106-109]`.
-4. **Resolution & Confinement (`ConfigBuilder::build`)** `[V: src/config/builder.rs:62-70]`:
-   - `resolve_templates()`: if configured, calls `ConfigSubDir::resolve` -> `SafeRelativePath::parse(root, dir)` -> `PathBoundary::try_new(root)` (`fs::canonicalize(root)` **a third time**) + `boundary.strict_join(dir)` (`lstat`/`readlink` across components) `[V: src/path.rs:181-189]`.
-   - `resolve_schemas()`: `DEFAULT_LOCAL_SCHEMAS_DIR` ("schemas") is **always** resolved, even if omitted in TOML: calls `ConfigSubDir::from_raw_or_default` -> `SafeRelativePath::parse(root, "schemas")` -> `PathBoundary::try_new(root)` (`fs::canonicalize(root)` **a fourth time**) + `boundary.strict_join("schemas")` `[V: src/config/builder.rs:135-144]`.
-   - `resolve_tasks()`: instantiates `TaskStatusMap`, allocating hash maps and string names `[V: src/config/builder.rs:190-205]`.
+   - If global config exists, calls `fs::read_to_string` and
+     `toml::from_str::<RawConfig>` for global config
+     `[V: src/config/service.rs:106-109]`.
+4. **Resolution & Confinement (`ConfigBuilder::build`)**
+   `[V: src/config/builder.rs:62-70]`:
+   - `resolve_templates()`: if configured, calls `ConfigSubDir::resolve` ->
+     `SafeRelativePath::parse(root, dir)` -> `PathBoundary::try_new(root)`
+     (`fs::canonicalize(root)` **a third time**) + `boundary.strict_join(dir)`
+     (`lstat`/`readlink` across components) `[V: src/path.rs:181-189]`.
+   - `resolve_schemas()`: `DEFAULT_LOCAL_SCHEMAS_DIR` ("schemas") is **always**
+     resolved, even if omitted in TOML: calls
+     `ConfigSubDir::from_raw_or_default` ->
+     `SafeRelativePath::parse(root, "schemas")` -> `PathBoundary::try_new(root)`
+     (`fs::canonicalize(root)` **a fourth time**) +
+     `boundary.strict_join("schemas")` `[V: src/config/builder.rs:135-144]`.
+   - `resolve_tasks()`: instantiates `TaskStatusMap`, allocating hash maps and
+     string names `[V: src/config/builder.rs:190-205]`.
 
 ### 2.2 Empirical Measurement (/tmp Throwaway Harness)
 
-A benchmark harness replicating the exact dependencies (`blake3 1.8.7`, `toml 1.1.8`, `strict-path 0.2.3`, `tempfile 3.27.0`) was compiled and run with `--release` on Darwin arm64 (APFS, hot cache) over 10,000 iterations against a representative 2 KB `config.toml` containing template, schema, task status, and frontmatter definitions:
+A benchmark harness replicating the exact dependencies (`blake3 1.8.7`,
+`toml 1.1.8`, `strict-path 0.2.3`, `tempfile 3.27.0`) was compiled and run with
+`--release` on Darwin arm64 (APFS, hot cache) over 10,000 iterations against a
+representative 2 KB `config.toml` containing template, schema, task status, and
+frontmatter definitions:
 
 | Operation | Elapsed Time (Mean) | Invocations per `load()` | Notes |
 |---|---|---|---|
@@ -70,15 +111,26 @@ A benchmark harness replicating the exact dependencies (`blake3 1.8.7`, `toml 1.
 ### 2.3 Verdict on Keystroke-Rate Viability
 
 - **Is 106 µs per-request acceptable for an LSP?**
-  - **Single-request latency**: 106 µs (0.1 ms) is small relative to a full index query (~1-5 ms) or template render. It will not exceed the 50 ms LSP budget in isolation `[H]`.
-  - **Throughput & Syscall Storm**: At typing rate (10-50 keystrokes/sec) or rapid completion/hover requests (up to 100 req/sec), calling `load()` on every request produces:
-    - ~700 to 1,000 filesystem syscalls (`lstat`, `fcntl(F_GETPATH)`, `open`, `read`, `close`) per second `[H]`.
-    - Continuous memory churn from TOML AST and `TaskStatusMap` heap allocations `[H]`.
-    - Catastrophic degradation on cold cache, spinning disks, or network mounts (NFS/SMB), where `canonicalize` and `fs::read_to_string` scale to 1.5–10 ms per call, inducing 150–500 ms/sec of pure I/O blocking `[H]`.
+  - **Single-request latency**: 106 µs (0.1 ms) is small relative to a full
+    index query (~1-5 ms) or template render. It will not exceed the 50 ms LSP
+    budget in isolation `[H]`.
+  - **Throughput & Syscall Storm**: At typing rate (10-50 keystrokes/sec) or
+    rapid completion/hover requests (up to 100 req/sec), calling `load()` on
+    every request produces:
+    - ~700 to 1,000 filesystem syscalls (`lstat`, `fcntl(F_GETPATH)`, `open`,
+      `read`, `close`) per second `[H]`.
+    - Continuous memory churn from TOML AST and `TaskStatusMap` heap allocations
+      `[H]`.
+    - Catastrophic degradation on cold cache, spinning disks, or network mounts
+      (NFS/SMB), where `canonicalize` and `fs::read_to_string` scale to 1.5–10
+      ms per call, inducing 150–500 ms/sec of pure I/O blocking `[H]`.
 - **Impact of a Watcher Signal or Stat Gate**:
-  - A watcher dirty flag (`AtomicBool`) drops the admission overhead for 99.99% of requests from **106.0 µs to < 1 ns** (a 100,000x reduction) `[V]`.
-  - Even a filesystem `stat` gate (checking mtime and file size) drops overhead from **106.0 µs to 1.5 µs** (a 70x reduction) `[V]`.
-- **Verdict**: Unmitigated per-request `load()` in L0 is **REFUTED**. An admission gate must short-circuit when configuration is unchanged on disk.
+  - A watcher dirty flag (`AtomicBool`) drops the admission overhead for 99.99%
+    of requests from **106.0 µs to < 1 ns** (a 100,000x reduction) `[V]`.
+  - Even a filesystem `stat` gate (checking mtime and file size) drops overhead
+    from **106.0 µs to 1.5 µs** (a 70x reduction) `[V]`.
+- **Verdict**: Unmitigated per-request `load()` in L0 is **REFUTED**. An
+  admission gate must short-circuit when configuration is unchanged on disk.
 
 ---
 
@@ -99,20 +151,36 @@ Audit of Ticket 21 Answer lines 101–107 against L0, L1, L3, and L-Alt:
 ### 3.1 Guarantees L0 Cannot Give Without a Held Object
 
 1. **In-Flight Isolation During Reload Failure** `[H]`:
-   - Suppose Request 1 is admitted at $T=0$ and executes an index query. At $T=5\text{ms}$, the user saves a broken syntax edit in `.traces/config.toml`. Request 2 arrives at $T=6\text{ms}$ and calls `load()`, which fails with `ConfigError::Read`.
-   - Under L0, the host has no core type linking Request 1's `Config` to its active `IndexerService` and `IndexStore`. If the host reacts to Request 2's failure by clearing its workspace cache, Request 1 faults or aborts mid-flight. L0 forces the host to implement its own multi-generation retention and failure isolation logic.
+   - Suppose Request 1 is admitted at $T=0$ and executes an index query. At
+     $T=5\text{ms}$, the user saves a broken syntax edit in
+     `.traces/config.toml`. Request 2 arrives at $T=6\text{ms}$ and calls
+     `load()`, which fails with `ConfigError::Read`.
+   - Under L0, the host has no core type linking Request 1's `Config` to its
+     active `IndexerService` and `IndexStore`. If the host reacts to Request 2's
+     failure by clearing its workspace cache, Request 1 faults or aborts
+     mid-flight. L0 forces the host to implement its own multi-generation
+     retention and failure isolation logic.
 2. **Deterministic Cross-Service Generation Identity** `[H]`:
-   - Ticket 21 requires that admitted requests keep an immutable generation identity shared across query evaluation, template frames, and index reads. In L0, `Config` has no generation ID (`generation: u64`). Two calls to `load()` that read the exact same disk content produce two distinct heap allocations with no structural identity linking them.
+   - Ticket 21 requires that admitted requests keep an immutable generation
+     identity shared across query evaluation, template frames, and index reads.
+     In L0, `Config` has no generation ID (`generation: u64`). Two calls to
+     `load()` that read the exact same disk content produce two distinct heap
+     allocations with no structural identity linking them.
 
 ---
 
 ## 4. Investigation 3: Scope of `source_digest`
 
-The L0 design proposes exposing `Config::source_digest(&self) -> Blake3Digest`, retaining the hash already computed during `config_file_trust_check` (`src/config/trust.rs:254-255`).
+The L0 design proposes exposing `Config::source_digest(&self) -> Blake3Digest`,
+retaining the hash already computed during `config_file_trust_check`
+(`src/config/trust.rs:254-255`).
 
 ### 4.1 What `source_digest` MUST Cover for Interchangeability
 
-If a host uses `old_digest == new_digest` to decide that derived services (`IndexerService`, `TemplateService`, query schemas) can be reused without reconstruction, the digest must cover all inputs that affect configuration semantics:
+If a host uses `old_digest == new_digest` to decide that derived services
+(`IndexerService`, `TemplateService`, query schemas) can be reused without
+reconstruction, the digest must cover all inputs that affect configuration
+semantics:
 
 | Input | Covered in Naive L0? | Required in `source_digest`? | Reason |
 |---|---|---|---|
@@ -126,9 +194,16 @@ If a host uses `old_digest == new_digest` to decide that derived services (`Inde
 
 ### 4.2 Flaws in Naive L0 Digest
 
-1. **Silent Global Drift**: If a user edits `~/.config/traces/config.toml`, the local file hash is unchanged. In naive L0, `Config::source_digest()` remains identical. The host reuses its old `TemplateService`, never observing the new global template directory `[V, H]`.
-2. **Silent Ignore Policy Drift**: If an LSP host changes `TRACES_IGNORED_DIRS` via initialization options, naive `source_digest` does not change, causing the indexer to retain stale directory exclusions `[V, H]`.
-3. **Verdict**: Naive local-only `source_digest` is **REFUTED**. The core must define a composite `ConfigSourceDigest` covering local content, global content, and host policy inputs `[P]`.
+1. **Silent Global Drift**: If a user edits `~/.config/traces/config.toml`, the
+   local file hash is unchanged. In naive L0, `Config::source_digest()` remains
+   identical. The host reuses its old `TemplateService`, never observing the new
+   global template directory `[V, H]`.
+2. **Silent Ignore Policy Drift**: If an LSP host changes `TRACES_IGNORED_DIRS`
+   via initialization options, naive `source_digest` does not change, causing
+   the indexer to retain stale directory exclusions `[V, H]`.
+3. **Verdict**: Naive local-only `source_digest` is **REFUTED**. The core must
+   define a composite `ConfigSourceDigest` covering local content, global
+   content, and host policy inputs `[P]`.
 
 ---
 
@@ -136,29 +211,47 @@ If a host uses `old_digest == new_digest` to decide that derived services (`Inde
 
 ### 5.1 Current Implementation State
 
-- In `src/config/service.rs:106-109`, global config is parsed directly via `GlobalConfigFile::<Parsed>::try_from(global)?` `[V]`.
-- Global config has **no trust gate**, **no companion hash**, **no tracker entry**, and **no content hash** computed or retained `[V: a2 §3.3]`.
+- In `src/config/service.rs:106-109`, global config is parsed directly via
+  `GlobalConfigFile::<Parsed>::try_from(global)?` `[V]`.
+- Global config has **no trust gate**, **no companion hash**,
+  **no tracker entry**, and **no content hash** computed or retained
+  `[V: a2 §3.3]`.
 
 ### 5.2 What Global Config Can Modify (Attack Surface)
 
 Reading `src/config/builder.rs:72-153` reveals that global config can configure:
 
-1. `templates.directory`: Points to any directory on the filesystem containing Jinja template files `[V: :83-93]`.
-2. `templates.output_dir`: Sets where template rendering writes generated notes `[V: :94-107]`.
-3. `schemas.directory`: Sets the directory for schema definitions `[V: :135-144]`.
+1. `templates.directory`: Points to any directory on the filesystem containing
+   Jinja template files `[V: :83-93]`.
+2. `templates.output_dir`: Sets where template rendering writes generated notes
+   `[V: :94-107]`.
+3. `schemas.directory`: Sets the directory for schema definitions
+   `[V: :135-144]`.
 4. `schemas.class_field`: Sets the default note class property `[V: :120-126]`.
-5. `tasks.tag_filters` and `tasks.statuses`: Alters task parsing and filtering `[V: :155-205]`.
+5. `tasks.tag_filters` and `tasks.statuses`: Alters task parsing and filtering
+   `[V: :155-205]`.
 
 ### 5.3 Security Implications in Multi-Host / Daemon Contexts
 
-- In a CLI context, global config belongs to the invoking user (`~/.config/traces/config.toml`), so omitting the trust gate follows standard UNIX conventions (analogous to `~/.gitconfig`) `[H]`.
-- In a long-lived multi-workspace LSP daemon or MCP server serving untrusted repositories:
-  - If global config is modified while the server is running, the server currently has no mechanism to detect the change.
-  - While global config cannot execute arbitrary shell scripts directly (Minijinja sandboxes execution), altering `templates.directory` allows a malicious local actor to redirect template instantiation to read arbitrary template files across the system `[H]`.
+- In a CLI context, global config belongs to the invoking user
+  (`~/.config/traces/config.toml`), so omitting the trust gate follows standard
+  UNIX conventions (analogous to `~/.gitconfig`) `[H]`.
+- In a long-lived multi-workspace LSP daemon or MCP server serving untrusted
+  repositories:
+  - If global config is modified while the server is running, the server
+    currently has no mechanism to detect the change.
+  - While global config cannot execute arbitrary shell scripts directly
+    (Minijinja sandboxes execution), altering `templates.directory` allows a
+    malicious local actor to redirect template instantiation to read arbitrary
+    template files across the system `[H]`.
 - **Smallest Rule Consistent with Ticket 21**:
-  - Global config must **NOT** use the local companion hash or trust gate (confirming Ticket 21 line 105) `[V]`.
-  - When read, global config bytes must be hashed into a `Blake3Digest` (`global_hash`). If the file is absent, use a well-known `BLAKE3_ABSENT` sentinel `[P]`.
-  - The `global_hash` must be included in `ConfigSourceDigest` so that global edits invalidate derived services `[P]`.
+  - Global config must **NOT** use the local companion hash or trust gate
+    (confirming Ticket 21 line 105) `[V]`.
+  - When read, global config bytes must be hashed into a `Blake3Digest`
+    (`global_hash`). If the file is absent, use a well-known `BLAKE3_ABSENT`
+    sentinel `[P]`.
+  - The `global_hash` must be included in `ConfigSourceDigest` so that global
+    edits invalidate derived services `[P]`.
 
 ---
 
@@ -169,50 +262,71 @@ Reading `src/config/builder.rs:72-153` reveals that global config can configure:
 #### 1. `ConfigLocator::from_env` (2 total call sites in workspace) `[V]`
 
 - `src/config/service.rs:75`: inside `ConfigService::load(&self, cwd)` `[V]`.
-- `src/config/service.rs:175`: inside static `ConfigService::trust_subjects(path, scope)` `[V]`.
+- `src/config/service.rs:175`: inside static
+  `ConfigService::trust_subjects(path, scope)` `[V]`.
 - Tests: **0** calls in `tests/` or unit tests `[V]`.
 
 #### 2. `ConfigService::load` (4 total call sites in workspace) `[V]`
 
-- `src/cli/mod.rs:250`: inside CLI helper `load_config(service: &ConfigService)` `[V]`.
+- `src/cli/mod.rs:250`: inside CLI helper `load_config(service: &ConfigService)`
+  `[V]`.
 - `src/lib.rs:377`: inside test fixture `TestProject::config(&self)` `[V]`.
 - `src/lib.rs:791`: inside unit test for empty directory error `[V]`.
-- `src/config/service.rs:538`: inside unit test for untrusted config rejection `[V]`.
+- `src/config/service.rs:538`: inside unit test for untrusted config rejection
+  `[V]`.
 
 #### 3. `ConfigService::trust_subjects` (1 production call site) `[V]`
 
 - `src/cli/mod.rs:538`: inside CLI helper `cli::resolve_trust_subjects` `[V]`.
-- Note: `src/config/service.rs` unit tests (lines 652, 668, 684, 703) **cannot call `ConfigService::trust_subjects`** because it hardcodes `from_env()`; they are forced to call the private helper `resolve_trust_subjects(&fixture.locator(), ...)` directly `[V]`.
+- Note: `src/config/service.rs` unit tests (lines 652, 668, 684, 703)
+  **cannot call `ConfigService::trust_subjects`** because it hardcodes
+  `from_env()`; they are forced to call the private helper
+  `resolve_trust_subjects(&fixture.locator(), ...)` directly `[V]`.
 
 #### 4. `ConfigService::default` (1 call site in workspace) `[V]`
 
-- `src/cli/mod.rs:227`: `Cli::parse().run(&ConfigService::default(), provider)` `[V]`.
+- `src/cli/mod.rs:227`: `Cli::parse().run(&ConfigService::default(), provider)`
+  `[V]`.
 
 #### 5. `ConfigService::for_test` (5 call sites in workspace) `[V]`
 
 - `src/lib.rs:645`: inside `testing::fixture_service(root)` `[V]`.
-- `src/cli/mod.rs:1062`: CLI unit test `list_templates_prints_available_templates` `[V]`.
+- `src/cli/mod.rs:1062`: CLI unit test
+  `list_templates_prints_available_templates` `[V]`.
 - `src/cli/mod.rs:1443`: CLI unit test `help_output_includes_examples` `[V]`.
-- `src/cli/mod.rs:1538`: CLI unit test `version_output_matches_cargo_pkg_version` `[V]`.
+- `src/cli/mod.rs:1538`: CLI unit test
+  `version_output_matches_cargo_pkg_version` `[V]`.
 - `src/config/service.rs:305`: inside internal test `Fixture::new()` `[V]`.
 
 ### 6.2 Test Breakage Impact Assessment
 
-If `ConfigService` owns its `ConfigLocator` (or receives `HostInputs`), what is the downstream test impact?
+If `ConfigService` owns its `ConfigLocator` (or receives `HostInputs`), what is
+the downstream test impact?
 
-- `TestProject` in `src/lib.rs:281-351` constructs its service via `project_service(root)` -> `fixture_service(&state_root)` `[V: :288, 644]`.
-- Updating `fixture_service` once in `src/lib.rs:645` to pass an isolated temp config home (`root.join("config-home")`) and empty ceilings isolates every test using `TestProject::trusted`, `TestProject::empty`, and `TestProject::untrusted` `[V, H]`.
+- `TestProject` in `src/lib.rs:281-351` constructs its service via
+  `project_service(root)` -> `fixture_service(&state_root)` `[V: :288, 644]`.
+- Updating `fixture_service` once in `src/lib.rs:645` to pass an isolated temp
+  config home (`root.join("config-home")`) and empty ceilings isolates every
+  test using `TestProject::trusted`, `TestProject::empty`, and
+  `TestProject::untrusted` `[V, H]`.
 - **Net test changes required**:
   - `src/lib.rs:645` (1 helper updated)
   - `src/cli/mod.rs` (3 test functions updated)
   - `src/config/service.rs:305` (1 fixture helper updated)
-  - Over 150 integration tests in `tests/` and unit tests in `src/` remain **100% untouched** `[V, H]`.
+  - Over 150 integration tests in `tests/` and unit tests in `src/` remain
+    **100% untouched** `[V, H]`.
 
 ### 6.3 Shared Traversal Inputs Between Discovery and Trust Walking
 
-- **Upward Discovery** (`nearest_local`, `src/config/discovery.rs:102-105`): stops when hitting any directory in `ceilings` (`env_vars::CEILING_DIRS`) `[V]`.
-- **Downward Subtree Discovery** (`local_subtree` -> `collect_descendant_configs`, `src/config/discovery.rs:157-158`): prunes subtrees matching `env_vars::is_ignored_dir` (`env_vars::IGNORED_DIRS`) `[V]`.
-- Placing both `ceiling_dirs` and `ignored_dirs` inside `ConfigLocator` unifies traversal policies and completely eradicates ambient reads from `src/env_vars.rs` `[P]`.
+- **Upward Discovery** (`nearest_local`, `src/config/discovery.rs:102-105`):
+  stops when hitting any directory in `ceilings` (`env_vars::CEILING_DIRS`)
+  `[V]`.
+- **Downward Subtree Discovery** (`local_subtree` ->
+  `collect_descendant_configs`, `src/config/discovery.rs:157-158`): prunes
+  subtrees matching `env_vars::is_ignored_dir` (`env_vars::IGNORED_DIRS`) `[V]`.
+- Placing both `ceiling_dirs` and `ignored_dirs` inside `ConfigLocator` unifies
+  traversal policies and completely eradicates ambient reads from
+  `src/env_vars.rs` `[P]`.
 
 ---
 
@@ -223,7 +337,8 @@ If `ConfigService` owns its `ConfigLocator` (or receives `HostInputs`), what is 
 Current state in repository:
 
 1. **`src/dirs.rs` (6 LazyLocks)** `[V: :61-189]`:
-   - `HOME`: User home directory (`$HOME` / `%USERPROFILE%` / `CARGO_MANIFEST_DIR/test`).
+   - `HOME`: User home directory (`$HOME` / `%USERPROFILE%` /
+     `CARGO_MANIFEST_DIR/test`).
    - `CONFIG_HOME`: Global configuration directory (`$XDG_CONFIG_HOME`).
    - `STATE_HOME`: Platform state directory (`$XDG_STATE_HOME`).
    - `TRACES_STATE_DIR`: Persistent state path (`$TRACES_STATE_DIR`).
@@ -237,18 +352,24 @@ Current state in repository:
 
 ### 7.2 Coexistence Under L0 / L-Alt
 
-When `ConfigService` is constructed with an adapter-provided `HostInputs` snapshot:
+When `ConfigService` is constructed with an adapter-provided `HostInputs`
+snapshot:
 
 - `TrackerStore` and `TrustStore` are rooted at `HostInputs.state_home` `[P]`.
-- `ConfigLocator` is rooted at `HostInputs.config_home` with `HostInputs.ceiling_dirs` and `HostInputs.ignored_dirs` `[P]`.
-- **Result**: Workspace A and Workspace B can run simultaneously in the same process with different project roots, different config homes, different trust stores, and different ignore lists. No process environment variables are inspected, and no global state is mutated `[V, H]`.
+- `ConfigLocator` is rooted at `HostInputs.config_home` with
+  `HostInputs.ceiling_dirs` and `HostInputs.ignored_dirs` `[P]`.
+- **Result**: Workspace A and Workspace B can run simultaneously in the same
+  process with different project roots, different config homes, different trust
+  stores, and different ignore lists. No process environment variables are
+  inspected, and no global state is mutated `[V, H]`.
 - Cross-workspace isolation is complete.
 
 ---
 
 ## 8. Investigation 7: Boundary Between Ticket 22 and Ticket 31
 
-To avoid architecture creep, Ticket 22 must define the domain primitives of configuration while deferring host orchestration to Ticket 31 (`WorkspaceHost`).
+To avoid architecture creep, Ticket 22 must define the domain primitives of
+configuration while deferring host orchestration to Ticket 31 (`WorkspaceHost`).
 
 | Responsibility | Owner | Rationale |
 |---|---|---|
@@ -269,23 +390,36 @@ To avoid architecture creep, Ticket 22 must define the domain primitives of conf
 ### 9.1 Evaluation of Alternatives
 
 1. **L0: Stateless Reload**
-   - Core has no cache or held state. Host must call `load()` on every request and manually compare digests.
-   - *Flaw*: Extreme filesystem churn at keystroke rate (106 µs / req); host must reinvent admission logic `[V, H]`.
+   - Core has no cache or held state. Host must call `load()` on every request
+     and manually compare digests.
+   - *Flaw*: Extreme filesystem churn at keystroke rate (106 µs / req); host
+     must reinvent admission logic `[V, H]`.
 2. **L1: Functional Snapshot Loader**
-   - Pure functional `ConfigLoader::load(&HostInputs) -> Result<ConfigGeneration>`.
-   - *Flaw*: Same as L0; lacks an admission fast path and forces host to coordinate caching `[H]`.
+   - Pure functional
+     `ConfigLoader::load(&HostInputs) -> Result<ConfigGeneration>`.
+   - *Flaw*: Same as L0; lacks an admission fast path and forces host to
+     coordinate caching `[H]`.
 3. **L3: Stateful Held Workspace (`WorkspaceConfig`)**
-   - Core manages a held object with an `admit_request()` method and an internal `Arc<ConfigGeneration>`.
-   - *Flaw*: Prematurely couples configuration domain to host orchestration (Ticket 31 territory); places cross-service workspace state in `src/config/` `[V, H]`.
-4. **L-Alt: Decoupled Admission Gate (`ConfigSnapshot` + `check_admission`) [RECOMMENDED]**
+   - Core manages a held object with an `admit_request()` method and an internal
+     `Arc<ConfigGeneration>`.
+   - *Flaw*: Prematurely couples configuration domain to host orchestration
+     (Ticket 31 territory); places cross-service workspace state in
+     `src/config/` `[V, H]`.
+4. **L-Alt: Decoupled Admission Gate (`ConfigSnapshot` + `check_admission`)
+   [RECOMMENDED]**
    - `ConfigService` remains stateless (owning only stores and locator).
    - `load(&self, start)` produces an immutable, refcounted `ConfigSnapshot`.
-   - Exposes `check_admission(&self, snapshot) -> Result<AdmissionStatus, ConfigTrustError>`.
+   - Exposes
+     `check_admission(&self, snapshot) -> Result<AdmissionStatus, ConfigTrustError>`.
    - `check_admission` performs **only** the fast stat and hash check:
-     - Stat config file mtime/size. If matches snapshot metadata, returns `AdmissionStatus::Valid` in **1.5 µs** `[V]`.
-     - If mtime differs, reads file and hashes: if hash matches `snapshot.digest.local_hash`, returns `Valid`.
-     - If hash differs or companion fails, returns `AdmissionStatus::Stale` or `Err(ConfigTrustError::Untrusted)`.
-   - Leaves thread synchronization and watchers to Ticket 31 while giving the host an unbypassable, high-performance admission primitive `[P]`.
+     - Stat config file mtime/size. If matches snapshot metadata, returns
+       `AdmissionStatus::Valid` in **1.5 µs** `[V]`.
+     - If mtime differs, reads file and hashes: if hash matches
+       `snapshot.digest.local_hash`, returns `Valid`.
+     - If hash differs or companion fails, returns `AdmissionStatus::Stale` or
+       `Err(ConfigTrustError::Untrusted)`.
+   - Leaves thread synchronization and watchers to Ticket 31 while giving the
+     host an unbypassable, high-performance admission primitive `[P]`.
 
 ### 9.2 Head-to-Head Comparison Matrix
 
@@ -423,13 +557,25 @@ impl ConfigService {
 
 ## 11. Ten-Line Summary and File Path
 
-1. Naive L0 stateless reload is **refuted** on performance: full `load()` takes ~106.0 µs and generates 700+ syscalls/sec at typing rates.
-2. An admission gate checking metadata/hashes reduces admission overhead on unchanged configs from 106.0 µs to 1.5 µs (or 0 ns with a watcher).
-3. L0 fails Ticket 21 line 103: without a held object or generation token, in-flight requests cannot be isolated from concurrent reload failures.
-4. Naive local-only `source_digest` is **refuted**: it fails to detect global config mutations (`~/.config/traces/config.toml`) and ignore policy changes.
-5. Global configuration can alter template and schema directories; it must be hashed into a `global_hash` within `ConfigSourceDigest`.
-6. `ConfigLocator` must be owned by `ConfigService`: this removes the 2 remaining `from_env()` ambient calls and makes `trust_subjects` an instance method.
-7. Updating `fixture_service` isolates all 150+ integration tests with zero test breakage outside 4 fixture helper sites.
-8. Multi-root process coexistence is fully achievable: `src/config/` has zero static variables; `HostInputs` eliminates all `dirs`/`env_vars` globals.
-9. L-Alt (Decoupled Admission Gate) provides the winning design: `ConfigService` produces `ConfigSnapshot` and offers `check_admission`, cleanly handing scheduling to Ticket 31.
-10. Deliverable path: `.scratch/arch-design/research/22-prep/l-attack-config-lifecycle.md`.
+1. Naive L0 stateless reload is **refuted** on performance: full `load()` takes
+   ~106.0 µs and generates 700+ syscalls/sec at typing rates.
+2. An admission gate checking metadata/hashes reduces admission overhead on
+   unchanged configs from 106.0 µs to 1.5 µs (or 0 ns with a watcher).
+3. L0 fails Ticket 21 line 103: without a held object or generation token,
+   in-flight requests cannot be isolated from concurrent reload failures.
+4. Naive local-only `source_digest` is **refuted**: it fails to detect global
+   config mutations (`~/.config/traces/config.toml`) and ignore policy changes.
+5. Global configuration can alter template and schema directories; it must be
+   hashed into a `global_hash` within `ConfigSourceDigest`.
+6. `ConfigLocator` must be owned by `ConfigService`: this removes the 2
+   remaining `from_env()` ambient calls and makes `trust_subjects` an instance
+   method.
+7. Updating `fixture_service` isolates all 150+ integration tests with zero test
+   breakage outside 4 fixture helper sites.
+8. Multi-root process coexistence is fully achievable: `src/config/` has zero
+   static variables; `HostInputs` eliminates all `dirs`/`env_vars` globals.
+9. L-Alt (Decoupled Admission Gate) provides the winning design: `ConfigService`
+   produces `ConfigSnapshot` and offers `check_admission`, cleanly handing
+   scheduling to Ticket 31.
+10. Deliverable path:
+    `.scratch/arch-design/research/22-prep/l-attack-config-lifecycle.md`.

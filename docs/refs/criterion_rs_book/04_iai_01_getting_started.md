@@ -1,7 +1,7 @@
 ## Getting Started
 
-Iai is designed to be similar in interface to Criterion.rs, so using it is easy. To get started,
-add the following to your Cargo.toml file:
+Iai is designed to be similar in interface to Criterion.rs, so using it is easy.
+To get started, add the following to your Cargo.toml file:
 
 ```toml
 [dev-dependencies]
@@ -12,7 +12,8 @@ name = "my_benchmark"
 harness = false
 ```
 
-Next, define a benchmark by creating a file at `$PROJECT/benches/my_benchmark.rs` with the following contents:
+Next, define a benchmark by creating a file at
+`$PROJECT/benches/my_benchmark.rs` with the following contents:
 
 ```rust
 use iai::{black_box, main};
@@ -37,9 +38,10 @@ fn iai_benchmark_long() -> u64 {
 iai::main!(iai_benchmark_short, iai_benchmark_long);
 ```
 
-Finally, run this benchmark with `cargo bench`. You should see output similar to the following:
+Finally, run this benchmark with `cargo bench`. You should see output similar to
+the following:
 
-```
+```text
      Running target/release/deps/test_regular_bench-8b173c29ce041afa
 
 bench_fibonacci_short

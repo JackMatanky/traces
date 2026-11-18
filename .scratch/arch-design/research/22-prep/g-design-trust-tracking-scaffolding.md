@@ -3,42 +3,67 @@
 *Author: Prep22DesignTrustInit*  
 *Date: 2026-10-25*  
 *Git HEAD: `8064cf76` (incorporating `main @ 207cc3fb`)*  
-*Deliverable: `.scratch/arch-design/research/22-prep/g-design-trust-tracking-scaffolding.md`*
+*Deliverable:
+`.scratch/arch-design/research/22-prep/g-design-trust-tracking-scaffolding.md`*
 
 ---
 
 ## 1. Executive Summary & Verification Context
 
-This document provides independent design options for Wayfinder Ticket 22 (`.scratch/arch-design/issues/22-config-ownership-and-lifecycle.md`), focusing on:
+This document provides independent design options for Wayfinder Ticket 22
+(`.scratch/arch-design/issues/22-config-ownership-and-lifecycle.md`), focusing
+on:
 
-- **Sub-question (d)**: The twin `TrustStore` and `TrackerStore` over `FilePathTracker`, the "track before grant" ordering invariant, and host-level trust operations.
-- **Sub-question (g)**: The ownership, four-way architectural split, and lifecycle of scaffolding (`cli::init`).
+- **Sub-question (d)**: The twin `TrustStore` and `TrackerStore` over
+  `FilePathTracker`, the "track before grant" ordering invariant, and host-level
+  trust operations.
+- **Sub-question (g)**: The ownership, four-way architectural split, and
+  lifecycle of scaffolding (`cli::init`).
 
 ### Claim Tagging Protocol
 
-- `[V]` = Verified by direct code read or execution in current tree (citing `file:line`).
+- `[V]` = Verified by direct code read or execution in current tree (citing
+  `file:line`).
 - `[H]` = Architectural inference or deduction from design constraints.
 - `[P]` = Design proposal or option alternative.
 
 ### Compatibility Envelope & Strategic Mandates
 
-1. **Ticket 16 Envelope Rulings** (`issues/16-grilling-compatibility-envelope.md:51-96`):
-   - **Trust gate behaviour**: Untrusted or stale local configuration refuses to load; hash must be verified before parse [V: `issues/16:82`]. **Frozen**.
-   - **Trust/tracking symlink layout under XDG**: Symlink paths and tracker storage structure are **Free** [V: `issues/16:83`]. Re-running `traces trust` is explicitly acceptable.
-   - **CLI subcommands & flag spellings**: `traces tracked` and `traces trust` subcommands are **Migratable** [V: `issues/16:78`].
-   - **Exit codes & CLI streams**: Exit codes 0/1/2/130, payload-only stdout, diagnostic-only stderr are **Frozen** [V: `issues/16:76`].
-   - **Visibility Rule**: Default direction is narrower visibility; limit `pub` to outward-facing components [V: `issues/16:89-95`].
-2. **Ticket 21 Execution Context Obligations** (`issues/21-ambient-environment-and-execution-context.md:76-202`):
-   - **O1**: Adapter snapshots OS inputs once at workspace open [V: `issues/21:76-82`].
+1. **Ticket 16 Envelope Rulings**
+   (`issues/16-grilling-compatibility-envelope.md:51-96`):
+   - **Trust gate behaviour**: Untrusted or stale local configuration refuses to
+     load; hash must be verified before parse [V: `issues/16:82`]. **Frozen**.
+   - **Trust/tracking symlink layout under XDG**: Symlink paths and tracker
+     storage structure are **Free** [V: `issues/16:83`]. Re-running
+     `traces trust` is explicitly acceptable.
+   - **CLI subcommands & flag spellings**: `traces tracked` and `traces trust`
+     subcommands are **Migratable** [V: `issues/16:78`].
+   - **Exit codes & CLI streams**: Exit codes 0/1/2/130, payload-only stdout,
+     diagnostic-only stderr are **Frozen** [V: `issues/16:76`].
+   - **Visibility Rule**: Default direction is narrower visibility; limit `pub`
+     to outward-facing components [V: `issues/16:89-95`].
+2. **Ticket 21 Execution Context Obligations**
+   (`issues/21-ambient-environment-and-execution-context.md:76-202`):
+   - **O1**: Adapter snapshots OS inputs once at workspace open [V:
+     `issues/21:76-82`].
    - **O2**: Hash-verify local config before parse [V: `issues/21:101-103`].
-   - **O3**: Held workspace revalidates local trust and content hash at request admission [V: `issues/21:101-105`].
-   - **O4**: Independent per-workspace policy (multi-root concurrent execution without process globals) [V: `issues/21:83-89`].
-   - **O5**: Global config has a separate freshness path; does not use local trust gate [V: `issues/21:105-107`].
-   - **O6**: Enforce no-ambient-reads via Clippy `disallowed-methods` [V: `issues/21:194-202`].
-   - **Unattended-prompt rule**: Core/template receive `DialogProvider` without checking TTY; unattended prompts use authored defaults or return typed errors; no silent fallback to empty text or false [V: `issues/21:182-189`].
+   - **O3**: Held workspace revalidates local trust and content hash at request
+     admission [V: `issues/21:101-105`].
+   - **O4**: Independent per-workspace policy (multi-root concurrent execution
+     without process globals) [V: `issues/21:83-89`].
+   - **O5**: Global config has a separate freshness path; does not use local
+     trust gate [V: `issues/21:105-107`].
+   - **O6**: Enforce no-ambient-reads via Clippy `disallowed-methods` [V:
+     `issues/21:194-202`].
+   - **Unattended-prompt rule**: Core/template receive `DialogProvider` without
+     checking TTY; unattended prompts use authored defaults or return typed
+     errors; no silent fallback to empty text or false [V: `issues/21:182-189`].
 3. **Downstream Integration**:
-   - **Ticket 31 (`WorkspaceHost`)**: Host composition of config loading, admission revalidation, and initialization.
-   - **Ticket 33 (`Crate Topology`)**: Steer toward separating CLI into its own crate, requiring core domain use cases for scaffolding and trust management.
+   - **Ticket 31 (`WorkspaceHost`)**: Host composition of config loading,
+     admission revalidation, and initialization.
+   - **Ticket 33 (`Crate Topology`)**: Steer toward separating CLI into its own
+     crate, requiring core domain use cases for scaffolding and trust
+     management.
 
 ---
 
@@ -48,17 +73,30 @@ This document provides independent design options for Wayfinder Ticket 22 (`.scr
 
 #### 1. What is `FilePathTracker` (1,189 LoC)?
 
-`src/file_tracker.rs` (1,189 lines total) provides hash-keyed directory persistence. A breakdown of its contents reveals:
+`src/file_tracker.rs` (1,189 lines total) provides hash-keyed directory
+persistence. A breakdown of its contents reveals:
 
-- **Unit Tests**: 649 lines (55%) [V: `src/file_tracker.rs:541-1189`]. The test suite exhaustively verifies Unix symlink creation, Windows file fallback, companion writing, entry collision handling, idempotent re-recording, and cleanup modes.
+- **Unit Tests**: 649 lines (55%) [V: `src/file_tracker.rs:541-1189`]. The test
+  suite exhaustively verifies Unix symlink creation, Windows file fallback,
+  companion writing, entry collision handling, idempotent re-recording, and
+  cleanup modes.
 - **Production Code**: 540 lines (45%) [V: `src/file_tracker.rs:1-540`].
 - **Production Responsibilities**:
-  1. *Path Canonicalization & Hashing*: Uses `fs::canonicalize` and `Blake3PathHash` to build a 64-character lowercase hex entry name [V: `src/file_tracker.rs:417-456`].
+  1. *Path Canonicalization & Hashing*: Uses `fs::canonicalize` and
+     `Blake3PathHash` to build a 64-character lowercase hex entry name [V:
+     `src/file_tracker.rs:417-456`].
   2. *OS-Specific Persistence*:
-     - Unix: Symbolic links pointing to canonical targets (`std::os::unix::fs::symlink`) [V: `src/file_tracker.rs:72-74`].
-     - Windows: Plain text files holding canonical target bytes (`fs::write(..., target.as_encoded_bytes())`) [V: `src/file_tracker.rs:75-79`].
-  3. *Companion Files*: Suffix-based metadata files `<hash><suffix>` created with `fs::write` (e.g. `<hash>.hash`) [V: `src/file_tracker.rs:214-226, 458-462`].
-  4. *Pruning (`clean`)*: Scans directory entries, identifies target liveness via `try_exists()`, and unlinks dangling symlinks/files and companions [V: `src/file_tracker.rs:271-384`].
+     - Unix: Symbolic links pointing to canonical targets
+       (`std::os::unix::fs::symlink`) [V: `src/file_tracker.rs:72-74`].
+     - Windows: Plain text files holding canonical target bytes
+       (`fs::write(..., target.as_encoded_bytes())`) [V:
+       `src/file_tracker.rs:75-79`].
+  3. *Companion Files*: Suffix-based metadata files `<hash><suffix>` created
+     with `fs::write` (e.g. `<hash>.hash`) [V:
+     `src/file_tracker.rs:214-226, 458-462`].
+  4. *Pruning (`clean`)*: Scans directory entries, identifies target liveness
+     via `try_exists()`, and unlinks dangling symlinks/files and companions [V:
+     `src/file_tracker.rs:271-384`].
 
 #### 2. The Dangling Symlink `EEXIST` Defect
 
@@ -75,23 +113,42 @@ if entry_path.exists() {
 let write_entry = std::os::unix::fs::symlink(&entry.canonical_target, &entry_path);
 ```
 
-- In Rust std, `Path::exists()` calls `fs::metadata(self).is_ok()`, which **follows symbolic links**.
-- If `entry_path` is a **dangling symlink** (its recorded target was deleted from disk), `entry_path.exists()` returns `false` [V].
-- When `std::os::unix::fs::symlink` executes, the filesystem sees the directory entry `entry_path` already occupied, immediately failing with `io::ErrorKind::AlreadyExists` (`EEXIST`) [V, H].
-- *Why it rarely trips in current code*: `StoreEntry::from_target(target)` runs `fs::canonicalize(target)` [V: `src/file_tracker.rs:444`]. If `target` does not exist, it fails before reaching `record`. However, if `entry_path` was planted by another process, or pointed to a target whose symlink ancestor changed, `exists()` is a TOCTOU hazard.
-- *Fix [P]*: Use `entry_path.symlink_metadata().is_ok()` (or `entry_path.is_symlink()`), or create a temporary symlink (`entry_path.with_extension("tmp-PID")`) and call POSIX atomic `std::fs::rename(tmp, entry_path)`. `rename(2)` replaces dangling or existing symlinks atomically without `EEXIST`.
+- In Rust std, `Path::exists()` calls `fs::metadata(self).is_ok()`, which
+  **follows symbolic links**.
+- If `entry_path` is a **dangling symlink** (its recorded target was deleted
+  from disk), `entry_path.exists()` returns `false` [V].
+- When `std::os::unix::fs::symlink` executes, the filesystem sees the directory
+  entry `entry_path` already occupied, immediately failing with
+  `io::ErrorKind::AlreadyExists` (`EEXIST`) [V, H].
+- *Why it rarely trips in current code*: `StoreEntry::from_target(target)` runs
+  `fs::canonicalize(target)` [V: `src/file_tracker.rs:444`]. If `target` does
+  not exist, it fails before reaching `record`. However, if `entry_path` was
+  planted by another process, or pointed to a target whose symlink ancestor
+  changed, `exists()` is a TOCTOU hazard.
+- *Fix [P]*: Use `entry_path.symlink_metadata().is_ok()` (or
+  `entry_path.is_symlink()`), or create a temporary symlink
+  (`entry_path.with_extension("tmp-PID")`) and call POSIX atomic
+  `std::fs::rename(tmp, entry_path)`. `rename(2)` replaces dangling or existing
+  symlinks atomically without `EEXIST`.
 
 #### 3. Windows File Fallback Mechanics
 
-On Windows, creating symbolic links requires `SeCreateSymbolicLinkPrivilege`, which is restricted to Administrator accounts unless the machine has Developer Mode enabled [V: `d1:242-244`].
+On Windows, creating symbolic links requires `SeCreateSymbolicLinkPrivilege`,
+which is restricted to Administrator accounts unless the machine has Developer
+Mode enabled [V: `d1:242-244`].
 
-- To maintain zero-configuration developer ergonomics, `FilePathTracker` detects Windows at compile time (`#[cfg(windows)]`) and writes a plain file containing the canonical path bytes [V: `src/file_tracker.rs:75-79`].
-- Reading the recorded target uses `fs::read_to_string` on Windows [V: `src/file_tracker.rs:476-478`].
-- Companion files (`.hash`) are identical plain files on both platforms [V: `src/file_tracker.rs:214-226`].
+- To maintain zero-configuration developer ergonomics, `FilePathTracker` detects
+  Windows at compile time (`#[cfg(windows)]`) and writes a plain file containing
+  the canonical path bytes [V: `src/file_tracker.rs:75-79`].
+- Reading the recorded target uses `fs::read_to_string` on Windows [V:
+  `src/file_tracker.rs:476-478`].
+- Companion files (`.hash`) are identical plain files on both platforms [V:
+  `src/file_tracker.rs:214-226`].
 
 #### 4. The Two-Store Ordering Invariant: "Track Before Grant"
 
-`ConfigService::trust` (`src/config/service.rs:128-136`) enforces write-ahead tracking:
+`ConfigService::trust` (`src/config/service.rs:128-136`) enforces write-ahead
+tracking:
 
 ```rust
 pub(crate) fn trust(&self, subject: &TrustRequest) -> Result<(), ConfigTrustError> {
@@ -102,39 +159,83 @@ pub(crate) fn trust(&self, subject: &TrustRequest) -> Result<(), ConfigTrustErro
 }
 ```
 
-- **Invariant**: A local configuration file MUST be recorded in `TrackerStore` *before* its workspace root is granted trust in `TrustStore` [V: `src/config/service.rs:6-8, 128-136`].
-- **Failure Semantics**: If `self.tracked.record` fails (e.g. disk full, permission error on `~/.local/state/traces/tracked-configs`), the method returns early via `?`. `self.trust.trust(subject)` is never invoked. The workspace remains completely untrusted [V: `src/config/service.rs:476-498`].
-- **Caller Convention vs Invariant Owner**: In the current codebase, this invariant is merely a convention maintained by one method in `ConfigService`. `TrustStore` and `TrackerStore` are completely independent structs. Nothing in the type system prevents a host or caller from calling `TrustStore::trust` directly without touching `TrackerStore` (as unit tests in `src/config/trust.rs:403` do routinely) [V].
+- **Invariant**: A local configuration file MUST be recorded in `TrackerStore`
+  *before* its workspace root is granted trust in `TrustStore` [V:
+  `src/config/service.rs:6-8, 128-136`].
+- **Failure Semantics**: If `self.tracked.record` fails (e.g. disk full,
+  permission error on `~/.local/state/traces/tracked-configs`), the method
+  returns early via `?`. `self.trust.trust(subject)` is never invoked. The
+  workspace remains completely untrusted [V: `src/config/service.rs:476-498`].
+- **Caller Convention vs Invariant Owner**: In the current codebase, this
+  invariant is merely a convention maintained by one method in `ConfigService`.
+  `TrustStore` and `TrackerStore` are completely independent structs. Nothing in
+  the type system prevents a host or caller from calling `TrustStore::trust`
+  directly without touching `TrackerStore` (as unit tests in
+  `src/config/trust.rs:403` do routinely) [V].
 
 #### 5. Tracker Load Path (Best-Effort) vs Grant Path (Strict)
 
-- **In `ConfigService::load` / `into_trusted`**: `tracker.record_best_effort(self.path())` logs a warning on failure and continues [V: `src/config/file.rs:219`, `src/config/tracker.rs:41-49`]. Tracking failure does not block reading notes or executing queries.
-- **In `ConfigService::trust`**: Tracking is strict (`?`). Failure aborts the grant [V: `src/config/service.rs:133`].
-- **Rationale [H]**: Reading a vault is a read-only query operation; failing to record machine-local audit metadata should not break a user's workflow. Conversely, granting trust is an explicit security privilege mutation; if the system cannot record what it is authorizing, the privilege escalation must abort fail-closed.
+- **In `ConfigService::load` / `into_trusted`**:
+  `tracker.record_best_effort(self.path())` logs a warning on failure and
+  continues [V: `src/config/file.rs:219`, `src/config/tracker.rs:41-49`].
+  Tracking failure does not block reading notes or executing queries.
+- **In `ConfigService::trust`**: Tracking is strict (`?`). Failure aborts the
+  grant [V: `src/config/service.rs:133`].
+- **Rationale [H]**: Reading a vault is a read-only query operation; failing to
+  record machine-local audit metadata should not break a user's workflow.
+  Conversely, granting trust is an explicit security privilege mutation; if the
+  system cannot record what it is authorizing, the privilege escalation must
+  abort fail-closed.
 
 #### 6. Partial Failure & Fault Recovery
 
 1. **Companion write vs Symlink write in `TrustStore::trust`**:
-   - `TrustStore::trust` writes the `<hash>.hash` companion file *before* recording the primary root symlink [V: `src/config/trust.rs:189-195`].
-   - If writing the `.hash` file succeeds but recording the symlink fails, an orphaned `<hash>.hash` file exists.
-   - When `TrustStore::trust_status` runs, it checks `if !self.store.contains(root)? { return Ok(Untrusted); }` [V: `src/config/trust.rs:245`]. Because the symlink is absent, trust is **not granted**. The orphan is harmless and gets cleaned by `clean()`.
-   - If the sequence were reversed (symlink first, then hash), a failure in hash writing would leave a trusted root with no baseline hash (`MissingBaseline` error state). The current order is fault-tolerant [V, H].
+   - `TrustStore::trust` writes the `<hash>.hash` companion file *before*
+     recording the primary root symlink [V: `src/config/trust.rs:189-195`].
+   - If writing the `.hash` file succeeds but recording the symlink fails, an
+     orphaned `<hash>.hash` file exists.
+   - When `TrustStore::trust_status` runs, it checks
+     `if !self.store.contains(root)? { return Ok(Untrusted); }` [V:
+     `src/config/trust.rs:245`]. Because the symlink is absent, trust is
+     **not granted**. The orphan is harmless and gets cleaned by `clean()`.
+   - If the sequence were reversed (symlink first, then hash), a failure in hash
+     writing would leave a trusted root with no baseline hash (`MissingBaseline`
+     error state). The current order is fault-tolerant [V, H].
 2. **Tracker write vs Trust write in `ConfigService::trust`**:
-   - If `TrackerStore::record` succeeds, but `TrustStore::trust` fails: the config path is recorded in `tracked-configs/`, but `trusted-configs/` has no entry [V: `a3:175-177`].
-   - There is no rollback of the tracker entry [V]. This is safe because execution gates on `TrustStore`, not `TrackerStore`. The config simply appears in `traces tracked list` as an observed, untrusted file.
+   - If `TrackerStore::record` succeeds, but `TrustStore::trust` fails: the
+     config path is recorded in `tracked-configs/`, but `trusted-configs/` has
+     no entry [V: `a3:175-177`].
+   - There is no rollback of the tracker entry [V]. This is safe because
+     execution gates on `TrustStore`, not `TrackerStore`. The config simply
+     appears in `traces tracked list` as an observed, untrusted file.
 
 #### 7. TOCTOU Mitigation in Current Code
 
-A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-35533) is hashing a file on disk, validating trust, and then re-reading the file from disk for parsing [V: `d1:32-34`]. An attacker can swap the file between hash check and parse.
+A classical security flaw in hash-gated configurations (e.g. `mise`
+CVE-2026-35533) is hashing a file on disk, validating trust, and then re-reading
+the file from disk for parsing [V: `d1:32-34`]. An attacker can swap the file
+between hash check and parse.
 
-- Traces avoids this TOCTOU window: `TrustStore::config_file_trust_check` reads the file content from disk once, computes its BLAKE3 hash, compares against the recorded baseline, and returns `ConfigTrustCheck::Trusted(content)` carrying the verified UTF-8 `String` [V: `src/config/trust.rs:240-260`].
-- `LocalConfigFile::into_trusted` packages this exact `content` into `LocalConfigFile<Trusted>`, ensuring the parser consumes the verified bytes without re-reading disk [V: `src/config/file.rs:220-225`].
+- Traces avoids this TOCTOU window: `TrustStore::config_file_trust_check` reads
+  the file content from disk once, computes its BLAKE3 hash, compares against
+  the recorded baseline, and returns `ConfigTrustCheck::Trusted(content)`
+  carrying the verified UTF-8 `String` [V: `src/config/trust.rs:240-260`].
+- `LocalConfigFile::into_trusted` packages this exact `content` into
+  `LocalConfigFile<Trusted>`, ensuring the parser consumes the verified bytes
+  without re-reading disk [V: `src/config/file.rs:220-225`].
 
 #### 8. Audit Consumer Reality: Who Reads `TrackerStore`?
 
-- **Core Engine Consumers**: **Zero** [V: `a3:200-202`]. No indexing, query planning, template rendering, schema validation, or caching subsystem reads or references `TrackerStore`.
-- **CLI Consumers**: Only `src/cli/tracked.rs:52` (`traces tracked list`) and `src/cli/tracked.rs:68` (`traces tracked clean`) [V].
-- **ADR-0002 Context**: ADR-0002 adopted mise's dual-store pattern (`TRACKED_CONFIGS` vs `TRUSTED_CONFIGS`) anticipating cross-project commands (like `mise prune` or `mise upgrade`) [V: `ADR-0002:40-44, 125-132`]. But Traces is not a package/tool manager; it does not manage cross-project dependencies or external runtime versions.
+- **Core Engine Consumers**: **Zero** [V: `a3:200-202`]. No indexing, query
+  planning, template rendering, schema validation, or caching subsystem reads or
+  references `TrackerStore`.
+- **CLI Consumers**: Only `src/cli/tracked.rs:52` (`traces tracked list`) and
+  `src/cli/tracked.rs:68` (`traces tracked clean`) [V].
+- **ADR-0002 Context**: ADR-0002 adopted mise's dual-store pattern
+  (`TRACKED_CONFIGS` vs `TRUSTED_CONFIGS`) anticipating cross-project commands
+  (like `mise prune` or `mise upgrade`) [V: `ADR-0002:40-44, 125-132`]. But
+  Traces is not a package/tool manager; it does not manage cross-project
+  dependencies or external runtime versions.
 
 ---
 
@@ -142,8 +243,11 @@ A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-355
 
 #### Option D1: Keep Two Stores As-Is (Document Invariant & Add Enforcement Tests)
 
-- **Concept**: Retain `TrustStore` and `TrackerStore` as distinct wrappers around `FilePathTracker`. Document the "track before grant" invariant in architecture docs.
-- **Mechanism**: `ConfigService` coordinates both stores. Tests in `src/config/service.rs` verify that tracker failures abort trust grants.
+- **Concept**: Retain `TrustStore` and `TrackerStore` as distinct wrappers
+  around `FilePathTracker`. Document the "track before grant" invariant in
+  architecture docs.
+- **Mechanism**: `ConfigService` coordinates both stores. Tests in
+  `src/config/service.rs` verify that tracker failures abort trust grants.
 - **Sketch**:
 
   ```rust
@@ -164,12 +268,20 @@ A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-355
 
 #### Option D2: Unified `WorkspaceRegistry` / Single Store (Survey H3)
 
-- **Concept**: Merge `TrustStore` and `TrackerStore` into a single `WorkspaceRegistry` backed by a structured file (`~/.local/state/traces/workspaces.json` or `.toml`).
-- **Mechanism**: Each workspace entry contains `{ root: PathBuf, config_file: Option<PathBuf>, status: WorkspaceStatus }` where status is `Seen | Trusted { content_hash: Blake3Digest } | Revoked`.
+- **Concept**: Merge `TrustStore` and `TrackerStore` into a single
+  `WorkspaceRegistry` backed by a structured file
+  (`~/.local/state/traces/workspaces.json` or `.toml`).
+- **Mechanism**: Each workspace entry contains
+  `{ root: PathBuf, config_file: Option<PathBuf>, status: WorkspaceStatus }`
+  where status is `Seen | Trusted { content_hash: Blake3Digest } | Revoked`.
 - **Information / Auditability Impact**:
-  - `untrust` mutates status to `Revoked` or `Seen` rather than deleting the entry [H].
-  - Storing both `root` and `config_file` in a single JSON/TOML file eliminates the mismatch between root symlinks and file symlinks.
-  - *Trade-off*: Replaces atomic POSIX symlinks with a file-locked structured state file. Requires atomic read-modify-write transactions and file locking across concurrent CLI/LSP invocations [H].
+  - `untrust` mutates status to `Revoked` or `Seen` rather than deleting the
+    entry [H].
+  - Storing both `root` and `config_file` in a single JSON/TOML file eliminates
+    the mismatch between root symlinks and file symlinks.
+  - *Trade-off*: Replaces atomic POSIX symlinks with a file-locked structured
+    state file. Requires atomic read-modify-write transactions and file locking
+    across concurrent CLI/LSP invocations [H].
 - **Sketch**:
 
   ```rust
@@ -192,8 +304,13 @@ A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-355
 
 #### Option D3: Generic `PathStore<Kind>` with Two Root Instances
 
-- **Concept**: Recognize that `TrustStore` and `TrackerStore` duplicate ~300 lines of boilerplate wrapping `FilePathTracker`. Replace them with a single parameterized `PathStore<Kind>` (or configuration parameter), instantiating two directories (`dirs::TRUSTED_CONFIGS` and `dirs::TRACKED_CONFIGS`).
-- **Mechanism**: `PathStore<TrustKind>` supports companion hashes; `PathStore<TrackerKind>` is plain path recording. Both use `FilePathTracker` under the hood.
+- **Concept**: Recognize that `TrustStore` and `TrackerStore` duplicate ~300
+  lines of boilerplate wrapping `FilePathTracker`. Replace them with a single
+  parameterized `PathStore<Kind>` (or configuration parameter), instantiating
+  two directories (`dirs::TRUSTED_CONFIGS` and `dirs::TRACKED_CONFIGS`).
+- **Mechanism**: `PathStore<TrustKind>` supports companion hashes;
+  `PathStore<TrackerKind>` is plain path recording. Both use `FilePathTracker`
+  under the hood.
 - **Sketch**:
 
   ```rust
@@ -212,11 +329,16 @@ A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-355
 
 #### Option D4: Trust Store Only (Retire `TrackerStore` & `traces tracked`)
 
-- **Concept**: Drop `TrackerStore` entirely. Delete `src/config/tracker.rs` (244 LoC) and `src/cli/tracked.rs` (165 LoC). Trust store becomes the sole store under `$TRACES_STATE_DIR/trusted-configs`.
+- **Concept**: Drop `TrackerStore` entirely. Delete `src/config/tracker.rs` (244
+  LoC) and `src/cli/tracked.rs` (165 LoC). Trust store becomes the sole store
+  under `$TRACES_STATE_DIR/trusted-configs`.
 - **Envelope Assessment**:
   - Trust-gate behavior remains **Frozen** [V: `issues/16:82`].
-  - Subcommands `traces tracked list` and `traces tracked clean` are **Migratable** [V: `issues/16:78`].
-  - Because no core engine component uses tracking data, removing it eliminates the cross-store ordering invariant completely. No "track before grant" synchronization is needed.
+  - Subcommands `traces tracked list` and `traces tracked clean` are
+    **Migratable** [V: `issues/16:78`].
+  - Because no core engine component uses tracking data, removing it eliminates
+    the cross-store ordering invariant completely. No "track before grant"
+    synchronization is needed.
 - **Sketch**:
 
   ```rust
@@ -234,9 +356,16 @@ A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-355
 
 #### Option D5: Combined `TrustManager` Enforcing Write-Ahead Ordering
 
-- **Concept**: Retain the dual-store symlink layout on disk, but eliminate `TrackerStore` and `TrustStore` as independent public types. Replace them with a single `TrustManager` (or `TrustService`) that internally owns both `FilePathTracker` instances.
-- **Mechanism**: The ordering invariant is made **structurally unbypassable**: callers cannot write to the trust store directly. The only method to grant trust is `TrustManager::grant(subject)`, which guarantees tracker write precedes trust symlink write.
-- **Reusable Host Trust API**: Serves CLI (`traces trust`), LSP (`workspace/didChangeConfiguration`), and MCP server per Ticket 20/21.
+- **Concept**: Retain the dual-store symlink layout on disk, but eliminate
+  `TrackerStore` and `TrustStore` as independent public types. Replace them with
+  a single `TrustManager` (or `TrustService`) that internally owns both
+  `FilePathTracker` instances.
+- **Mechanism**: The ordering invariant is made **structurally unbypassable**:
+  callers cannot write to the trust store directly. The only method to grant
+  trust is `TrustManager::grant(subject)`, which guarantees tracker write
+  precedes trust symlink write.
+- **Reusable Host Trust API**: Serves CLI (`traces trust`), LSP
+  (`workspace/didChangeConfiguration`), and MCP server per Ticket 20/21.
 - **Sketch**:
 
   ```rust
@@ -274,7 +403,8 @@ A classical security flaw in hash-gated configurations (e.g. `mise` CVE-2026-355
 
 ### 2.3 Operation x Store Matrix per Option
 
-The following matrix contrasts how each system operation affects underlying storage across options, and identifies the explicit **Invariant Owner**:
+The following matrix contrasts how each system operation affects underlying
+storage across options, and identifies the explicit **Invariant Owner**:
 
 | Operation | D1 (As-Is Dual) | D2 (WorkspaceRegistry) | D3 (Generic PathStore) | D4 (Trust Store Only) | D5 (Combined TrustManager) |
 |---|---|---|---|---|---|
@@ -305,11 +435,29 @@ The following matrix contrasts how each system operation affects underlying stor
 
 ### 2.5 Recommendation, Best Dissent, and Flip Fact for (d)
 
-- **Lean**: **Option D4 (Trust Store Only, Retire Tracker)** if the human agrees to retire `traces tracked`; otherwise **Option D5 (Combined TrustManager)**.
-  - *Why D4*: The code inventory proves that `TrackerStore` has **zero engine consumers** [V: `a3:200-202`]. It was borrowed from `mise` under an assumption that Traces would need machine-wide config inventories for version pruning [V: `ADR-0002:40-44, 125-132`]. Traces has no such feature. Retiring tracking eliminates 409 LoC of dead weight, deletes an artificial two-store ordering invariant, and removes a CLI command that adds user cognitive load without operational value.
-  - *Why D5 as fallback*: If the human values `traces tracked` for personal auditing, Option D5 is the superior design: it encapsulates both stores behind one unbypassable `TrustManager` interface, preventing partial state divergence and making the ordering invariant structural rather than conventional.
-- **Best Dissent against D4**: "A user who works across 50 git repositories cannot easily answer 'which repositories on my machine have local `.traces/config.toml` files?' without `traces tracked list`. If they ran a security audit or revoked permissions, they lose the ability to see un-trusted or forgotten projects."
-- **Flip Fact**: If evidence shows that users or automated tools actively use `traces tracked list` in shell scripts to inventory vaults, or if a planned ticket (e.g. Ticket 31 `WorkspaceHost`) requires discovering all workspaces on a machine for background indexing, D4 must be rejected in favor of D5.
+- **Lean**: **Option D4 (Trust Store Only, Retire Tracker)** if the human agrees
+  to retire `traces tracked`; otherwise **Option D5 (Combined TrustManager)**.
+  - *Why D4*: The code inventory proves that `TrackerStore` has
+    **zero engine consumers** [V: `a3:200-202`]. It was borrowed from `mise`
+    under an assumption that Traces would need machine-wide config inventories
+    for version pruning [V: `ADR-0002:40-44, 125-132`]. Traces has no such
+    feature. Retiring tracking eliminates 409 LoC of dead weight, deletes an
+    artificial two-store ordering invariant, and removes a CLI command that adds
+    user cognitive load without operational value.
+  - *Why D5 as fallback*: If the human values `traces tracked` for personal
+    auditing, Option D5 is the superior design: it encapsulates both stores
+    behind one unbypassable `TrustManager` interface, preventing partial state
+    divergence and making the ordering invariant structural rather than
+    conventional.
+- **Best Dissent against D4**: "A user who works across 50 git repositories
+  cannot easily answer 'which repositories on my machine have local
+  `.traces/config.toml` files?' without `traces tracked list`. If they ran a
+  security audit or revoked permissions, they lose the ability to see un-trusted
+  or forgotten projects."
+- **Flip Fact**: If evidence shows that users or automated tools actively use
+  `traces tracked list` in shell scripts to inventory vaults, or if a planned
+  ticket (e.g. Ticket 31 `WorkspaceHost`) requires discovering all workspaces on
+  a machine for background indexing, D4 must be rejected in favor of D5.
 
 ---
 
@@ -319,36 +467,68 @@ The following matrix contrasts how each system operation affects underlying stor
 
 #### 1. Current Architecture of `src/cli/init.rs` (557 LoC)
 
-- **Unit Tests**: 277 lines (50%) [V: `src/cli/init.rs:257-557`]. Tests prompt cancellation, already-initialized rejection, invalid template directories, directory rollback, atomic file writing, and output messages.
+- **Unit Tests**: 277 lines (50%) [V: `src/cli/init.rs:257-557`]. Tests prompt
+  cancellation, already-initialized rejection, invalid template directories,
+  directory rollback, atomic file writing, and output messages.
 - **Production Code**: 280 lines (50%) [V: `src/cli/init.rs:1-256`].
-- **Complete Isolation**: `cli::init` touches **zero** core domain services [V: `a3:315`]. It does not reference `ConfigService`, `TemplateService`, `SchemaService`, or `TrustStore`.
+- **Complete Isolation**: `cli::init` touches **zero** core domain services [V:
+  `a3:315`]. It does not reference `ConfigService`, `TemplateService`,
+  `SchemaService`, or `TrustStore`.
 - **The Four-Way Architectural Split** [V: `a3:217-242`]:
-  1. *Prompt Flow* (`cli::init.rs:90-107`): Interactive dialog collection via `DialogProvider::text` for template directory and output directory.
-  2. *Decision Logic* (`cli::init.rs:53-65`): Pre-condition guard against existing `.traces/`, lexical confinement and path traversal validation via `ConfigSubDir::resolve`, and directory type checking.
-  3. *Filesystem Effects & Rollback Journal* (`cli::init.rs:67-80, 116-144, 168-173, 233-247`): Maintains `created: Vec<PathBuf>`, creates `.traces/` and missing template directories, writes `.traces/config.toml` atomically via `File::create_new`, and unwinds on failure by removing created directories in reverse order (newest first).
-  4. *Default Content & Serialization* (`cli::init.rs:216-248`): Constructs `RawConfig` with user choices and serializes to TOML with empty `[schemas]` and `[frontmatter]` tables.
+  1. *Prompt Flow* (`cli::init.rs:90-107`): Interactive dialog collection via
+     `DialogProvider::text` for template directory and output directory.
+  2. *Decision Logic* (`cli::init.rs:53-65`): Pre-condition guard against
+     existing `.traces/`, lexical confinement and path traversal validation via
+     `ConfigSubDir::resolve`, and directory type checking.
+  3. *Filesystem Effects & Rollback Journal*
+     (`cli::init.rs:67-80, 116-144, 168-173, 233-247`): Maintains
+     `created: Vec<PathBuf>`, creates `.traces/` and missing template
+     directories, writes `.traces/config.toml` atomically via
+     `File::create_new`, and unwinds on failure by removing created directories
+     in reverse order (newest first).
+  4. *Default Content & Serialization* (`cli::init.rs:216-248`): Constructs
+     `RawConfig` with user choices and serializes to TOML with empty `[schemas]`
+     and `[frontmatter]` tables.
 
 #### 2. The Post-Init Untrusted Trap [V: `a3:323-333, 442-444`]
 
-A critical defect in current design: **`traces init` leaves the newly created workspace completely untrusted and untracked** [V: `src/cli/init.rs:52-83`].
+A critical defect in current design: **`traces init` leaves the newly created
+workspace completely untrusted and untracked** [V: `src/cli/init.rs:52-83`].
 
-- When a user runs `traces init` followed immediately by `traces template list`, `traces index`, or `traces list`, the command halts with:
-  `ConfigTrustError::Untrusted { root: "...", path: ".../config.toml", status: Untrusted }` [V: `src/config/file.rs:229-234`].
-- **UX Consequence**: Every user who initializes a project is blocked on their next command until they discover and run `traces trust` [H].
-- **Root Cause**: Scaffolding was written as a standalone CLI helper without awareness of `ConfigService` or `TrustStore` [V: `a3:315-322`].
+- When a user runs `traces init` followed immediately by `traces template list`,
+  `traces index`, or `traces list`, the command halts with:
+  `ConfigTrustError::Untrusted { root: "...", path: ".../config.toml", status: Untrusted }`
+  [V: `src/config/file.rs:229-234`].
+- **UX Consequence**: Every user who initializes a project is blocked on their
+  next command until they discover and run `traces trust` [H].
+- **Root Cause**: Scaffolding was written as a standalone CLI helper without
+  awareness of `ConfigService` or `TrustStore` [V: `a3:315-322`].
 
 #### 3. Default Asymmetry Defect (`findings-ledger.md:19`)
 
-- In `src/config/builder.rs:76-82`, `[templates].directory` defaults to `None` if omitted from TOML [V].
-- In `src/cli/init.rs:93-94`, `init` hardcodes `DEFAULT_LOCAL_TEMPLATES_DIR = ".traces/templates"` [V].
-- Conversely, `[schemas].directory` defaults to `"schemas"` in `builder.rs:141-150`, but `init` does not scaffold `.traces/schemas/` at all [V: `a3:304-305`].
-- **Architectural Debt**: Config defaults are split between `builder.rs`, `constants.rs`, and `cli::init.rs` rather than owned by a single source of truth in `RawConfig` or `ConfigBuilder`.
+- In `src/config/builder.rs:76-82`, `[templates].directory` defaults to `None`
+  if omitted from TOML [V].
+- In `src/cli/init.rs:93-94`, `init` hardcodes
+  `DEFAULT_LOCAL_TEMPLATES_DIR = ".traces/templates"` [V].
+- Conversely, `[schemas].directory` defaults to `"schemas"` in
+  `builder.rs:141-150`, but `init` does not scaffold `.traces/schemas/` at all
+  [V: `a3:304-305`].
+- **Architectural Debt**: Config defaults are split between `builder.rs`,
+  `constants.rs`, and `cli::init.rs` rather than owned by a single source of
+  truth in `RawConfig` or `ConfigBuilder`.
 
 #### 4. The Unattended-Prompt Rule & Host Composition (Tickets 21, 31, 33)
 
-- **Ticket 21 Mandate**: In non-interactive contexts (CI, `--no-input`, LSP, MCP), the core must receive answers as plain data or query a `DialogProvider` that resolves authored defaults without detecting a TTY [V: `issues/21:182-189`].
-- **Ticket 31 Mandate**: Hosts (CLI, LSP `traces/initWorkspace`, MCP tools) must share identical scaffolding semantics. Scaffolding cannot remain trapped in `src/cli/` [V: `issues/30:12, 38-41`].
-- **Ticket 33 Steer**: Preparing for separating the CLI into its own crate requires extracting domain logic from `src/cli/init.rs` into the core library [V: `map.md:33-42`].
+- **Ticket 21 Mandate**: In non-interactive contexts (CI, `--no-input`, LSP,
+  MCP), the core must receive answers as plain data or query a `DialogProvider`
+  that resolves authored defaults without detecting a TTY [V:
+  `issues/21:182-189`].
+- **Ticket 31 Mandate**: Hosts (CLI, LSP `traces/initWorkspace`, MCP tools) must
+  share identical scaffolding semantics. Scaffolding cannot remain trapped in
+  `src/cli/` [V: `issues/30:12, 38-41`].
+- **Ticket 33 Steer**: Preparing for separating the CLI into its own crate
+  requires extracting domain logic from `src/cli/init.rs` into the core library
+  [V: `map.md:33-42`].
 
 ---
 
@@ -356,17 +536,26 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 
 #### Option G1: Keep in CLI (`src/cli/init.rs` As-Is)
 
-- **Concept**: Retain scaffolding entirely within the CLI layer. Document that non-CLI hosts cannot initialize vaults, or must shell out to `traces init`.
-- **Mechanism**: Interactive prompts, validation, directory creation, rollback journal, and TOML writing remain in `src/cli/init.rs`.
+- **Concept**: Retain scaffolding entirely within the CLI layer. Document that
+  non-CLI hosts cannot initialize vaults, or must shell out to `traces init`.
+- **Mechanism**: Interactive prompts, validation, directory creation, rollback
+  journal, and TOML writing remain in `src/cli/init.rs`.
 - **Sketch**: Existing implementation in `src/cli/init.rs` [V].
 
 #### Option G2: Core `ScaffoldUseCase` (Plan $\rightarrow$ Apply with Undo) + Thin CLI Adapter
 
-- **Concept**: Decompose scaffolding into a reusable application use case in the core (`ConfigService::scaffold` or `core::scaffold::InitWorkflow`), taking plain data parameters and executing transactional filesystem writes with an undo journal. The CLI retains only argument parsing and `DialogProvider` prompts.
+- **Concept**: Decompose scaffolding into a reusable application use case in the
+  core (`ConfigService::scaffold` or `core::scaffold::InitWorkflow`), taking
+  plain data parameters and executing transactional filesystem writes with an
+  undo journal. The CLI retains only argument parsing and `DialogProvider`
+  prompts.
 - **Mechanism**:
-  - `InitOptions`: Plain data struct `{ root: PathBuf, template_dir: PathBuf, output_dir: PathBuf }`.
-  - `ScaffoldJournal`: Tracks created paths; provides atomic `commit()` or `rollback()`.
-  - Non-interactive hosts pass pre-computed `InitOptions`. CLI prompts the user to construct `InitOptions`.
+  - `InitOptions`: Plain data struct
+    `{ root: PathBuf, template_dir: PathBuf, output_dir: PathBuf }`.
+  - `ScaffoldJournal`: Tracks created paths; provides atomic `commit()` or
+    `rollback()`.
+  - Non-interactive hosts pass pre-computed `InitOptions`. CLI prompts the user
+    to construct `InitOptions`.
 - **Sketch**:
 
   ```rust
@@ -406,8 +595,13 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 
 #### Option G3: Core Use Case + Canonical Default Content in `RawConfig` / `ConfigBuilder`
 
-- **Concept**: Builds upon Option G2, but eliminates the default asymmetry (`findings-ledger:19`).
-- **Mechanism**: Default configuration text is not constructed ad-hoc in scaffolding code. Instead, `RawConfig::scaffold_default()` or `ConfigBuilder::default_local_toml()` generates the TOML, guaranteeing that serialized default keys match the builder's default expectations and are validated against `RawConfig` schemas.
+- **Concept**: Builds upon Option G2, but eliminates the default asymmetry
+  (`findings-ledger:19`).
+- **Mechanism**: Default configuration text is not constructed ad-hoc in
+  scaffolding code. Instead, `RawConfig::scaffold_default()` or
+  `ConfigBuilder::default_local_toml()` generates the TOML, guaranteeing that
+  serialized default keys match the builder's default expectations and are
+  validated against `RawConfig` schemas.
 - **Sketch**:
 
   ```rust
@@ -430,8 +624,12 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 
 #### Option G4: Multi-Service Scaffolding (Config + Template Starter Scaffolding)
 
-- **Concept**: Recognize that initializing a PKM vault is not just writing a config file: a new user needs starter templates (e.g. `default.md`, `daily.md`).
-- **Mechanism**: Scaffolding is coordinated by an application orchestrator that calls `ConfigService::scaffold_config` and `TemplateService::scaffold_starter_templates`.
+- **Concept**: Recognize that initializing a PKM vault is not just writing a
+  config file: a new user needs starter templates (e.g. `default.md`,
+  `daily.md`).
+- **Mechanism**: Scaffolding is coordinated by an application orchestrator that
+  calls `ConfigService::scaffold_config` and
+  `TemplateService::scaffold_starter_templates`.
 - **Sketch**:
 
   ```rust
@@ -450,11 +648,15 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 
 #### Option G5: Init-Then-Trust Composition (`TrustPolicy` Integration)
 
-- **Concept**: Solve the post-init untrusted trap directly in the scaffolding lifecycle.
-- **Mechanism**: The scaffolding use case accepts a `TrustPolicy` parameter (`AutoTrust`, `PromptTrust`, or `LeaveUntrusted`).
-  - In CLI interactive mode: `Init` automatically grants trust to the newly created config (or asks confirmation).
+- **Concept**: Solve the post-init untrusted trap directly in the scaffolding
+  lifecycle.
+- **Mechanism**: The scaffolding use case accepts a `TrustPolicy` parameter
+  (`AutoTrust`, `PromptTrust`, or `LeaveUntrusted`).
+  - In CLI interactive mode: `Init` automatically grants trust to the newly
+    created config (or asks confirmation).
   - In unattended mode / CI: Caller chooses `AutoTrust` or explicit policy.
-  - Automatically records the new config in `TrustStore` (and `TrackerStore`), so subsequent commands succeed immediately without an `Untrusted` error.
+  - Automatically records the new config in `TrustStore` (and `TrackerStore`),
+    so subsequent commands succeed immediately without an `Untrusted` error.
 - **Sketch**:
 
   ```rust
@@ -509,25 +711,46 @@ A critical defect in current design: **`traces init` leaves the newly created wo
 
 ### 3.5 Recommendation, Best Dissent, and Flip Fact for (g)
 
-- **Lean**: **Option G5 combining G3 and G2 (Core `InitService` + Canonical `RawConfig::starter` + `TrustPolicy::AutoTrust`)**.
+- **Lean**: **Option G5 combining G3 and G2 (Core `InitService` + Canonical
+  `RawConfig::starter` + `TrustPolicy::AutoTrust`)**.
   - *Why*:
-    1. It eliminates the post-init untrusted trap: a human who runs `traces init` expects the vault to be immediately usable without having to discover and execute `traces trust` [V: `a3:323-333`].
-    2. It moves domain logic out of `src/cli/init.rs` into a pure, testable core use case, unblocking the CLI crate split (Ticket 33) and enabling LSP/MCP vault creation (Ticket 31).
-    3. It adheres strictly to Ticket 21's unattended-prompt rule: non-CLI hosts pass pre-computed `InitOptions`, while the CLI prompts via `DialogProvider`.
-    4. It resolves the template directory default asymmetry (`findings-ledger:19`) by anchoring starter configuration in `RawConfig`.
-- **Best Dissent against G5**: "Implicitly trusting a workspace on creation violates the principle of explicit security authorization. If a script or malicious tool creates a vault in a user's directory, auto-trusting grants execution privileges without explicit confirmation."
-  - *Counter*: `init` is an explicit creation command initiated by the user. If the user just asked Traces to initialize a repository in the current directory, requiring a redundant `traces trust` invocation is friction, not security. Furthermore, for unattended hosts, the caller can explicitly specify `TrustOnCreate::LeaveUntrusted` if sandbox isolation is desired.
-- **Flip Fact**: If user security requirements mandate that *all* trust grants require an out-of-band cryptographic confirmation or separate confirmation prompt, `AutoTrust` should default to `false` in unattended mode and require a confirmation prompt in CLI interactive mode.
+    1. It eliminates the post-init untrusted trap: a human who runs
+       `traces init` expects the vault to be immediately usable without having
+       to discover and execute `traces trust` [V: `a3:323-333`].
+    2. It moves domain logic out of `src/cli/init.rs` into a pure, testable core
+       use case, unblocking the CLI crate split (Ticket 33) and enabling LSP/MCP
+       vault creation (Ticket 31).
+    3. It adheres strictly to Ticket 21's unattended-prompt rule: non-CLI hosts
+       pass pre-computed `InitOptions`, while the CLI prompts via
+       `DialogProvider`.
+    4. It resolves the template directory default asymmetry
+       (`findings-ledger:19`) by anchoring starter configuration in `RawConfig`.
+- **Best Dissent against G5**: "Implicitly trusting a workspace on creation
+  violates the principle of explicit security authorization. If a script or
+  malicious tool creates a vault in a user's directory, auto-trusting grants
+  execution privileges without explicit confirmation."
+  - *Counter*: `init` is an explicit creation command initiated by the user. If
+    the user just asked Traces to initialize a repository in the current
+    directory, requiring a redundant `traces trust` invocation is friction, not
+    security. Furthermore, for unattended hosts, the caller can explicitly
+    specify `TrustOnCreate::LeaveUntrusted` if sandbox isolation is desired.
+- **Flip Fact**: If user security requirements mandate that *all* trust grants
+  require an out-of-band cryptographic confirmation or separate confirmation
+  prompt, `AutoTrust` should default to `false` in unattended mode and require a
+  confirmation prompt in CLI interactive mode.
 
 ---
 
 ## 4. Combined Module-Tree Architecture & Package Topologies
 
-Sub-questions (d) and (g) resolve state persistence, trust authorization, and workspace lifecycle. Below are three architectural package topologies evaluating how these concerns compose into the wider system.
+Sub-questions (d) and (g) resolve state persistence, trust authorization, and
+workspace lifecycle. Below are three architectural package topologies evaluating
+how these concerns compose into the wider system.
 
 ### Option A: Monolithic Core Module Structure (Single Crate `traces`)
 
-Retains the single crate layout, organizing config and trust into coherent internal modules:
+Retains the single crate layout, organizing config and trust into coherent
+internal modules:
 
 ```text
 src/
@@ -594,7 +817,9 @@ crates/
 
 ### 4.1 Public-Surface Delta & Visibility Rule Audit
 
-Applying the **Visibility Rule** (`issues/16:89-95`): "Reduce visibility whenever possible. Limit `pub` to outward-facing components. Justify each `pub` item."
+Applying the **Visibility Rule** (`issues/16:89-95`): "Reduce visibility
+whenever possible. Limit `pub` to outward-facing components. Justify each `pub`
+item."
 
 | Item / Type | Current Visibility | Proposed Visibility | Justification & Architectural Boundary |
 |---|---|---|---|
@@ -611,10 +836,12 @@ Applying the **Visibility Rule** (`issues/16:89-95`): "Reduce visibility wheneve
 
 ### 4.2 Clippy and Lint Guardrails
 
-To enforce Ticket 21's ambient-elimination mandates and ensure invariant enforcement:
+To enforce Ticket 21's ambient-elimination mandates and ensure invariant
+enforcement:
 
-1. **Ambient OS Input Elimination (`disallowed-methods`)**:
-   Core modules (`src/config/`, `src/app/`, `src/infra/file_tracker.rs`) must reject direct ambient calls:
+1. **Ambient OS Input Elimination (`disallowed-methods`)**: Core modules
+   (`src/config/`, `src/app/`, `src/infra/file_tracker.rs`) must reject direct
+   ambient calls:
 
    ```toml
    # Cargo.toml or clippy.toml
@@ -625,44 +852,71 @@ To enforce Ticket 21's ambient-elimination mandates and ensure invariant enforce
    ]
    ```
 
-2. **Panic-Free I/O Seams**:
-   All filesystem and serialization operations in `InitService` and `TrustManager` must return explicit `Result<T, E>` enums deriving `thiserror::Error`. No `unwrap()`, `expect()`, or panicking I/O.
+2. **Panic-Free I/O Seams**: All filesystem and serialization operations in
+   `InitService` and `TrustManager` must return explicit `Result<T, E>` enums
+   deriving `thiserror::Error`. No `unwrap()`, `expect()`, or panicking I/O.
 3. **Must-Use Enforcement**:
-   - `#[must_use]` on `InitService::scaffold`, `ScaffoldReport`, and `TrustManager::grant` to ensure callers handle journal commits and errors.
-4. **No Process Globals**:
-   Static `LazyLock`s in `dirs.rs` (`TRACKED_CONFIGS`, `TRUSTED_CONFIGS`) must be deprecated; `TrustManager` receives state directory paths from the injected `HostEnvironment`.
+   - `#[must_use]` on `InitService::scaffold`, `ScaffoldReport`, and
+     `TrustManager::grant` to ensure callers handle journal commits and errors.
+4. **No Process Globals**: Static `LazyLock`s in `dirs.rs` (`TRACKED_CONFIGS`,
+   `TRUSTED_CONFIGS`) must be deprecated; `TrustManager` receives state
+   directory paths from the injected `HostEnvironment`.
 
 ---
 
 ## 5. Questions for the Human & Value-Laden Choices
 
-The following questions represent genuinely value-laden product, UX, and security choices that require human decision during the grilling session:
+The following questions represent genuinely value-laden product, UX, and
+security choices that require human decision during the grilling session:
 
 1. **Retire `traces tracked` vs Keep for User Auditing (Option D4 vs D5)**:
-   - *Question*: Should Traces retire `TrackerStore` and the CLI commands `traces tracked list/clean` (Option D4), or keep them as an audit log of all observed config files on the machine (Option D5)?
-   - *Tension*: Retiring saves 409 LoC and eliminates a complex ordering invariant with zero core engine utility. Keeping preserves human auditability for users with many scattered vaults.
+   - *Question*: Should Traces retire `TrackerStore` and the CLI commands
+     `traces tracked list/clean` (Option D4), or keep them as an audit log of
+     all observed config files on the machine (Option D5)?
+   - *Tension*: Retiring saves 409 LoC and eliminates a complex ordering
+     invariant with zero core engine utility. Keeping preserves human
+     auditability for users with many scattered vaults.
 2. **Auto-Trust Scaffolding on Creation (Option G5)**:
-   - *Question*: Should `traces init` automatically grant trust to the newly scaffolded workspace (Option G5), or should it deliberately require the user to run `traces trust` as a separate, conscious step?
-   - *Tension*: Auto-trust eliminates immediate user frustration on the next command; requiring explicit trust reinforces the strict mental model that trust is an independent security grant.
+   - *Question*: Should `traces init` automatically grant trust to the newly
+     scaffolded workspace (Option G5), or should it deliberately require the
+     user to run `traces trust` as a separate, conscious step?
+   - *Tension*: Auto-trust eliminates immediate user frustration on the next
+     command; requiring explicit trust reinforces the strict mental model that
+     trust is an independent security grant.
 3. **Template Scaffolding Scope (Option G4 vs G2/G3)**:
-   - *Question*: Should `traces init` remain strictly focused on scaffolding `.traces/` and `.traces/config.toml` (Options G2/G3), or should it also scaffold starter template files (e.g. `default.md`, `daily.md`) (Option G4)?
-   - *Tension*: Minimal scaffolding avoids opinionated defaults; rich scaffolding gives new users an immediately functional PKM vault.
+   - *Question*: Should `traces init` remain strictly focused on scaffolding
+     `.traces/` and `.traces/config.toml` (Options G2/G3), or should it also
+     scaffold starter template files (e.g. `default.md`, `daily.md`) (Option
+     G4)?
+   - *Tension*: Minimal scaffolding avoids opinionated defaults; rich
+     scaffolding gives new users an immediately functional PKM vault.
 
 ---
 
 ## 6. Independence & Sequencing Analysis
 
-Sub-questions (d) and (g) have clear independence boundaries allowing them to be sequenced cleanly in the redesign specification:
+Sub-questions (d) and (g) have clear independence boundaries allowing them to be
+sequenced cleanly in the redesign specification:
 
 1. **Independence of Sub-Question (d) (Trust/Tracking Stores)**:
-   - Completely independent of sub-questions (a) (root types), (b) (parser input), and (c) (residual digests).
-   - Can be decided and implemented immediately without waiting for Note or Query decisions.
-   - Blocks downstream Ticket 31 (`WorkspaceHost`) which needs the final `TrustManager` API for request-admission revalidation.
+   - Completely independent of sub-questions (a) (root types), (b) (parser
+     input), and (c) (residual digests).
+   - Can be decided and implemented immediately without waiting for Note or
+     Query decisions.
+   - Blocks downstream Ticket 31 (`WorkspaceHost`) which needs the final
+     `TrustManager` API for request-admission revalidation.
 2. **Independence of Sub-Question (g) (Scaffolding Ownership)**:
    - Independent of (a), (b), (c), and (e).
-   - Composes with (d): if Option G5 (AutoTrust on create) is chosen, `InitService` calls `TrustManager::grant`. However, the decision to extract `InitService` from `cli::init` can be made independently of whether trust is auto-granted.
+   - Composes with (d): if Option G5 (AutoTrust on create) is chosen,
+     `InitService` calls `TrustManager::grant`. However, the decision to extract
+     `InitService` from `cli::init` can be made independently of whether trust
+     is auto-granted.
    - Prerequisite for Ticket 33 (separating the CLI into its own crate).
 3. **Recommended Specification Sequence**:
-   - **Step 1**: Resolve (d) $\rightarrow$ Choose D4 (retire tracker) or D5 (combined `TrustManager`).
-   - **Step 2**: Resolve (g) $\rightarrow$ Extract `InitService` with `RawConfig::starter` (G3), and wire `AutoTrust` (G5) using the chosen trust interface from Step 1.
-   - **Step 3**: Re-home `file_tracker.rs` into `infra` or `config::trust` per sub-question (f).
+   - **Step 1**: Resolve (d) $\rightarrow$ Choose D4 (retire tracker) or D5
+     (combined `TrustManager`).
+   - **Step 2**: Resolve (g) $\rightarrow$ Extract `InitService` with
+     `RawConfig::starter` (G3), and wire `AutoTrust` (G5) using the chosen trust
+     interface from Step 1.
+   - **Step 3**: Re-home `file_tracker.rs` into `infra` or `config::trust` per
+     sub-question (f).

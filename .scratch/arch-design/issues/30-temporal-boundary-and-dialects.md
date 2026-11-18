@@ -11,9 +11,8 @@ The survey said temporal is 10k lines of code (3k production). It said
 "Current code" below. Scouts judged `DatePoint`, `DateValue`/`DateTimeValue` and
 `DurationValue` sound. Nobody has verified that judgment.
 
-Decide the temporal boundary. Answer each numbered question separately.
-Use [ticket 36's decision-record
-rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
+Decide the temporal boundary. Answer each numbered question separately. Use
+[ticket 36's decision-record rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
 Keep decision evidence separate from implementation gates.
 
 ## Preparation for the grilling
@@ -252,17 +251,18 @@ The [K report](../research/30-prep/k-citation-verification.md) checks
 selected external claims from C and E. Candidate source APIs are outside
 its own audit. It does not check every D citation.
 
-The [M acceptance closure](../research/30-prep/m-gap-closure.md#four-candidate-acceptance-closure)
-executes all four candidates at Rust 1.96.0, the actual repository floor.
-It records 64 shared definitions, two English lenient cases, four baselines
-and 36 explicit-context host variations: 298 JSON records.
-Each contains a native first call and warmed call with identical outcomes.
-All seven matching weekday anchors execute. Selected explicit-anchor/zone
-results stay invariant under `TZ`, `LC_ALL` and `TZDIR` changes.
-First/warmed allocations and whole-harness sizes are measured, not inferred.
-The instrumented profile uses opt-z, LTO, strip, one codegen unit and
-`panic = "unwind"`; it is not the product abort profile. No new throughput
-measurement exists. Earlier abort-profile costs remain historical. [V]
+The
+[M acceptance closure](../research/30-prep/m-gap-closure.md#four-candidate-acceptance-closure)
+executes all four candidates at Rust 1.96.0, the actual repository floor. It
+records 64 shared definitions, two English lenient cases, four baselines and 36
+explicit-context host variations: 298 JSON records. Each contains a native first
+call and warmed call with identical outcomes. All seven matching weekday anchors
+execute. Selected explicit-anchor/zone results stay invariant under `TZ`,
+`LC_ALL` and `TZDIR` changes. First/warmed allocations and whole-harness sizes
+are measured, not inferred. The instrumented profile uses opt-z, LTO, strip, one
+codegen unit and `panic = "unwind"`; it is not the product abort profile. No new
+throughput measurement exists. Earlier abort-profile costs remain historical.
+[V]
 
 English, fuzzydate and chrono-english have actual panic evidence.
 English's Unicode and unchecked Span constructors panic; fuzzydate

@@ -1,9 +1,8 @@
 # Schema- and File-Class-aware language intelligence
 
-Type: grilling
-Status: resolved
-Blocked by: 08, 19
-Research: `20-schema-fileclass-intelligence.md` (includes stress test results in Part VIII), `20-designs.md`
+Type: grilling Status: resolved Blocked by: 08, 19 Research:
+`20-schema-fileclass-intelligence.md` (includes stress test results in Part
+VIII), `20-designs.md`
 
 ## Question
 

@@ -142,8 +142,8 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   and reassigns in target order, leaving values by reference [V:
   src/io/reorderFrontmatter.ts:45-58]. Integer-like keys (`2024`) cannot be
   positioned due to YAML parser sorting [V: src/schema/reorder.ts:26,95].
-- Rename migration: `migrateRenamedField` scans vault with `notesCarrying`, opens
-  confirmation modal, updates frontmatter across notes, and rewrites
+- Rename migration: `migrateRenamedField` scans vault with `notesCarrying`,
+  opens confirmation modal, updates frontmatter across notes, and rewrites
   `fieldsOrder` in declaring and descendant classes [V:
   src/commands/renameFieldMigration.ts:37-87,119].
 - Query cache: `queryCache.ts` memoizes promise-based Base scans keyed by
@@ -254,7 +254,8 @@ AST defines 28 enum strings in `FIELD_TYPES` [V: src/schema/field.ts:15-44]:
   types, only ~10 represent unique structural data types. `Cycle`,
   `CycleDuration`, `Location`, `Icon`, `Color` are UI presentation concerns.
 - Ticket 27 & 38 (Live Buffers & Body Schemas): Fileclass has zero live buffer
-  synchronization or body validation. It provides no precedent for tickets 27/38.
+  synchronization or body validation. It provides no precedent for tickets
+  27/38.
 
 ### Round-4 Claims Verification Ledger
 

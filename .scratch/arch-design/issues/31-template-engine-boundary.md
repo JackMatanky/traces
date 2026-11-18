@@ -6,13 +6,12 @@ Blocked by: 7, 16, 18, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 32
 
 ## Question
 
-Decide how the template engine relates to the rest.
-Answer each numbered question separately.
-Use [ticket 36's decision-record
-rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
-Keep decision evidence separate from implementation gates.
-A question that ends with "Needs 30" waits for the answer of ticket 30.
-See "Dependencies on open tickets" for the other open tickets.
+Decide how the template engine relates to the rest. Answer each numbered
+question separately. Use
+[ticket 36's decision-record rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
+Keep decision evidence separate from implementation gates. A question that ends
+with "Needs 30" waits for the answer of ticket 30. See "Dependencies on open
+tickets" for the other open tickets.
 
 ### Values and operators
 

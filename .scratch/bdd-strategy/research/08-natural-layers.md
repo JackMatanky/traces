@@ -170,8 +170,8 @@ suite from these changes.
 
 - **Option 2: Strict six-condition checklist.** Apply ticket 07's six conditions
   directly to each test.
-- **Evidence:** The 34 classes map to Option 1 cleanly. Authors can apply Option 1
-  faster.
+- **Evidence:** The 34 classes map to Option 1 cleanly. Authors can apply Option
+  1 faster.
 - **Open questions for grilling:**
   - When new host boundaries appear (LSP stdio, MCP), does the scenario
     definition expand to cover them?
@@ -186,14 +186,15 @@ suite from these changes.
   end-to-end workflows. Property tests prove invariant laws across arbitrary
   inputs.
 
-- **Expected growth:** Targeted growth only. Add property tests for the identified
-  law-shaped classes (codecs, total orders, table escaping). Do not write
-  property tests for business workflows or error message strings. *[Ticket 08
-  decision: Proptests stay inline in `src/`. Growth candidates wait for ticket
+- **Expected growth:** Targeted growth only. Add property tests for the
+  identified law-shaped classes (codecs, total orders, table escaping). Do not
+  write property tests for business workflows or error message strings. *[Ticket
+  08 decision: Proptests stay inline in `src/`. Growth candidates wait for
+  ticket
   09. Query-plan idempotence excluded.]*
 - **Open questions for grilling:**
   - Must proptests stay inline in `src/` or move to a separate `tests/`
     integration target?
-  - Must CI fail if a new proptest runs without a recorded regression
-    baseline?
-  *[Ticket 08 decision: Proptests stay inline in `src/`. No CI rule for regression files.]*
+  - Must CI fail if a new proptest runs without a recorded regression baseline?
+    *[Ticket 08 decision: Proptests stay inline in `src/`. No CI rule for
+    regression files.]*

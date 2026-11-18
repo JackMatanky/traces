@@ -88,9 +88,9 @@ values. Mutarust also prints one result line per mutant under `--debug`.
 ## LLVM Coverage
 
 Use `--coverage` to collect Rust line coverage before mutation. Mutarust uses
-the Cargo-compatible [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)
-tool and its LCOV output. Install the tool and the Rust LLVM tools component
-before use:
+the Cargo-compatible
+[`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) tool and its LCOV
+output. Install the tool and the Rust LLVM tools component before use:
 
 ```text
 cargo install cargo-llvm-cov
@@ -258,9 +258,9 @@ in the selected Cargo workspace. With `--exec`, Mutarust instead sets
 used with `--no-exec`.
 
 `--dry-run` cannot be used with `--no-exec`, `--exec`, timeout controls, Cargo
-test controls, `--workers`, or `--do-not-remove-tmp-folder`. `--no-exec` cannot be used
-with `--exec`, timeout controls, or Cargo test controls. These rules prevent a
-command from silently ignoring a selected option.
+test controls, `--workers`, or `--do-not-remove-tmp-folder`. `--no-exec` cannot
+be used with `--exec`, timeout controls, or Cargo test controls. These rules
+prevent a command from silently ignoring a selected option.
 
 ## Custom Test Commands
 

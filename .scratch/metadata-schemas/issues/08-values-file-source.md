@@ -343,7 +343,8 @@ exactly mirroring how `ancestors`/`resolved` already flow into
 optional builder setter that would let a caller silently skip it:
 
 - `SchemaBuilder::new` (`src/schema/builder.rs:71`)
-- `SchemaMerger::merge` / `resolve_own_fields` (`builder.rs:299`, `builder.rs:370`)
+- `SchemaMerger::merge` / `resolve_own_fields` (`builder.rs:299`,
+  `builder.rs:370`)
 - `SchemaFieldBuilder::new` (`src/schema/fields/builder.rs:48`)
 - `SchemaFieldBuilder::parse_options` (`fields/builder.rs:188`)
 - `select::SchemaSelectField::parse` (`fields/select.rs:43`)
@@ -803,8 +804,8 @@ and no display-order concept beyond array position.
 - `SchemaSelectField::parse` (`src/schema/fields/select.rs`): shape
   discrimination + structured-entry construction + `SelectValuesFileCache`
   lookup for the file-subtable shape.
-- `order` sorting uses `f64::total_cmp` (`a.total_cmp(&b)`) with `slice::sort_by`
-  for stable, non-panicking float comparison (`NaN`/`0.0`).
+- `order` sorting uses `f64::total_cmp` (`a.total_cmp(&b)`) with
+  `slice::sort_by` for stable, non-panicking float comparison (`NaN`/`0.0`).
 - The subtable shape in Schema TOML (`values = { path = "...", ... }`) strictly
   denies unknown subtable keys (only `path`, `value`, `label`, `order` allowed);
   entry objects in values files / inline arrays are open-keyed (`extra`).

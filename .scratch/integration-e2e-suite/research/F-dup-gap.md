@@ -1,14 +1,14 @@
 # Subagent F — Duplication & Coverage-Gap Analysis
 
-Read-only audit. Static inspection only (Read/Grep/Glob); no build, test, or lint
-commands were run. All unit citations below were verified to exist by grepping
-`fn <name>(` in the cited file.
+Read-only audit. Static inspection only (Read/Grep/Glob); no build, test, or
+lint commands were run. All unit citations below were verified to exist by
+grepping `fn <name>(` in the cited file.
 
 ## Evidence standard used
 
-- **Duplication** = *same layer, same boundary, same observable*, asserted twice.
-  Every finding below names **both** tests (`path::test`), the **identical
-  observable** each asserts, and the **entry point** of each.
+- **Duplication** = *same layer, same boundary, same observable*, asserted
+  twice. Every finding below names **both** tests (`path::test`), the
+  **identical observable** each asserts, and the **entry point** of each.
 - **Vertical redundancy** = the outer test proves a *new* failure boundary the
   inner test structurally cannot observe (exit code, stdout/stderr split,
   cross-process state, argv→handler wiring, negative filesystem assertion).
@@ -27,11 +27,12 @@ commands were run. All unit citations below were verified to exist by grepping
 
 Note: `tests/e2e/init.rs` and `tests/e2e/golden_path.rs` do **not** use the
 process boundary for `init` — they call `Init.run(&PresetDialogProvider::new())`
-in-process (see `tests/e2e/support.rs:1-4` and `tests/e2e/golden_path.rs:51-54`).
+in-process (see `tests/e2e/support.rs:1-4` and
+`tests/e2e/golden_path.rs:51-54`).
 
 ---
 
-# ARTIFACT 1 — Behavior × Layer matrix
+## ARTIFACT 1 — Behavior × Layer matrix
 
 Unit citations are `file::test`, all verified present.
 
@@ -65,13 +66,16 @@ Unit citations are `file::test`, all verified present.
 
 ---
 
-# ARTIFACT 2 — Duplication findings
+## ARTIFACT 2 — Duplication findings
 
-## D1 — `config_lifecycle.rs`'s two tests are byte-equivalent (WASTEFUL)
+### D1 — `config_lifecycle.rs`'s two tests are byte-equivalent (WASTEFUL)
 
-- **A:** `tests/integration/config_lifecycle.rs::trust_then_untrust_round_trips_through_the_public_service_surface`
-  — entry: `fixture_service(temp)` → `create_trusted_project(&service, &root)` → `service.untrust(&TrustRequest::from(root))`.
-- **B:** `tests/integration/config_lifecycle.rs::test_project_manages_trust_and_untrust_lifecycle`
+- **A:**
+  `tests/integration/config_lifecycle.rs::trust_then_untrust_round_trips_through_the_public_service_surface`
+  — entry: `fixture_service(temp)` → `create_trusted_project(&service, &root)` →
+  `service.untrust(&TrustRequest::from(root))`.
+- **B:**
+  `tests/integration/config_lifecycle.rs::test_project_manages_trust_and_untrust_lifecycle`
   — entry: `TestProject::trusted(root)` → `project.untrust()`.
 
 **Identical observable:** (1) `.traces/config.toml` exists after trust, (2)
@@ -85,21 +89,23 @@ B adds no boundary, no fixture, no assertion.
 **Disposition:** delete B (or convert it into a `TestProject` fixture-smoke
 unit test in `src/lib.rs`). Canonical: A.
 
-## D2 — Integration round-trip vs unit round-trip for index persistence (WASTEFUL)
+### D2 — Integration round-trip vs unit round-trip for index persistence (WASTEFUL)
 
-- **A:** `src/index/service.rs::produces_identical_entries_through_persist_and_load_roundtrip`
-  — entry: `IndexerService::for_tests(root)` → `build()` → `persist()` → `load()`;
-  asserts path, size, inlinks, outlinks equal for 3 files.
-- **B:** `tests/integration/index_persistence_roundtrip.rs::persist_then_load_recovers_the_same_file_count_and_paths`
-  — entry: `TestProject::trusted` → `project.build_and_persist()` → `project.indexer().load()`;
-  asserts entry count + sorted paths for 2 files.
+- **A:**
+  `src/index/service.rs::produces_identical_entries_through_persist_and_load_roundtrip`
+  — entry: `IndexerService::for_tests(root)` → `build()` → `persist()` →
+  `load()`; asserts path, size, inlinks, outlinks equal for 3 files.
+- **B:**
+  `tests/integration/index_persistence_roundtrip.rs::persist_then_load_recovers_the_same_file_count_and_paths`
+  — entry: `TestProject::trusted` → `project.build_and_persist()` →
+  `project.indexer().load()`; asserts entry count + sorted paths for 2 files.
 
 **Identical observable:** `build → persist → load` yields the same files.
 
-Both constructors are `pub` under `feature = "test-utils"` (`IndexerService::for_tests`
-is `#[cfg(any(test, feature = "test-utils"))] pub`, `src/index/service.rs:56-59`),
-so B does **not** cross a boundary A can't: it asserts strictly *less* (no
-inlinks/outlinks/size). B's doc comment also cites
+Both constructors are `pub` under `feature = "test-utils"`
+(`IndexerService::for_tests` is `#[cfg(any(test, feature = "test-utils"))] pub`,
+`src/index/service.rs:56-59`), so B does **not** cross a boundary A can't: it
+asserts strictly *less* (no inlinks/outlinks/size). B's doc comment also cites
 `src/index/mod.rs::persist_then_load_recovers_the_same_records_and_notes`, a
 test that does not exist anywhere in the tree (`src/index/mod.rs:44-67` contains
 only a shared `fixtures` module) — the "promoted from" pointer is stale.
@@ -110,12 +116,15 @@ strengthen it to the inlinks/outlinks assertions, but not both. Integration
 **not** duplication (it deletes the source markdown and re-queries — a contract
 no unit test states). Keep it.
 
-## D3 — Task classification proven twice at the integration layer (PARTIALLY WASTEFUL)
+### D3 — Task classification proven twice at the integration layer (PARTIALLY WASTEFUL)
 
-- **A:** `tests/integration/index_query.rs::evaluates_query_modes_distinguishing_lists_and_tasks_with_structural_metadata`
+- **A:**
+  `tests/integration/index_query.rs::evaluates_query_modes_distinguishing_lists_and_tasks_with_structural_metadata`
   — entry: `project.config().with_tasks(TaskConfig::from_tags(["#task"]))` →
-  `IndexerService::from(&config).build()` → `QueryService::run(QueryBuilder::{lists,tasks})`.
-- **B:** `tests/integration/task_tag_filters.rs::config_with_tag_filters_classifies_tasks_and_checkboxes_correctly`
+  `IndexerService::from(&config).build()` →
+  `QueryService::run(QueryBuilder::{lists,tasks})`.
+- **B:**
+  `tests/integration/task_tag_filters.rs::config_with_tag_filters_classifies_tasks_and_checkboxes_correctly`
   — entry: **identical chain**, `TaskConfig::from_tags(["#task","#todo"])`.
 
 **Identical observable (overlapping half):** with a non-empty tag filter,
@@ -134,13 +143,16 @@ differential is proven twice at the same layer with the same facade.
 `[tasks] tag_filters` in `config.toml` reaches the classifier. **That is the
 actual gap:** see G6.
 
-## D4 — `renders_a_file_sourced_select_field…`: integration and E2E assert byte-identical content (WASTEFUL across a thin boundary)
+### D4 — `renders_a_file_sourced_select_field…`: integration and E2E assert byte-identical content (WASTEFUL across a thin boundary)
 
-- **A:** `tests/integration/template_render.rs::renders_a_file_sourced_select_field_in_template_rendering`
-  — entry: `TemplateService::new(&config, …)` → `render_to_file(…, Commit(CreateNew))`
-  → reads `topic_note.md`.
-- **B:** `tests/e2e/template_write.rs::renders_file_sourced_select_field_in_e2e_template`
-  — entry: spawned `traces template -i topic_note --no-input` → reads `topic_note.md`.
+- **A:**
+  `tests/integration/template_render.rs::renders_a_file_sourced_select_field_in_template_rendering`
+  — entry: `TemplateService::new(&config, …)` →
+  `render_to_file(…, Commit(CreateNew))` → reads `topic_note.md`.
+- **B:**
+  `tests/e2e/template_write.rs::renders_file_sourced_select_field_in_e2e_template`
+  — entry: spawned `traces template -i topic_note --no-input` → reads
+  `topic_note.md`.
 
 **Identical observable:** both write the *same* values file
 (`[[entries]] id="rust" title="Rust Programming"`), the *same* schema TOML
@@ -150,19 +162,23 @@ assert `content == "Category: Rust Programming (rust)"`.
 
 **Boundary delta:** B adds argv parsing (`-i`/`--no-input`) + exit code. Argv
 parsing for `template` is already covered by `src/cli/template.rs::parse` (19
-tests) and the write path by `src/cli/template.rs::writes_a_schema_backed_template_through_cli_dispatch`.
+tests) and the write path by
+`src/cli/template.rs::writes_a_schema_backed_template_through_cli_dispatch`.
 
 **Disposition:** wasteful. Canonical = A (integration, full content assertion).
 Convert B to assert something A structurally cannot: e.g. `--output` path, or
 drop it — `writes_the_rendered_file_to_the_default_output_path` in the same file
 already owns the argv→file-write boundary.
 
-## D5 — E2E `task_prints_a_checkbox_line_per_task` re-proves the unit render (WEAK — keep one representative)
+### D5 — E2E `task_prints_a_checkbox_line_per_task` re-proves the unit render (WEAK — keep one representative)
 
-- **A:** `src/cli/task.rs::render::renders_a_checkbox_line_per_task_in_document_order`
+- **A:**
+  `src/cli/task.rs::render::renders_a_checkbox_line_per_task_in_document_order`
   — entry: `Task{from:None, filter:vec![]}.render(&config)` → asserts
-  `rendered == "- [ ] buy milk (todo.md)\n- [x] pay rent (todo.md)\n"`, `count == 2`.
-- **B:** `tests/e2e/dispatch.rs::query_commands::task_prints_a_checkbox_line_per_task`
+  `rendered == "- [ ] buy milk (todo.md)\n- [x] pay rent (todo.md)\n"`,
+  `count == 2`.
+- **B:**
+  `tests/e2e/dispatch.rs::query_commands::task_prints_a_checkbox_line_per_task`
   — entry: spawned `traces task` → asserts `stdout.contains("- [ ] buy milk")`
   and `stdout.contains("- [x] walk dog")`.
 
@@ -174,16 +190,17 @@ already owns the argv→file-write boundary.
 (`indexing_then_page_and_task_queries_observe_the_same_project_state`,
 line 1218); the residual untested link in-process is the two `print!` lines.
 
-**Disposition:** this is *weak* vertical redundancy, not clean waste. Keep **one**
-E2E stdout assertion for the `task` channel (B or D6's test, not both) and rely
-on the unit for content breadth.
+**Disposition:** this is *weak* vertical redundancy, not clean waste. Keep
+**one** E2E stdout assertion for the `task` channel (B or D6's test, not both)
+and rely on the unit for content breadth.
 
-## D6 — E2E `task_sorting_orders_output_with_asc_and_desc` re-proves sorting at the 4th layer (WASTEFUL)
+### D6 — E2E `task_sorting_orders_output_with_asc_and_desc` re-proves sorting at the 4th layer (WASTEFUL)
 
 - **A:** `src/cli/task.rs::render::sorts_tasks_by_field` — entry:
   `Task{sort: SortArgs{keys:["list.text"], asc:true}}.render(&config)` → asserts
   exact ordering `apple, mango, zebra`.
-- **B:** `tests/e2e/dispatch.rs::query_commands::task_sorting_orders_output_with_asc_and_desc`
+- **B:**
+  `tests/e2e/dispatch.rs::query_commands::task_sorting_orders_output_with_asc_and_desc`
   — entry: spawned `traces task --sort list.text --asc` / `--desc` → asserts the
   same Alpha/Bravo/Charlie/Delta ordering both ways.
 
@@ -191,27 +208,32 @@ on the unit for content breadth.
 reverses.
 
 Already covered at: `src/query/sort.rs::orders_ascending_by_default` /
-`orders_descending_when_requested` (semantics), `src/cli/task.rs::argv::parses_sort_flags`
-(argv), `tests/integration/index_query.rs::sorts_pages_descending_by_text_field`
+`orders_descending_when_requested` (semantics),
+`src/cli/task.rs::argv::parses_sort_flags` (argv),
+`tests/integration/index_query.rs::sorts_pages_descending_by_text_field`
 (builder→execution), plus A (CLI render). B adds only stdout capture.
 
 **Disposition:** wasteful — 5 proofs of one ordering rule. Canonical:
 `src/query/sort.rs` (semantics) + one integration (builder seam). Delete B.
 
-## D7 — The same diagnostic string asserted at 4 sites, 2 of them E2E (WASTEFUL PAIR)
+### D7 — The same diagnostic string asserted at 4 sites, 2 of them E2E (WASTEFUL PAIR)
 
-- **A:** `tests/integration/index_query.rs::accepts_canonical_list_paths_and_rejects_obsolete_task_paths_with_diagnostic`
+- **A:**
+  `tests/integration/index_query.rs::accepts_canonical_list_paths_and_rejects_obsolete_task_paths_with_diagnostic`
   — entry: `QueryBuilder::tasks(…).filter("task.completed == true")` → asserts
   `msg.contains("did you mean `list.completed`?")`.
-- **B:** `tests/integration/template_render.rs::tasks_pipeline_rejects_obsolete_task_field_syntax_with_diagnostic`
+- **B:**
+  `tests/integration/template_render.rs::tasks_pipeline_rejects_obsolete_task_field_syntax_with_diagnostic`
   — entry: `TemplateService::render_to_file` on
-  `{{ tasks.from().where('task.completed == true') | count }}` → asserts the same
-  string through the minijinja source chain. **Different seam (does the `tasks`
-  namespace route through `QueryBuilder::filter`?) → keep both.**
-- **C:** `tests/e2e/dispatch.rs::query_commands::task_invalid_where_reports_its_location_and_repair`
+  `{{ tasks.from().where('task.completed == true') | count }}` → asserts the
+  same string through the minijinja source chain. **Different seam (does the
+  `tasks` namespace route through `QueryBuilder::filter`?) → keep both.**
+- **C:**
+  `tests/e2e/dispatch.rs::query_commands::task_invalid_where_reports_its_location_and_repair`
   — entry: spawned `traces task --where task.completed == true` →
   `stderr.contains("did you mean `list.completed`?")`.
-- **D:** `tests/e2e/dispatch.rs::query_commands::task_table_invalid_column_reports_its_location_and_repair`
+- **D:**
+  `tests/e2e/dispatch.rs::query_commands::task_table_invalid_column_reports_its_location_and_repair`
   — entry: spawned `traces task --table --column task.completed` →
   **the same assertion string, same exit-code class, same Miette render path.**
 
@@ -219,25 +241,32 @@ Already covered at: `src/query/sort.rs::orders_ascending_by_default` /
 stderr via `plain()` → `traces::cli::query::failed` exit). They differ only in
 which flag reaches the shared `FieldPath::parse`. Both doc-comments claim
 "proves this flag's own argv wiring", but `src/cli/task.rs::argv` already proves
-`--column` parsing and `src/cli/table.rs::render::rejects_malformed_column_field_path`
-proves column rejection.
+`--column` parsing and
+`src/cli/table.rs::render::rejects_malformed_column_field_path` proves column
+rejection.
 
 **Disposition:** delete D, keep C. (A/B keep.)
 
-## D8 — E2E `task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers` = 4 unit tests concatenated at process cost (WASTEFUL as a *content* proof, KEEP as a *stdout exactness* proof)
+### D8 — E2E `task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers` = 4 unit tests concatenated at process cost (WASTEFUL as a *content* proof, KEEP as a *stdout exactness* proof)
 
-- **A:** `src/query/format.rs::render_task_list::preserves_custom_status_markers`
-  — entry: `QuerySet::task_list(TaskPathStyle::None)` → asserts exact string
+- **A:**
+  `src/query/format.rs::render_task_list::preserves_custom_status_markers` —
+  entry: `QuerySet::task_list(TaskPathStyle::None)` → asserts exact string
   `- [ ] … / - [/] … / - [-] … / - [!] … / - [?] …`.
-- **B:** `src/query/format.rs::render_task_list::indents_nested_tasks_by_two_spaces_per_depth`
+- **B:**
+  `src/query/format.rs::render_task_list::indents_nested_tasks_by_two_spaces_per_depth`
   — same entry → asserts exact indented string.
-- **C:** `src/query/format.rs::render_task_list::formats_coordinate_path_style_with_line_numbers`
-  — same entry → asserts exact `- [ ] first (todo.md:3)\n  - [x] second (todo.md:4)`.
-- **D:** `src/cli/task.rs::render::renders_line_number_coordinates_with_line_numbers_flag`
+- **C:**
+  `src/query/format.rs::render_task_list::formats_coordinate_path_style_with_line_numbers`
+  — same entry → asserts exact
+  `- [ ] first (todo.md:3)\n  - [x] second (todo.md:4)`.
+- **D:**
+  `src/cli/task.rs::render::renders_line_number_coordinates_with_line_numbers_flag`
   — entry: `Task{line_numbers:true}.render(&config)` → asserts `todo.md:3`/`:4`.
-- **E:** `tests/e2e/dispatch.rs::query_commands::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`
-  — entry: spawned `traces task` and `traces task -l` → `assert_eq!(stdout, expected)`
-  for both variants.
+- **E:**
+  `tests/e2e/dispatch.rs::query_commands::task_preserves_custom_markers_indents_nested_depth_and_formats_line_numbers`
+  — entry: spawned `traces task` and `traces task -l` →
+  `assert_eq!(stdout, expected)` for both variants.
 
 **Identical observable:** custom status markers preserved + 2-space-per-depth
 indent + `(path)` / `(path:line)` suffix form.
@@ -249,13 +278,15 @@ contract), and note that A/B/C are the canonical content proofs. **No action
 needed; this is the model the other E2E query tests should follow** (one rich
 exact-string stdout test instead of five partial ones — see D5/D6).
 
-## D9 — Three E2E completion tests = the three unit tests at process cost (WASTEFUL ×2)
+### D9 — Three E2E completion tests = the three unit tests at process cost (WASTEFUL ×2)
 
-- **A1/A2/A3:** `src/cli/completions.rs::script::{zsh_output_starts_with_the_zsh_compdef_directive,
-  bash_output_names_the_traces_completion_function, fish_output_targets_the_traces_command}`
+- **A1/A2/A3:**
+  `src/cli/completions.rs::script::{zsh_output_starts_with_the_zsh_compdef_directive, bash_output_names_the_traces_completion_function, fish_output_targets_the_traces_command}`
   — entry: `Completions::script(Shell::{Zsh,Bash,Fish})` → assert
-  `starts_with("#compdef traces")` / `contains("_traces()")` / `contains("-c traces")`.
-- **B1/B2/B3:** `tests/e2e/dispatch.rs::completions::{zsh,bash,fish}_shell_prints_a_completion_script`
+  `starts_with("#compdef traces")` / `contains("_traces()")` /
+  `contains("-c traces")`.
+- **B1/B2/B3:**
+  `tests/e2e/dispatch.rs::completions::{zsh,bash,fish}_shell_prints_a_completion_script`
   — entry: spawned `traces completions --shell <shell>` → assert
   `stdout.contains("#compdef traces")` / `"complete -c traces"` / `"_traces()"`.
 
@@ -268,7 +299,7 @@ retain A1–A3 for per-shell marker coverage. (Note B2's marker is the strongest
 of the three because `#compdef` must be *first* — if you keep only one, keep
 zsh: `assert!(stdout.starts_with("#compdef traces"))`.)
 
-## D10 — Trust/untrust: 4 layers, and the integration layer is the weakest (OVER-COVERED)
+### D10 — Trust/untrust: 4 layers, and the integration layer is the weakest (OVER-COVERED)
 
 Layers asserting "trust writes a store entry / untrust removes it":
 
@@ -293,12 +324,14 @@ consequence at the process boundary.
 (D1) and consider deleting the remaining one too (its `pub`-surface rationale is
 subsumed by layers 2 and 4).
 
-## D11 — `untrusted_root_fails_with_the_config_build_diagnostic` vs `untrust_then_list_fails_with_the_untrusted_diagnostic` (PARTIAL overlap — keep both)
+### D11 — `untrusted_root_fails_with_the_config_build_diagnostic` vs `untrust_then_list_fails_with_the_untrusted_diagnostic` (PARTIAL overlap — keep both)
 
-- **A:** `tests/e2e/dispatch.rs::trust_and_diagnostics::untrusted_root_fails_with_the_config_build_diagnostic`
+- **A:**
+  `tests/e2e/dispatch.rs::trust_and_diagnostics::untrusted_root_fails_with_the_config_build_diagnostic`
   — precondition: config written, **never trusted**; asserts non-zero exit,
   **empty stdout**, `stderr.contains("traces::cli::config_build_untrusted")`.
-- **B:** `tests/e2e/untrust.rs::untrust_then_list_fails_with_the_untrusted_diagnostic`
+- **B:**
+  `tests/e2e/untrust.rs::untrust_then_list_fails_with_the_untrusted_diagnostic`
   — precondition: trusted, then **untrusted in a prior process**; asserts
   non-zero exit + the same code.
 
@@ -310,7 +343,7 @@ next config load — a real cross-process defect class A cannot detect.
 **Disposition:** keep both (useful vertical redundancy). Note the redundancy is
 cheap: B could absorb A's empty-stdout assertion to make it strictly stronger.
 
-## D12 — E2E dispatch overall: 10 of 20 tests only re-derive in-process content
+### D12 — E2E dispatch overall: 10 of 20 tests only re-derive in-process content
 
 Tally over `tests/e2e/dispatch.rs` (20 tests):
 
@@ -328,45 +361,50 @@ regression could newly catch, while keeping every *distinct* process contract.
 
 ---
 
-# GAP list
+## GAP list
 
 Ranked by (defect class uniqueness × production-path exposure).
 
 ### G1 — `Commands::Init` dispatch arm is never executed (HIGH)
 
-- **Unprotected path:** `src/cli/mod.rs:187` — `Self::Init(args) => args.run(provider.as_ref())`,
-  reached only via `Cli::run` (`src/cli/mod.rs:121`) and `traces_pkm::cli::run`
-  (`src/cli/mod.rs:214`).
+- **Unprotected path:** `src/cli/mod.rs:187` —
+  `Self::Init(args) => args.run(provider.as_ref())`, reached only via `Cli::run`
+  (`src/cli/mod.rs:121`) and `traces_pkm::cli::run` (`src/cli/mod.rs:214`).
 - **Evidence:** the only `init` test through `Cli` is
   `src/cli/mod.rs::parse::init_argv_maps_to_init_subcommand`, which stops at
   `matches!(cli.command, Some(Commands::Init(_)))` and never calls `.run()`.
   Both E2E tests bypass the arm entirely:
   `tests/e2e/init.rs::init_scaffolds_preset_defaults_and_refuses_existing_traces_dir:34`
-  and `tests/e2e/golden_path.rs::init_trust_index_list_table_task_and_template_chain_through_one_project:53`
-  call `Init.run(&provider)` directly. `grep` for `Commands::Init` finds only the
-  two parse assertions.
+  and
+  `tests/e2e/golden_path.rs::init_trust_index_list_table_task_and_template_chain_through_one_project:53`
+  call `Init.run(&provider)` directly. `grep` for `Commands::Init` finds only
+  the two parse assertions.
 - **Defect class a process/seam test would catch:** provider plumbing
-  (`provider.as_ref()` handed to the wrong handler), `CommandOutcome` mapping for
-  `CliError::InitAlreadyInitialized`, and the stderr line
+  (`provider.as_ref()` handed to the wrong handler), `CommandOutcome` mapping
+  for `CliError::InitAlreadyInitialized`, and the stderr line
   `eprintln!("initialised traces in …")` (`src/cli/init.rs:47`) never reaching
   the user.
 - **Cheapest fix (no new harness):** one *component* test in
-  `src/cli/mod.rs::run` — `Cli::try_parse_from(["traces","init"]).run(&service, PresetDialogProvider)`.
+  `src/cli/mod.rs::run` —
+  `Cli::try_parse_from(["traces","init"]).run(&service, PresetDialogProvider)`.
   A true E2E would additionally need stdin scripting (init is inherently
   interactive, hence `tests/e2e/init.rs:4-5` drives it in-process), so the
   component seam is the right investment.
 
-### G2 — Inlinks: unit-only across a public query surface (HIGH)
+#### G2 — Inlinks: unit-only across a public query surface (HIGH)
 
-- **Unprotected path:** `src/index/inlinks.rs` (46 unit tests) → `WorkspaceIndex`
-  → `QueryRow`/`QuerySet` field `inlinks` (`src/query/results.rs::resolves_inlinks_as_a_list_of_linking_note_paths`,
-  `resolves_inlinks_as_an_empty_list_when_nothing_links_to_the_note`) → user-facing
-  `list --column inlinks` / `{{ … .list("inlinks") }}`.
+- **Unprotected path:** `src/index/inlinks.rs` (46 unit tests) →
+  `WorkspaceIndex` → `QueryRow`/`QuerySet` field `inlinks`
+  (`src/query/results.rs::resolves_inlinks_as_a_list_of_linking_note_paths`,
+  `resolves_inlinks_as_an_empty_list_when_nothing_links_to_the_note`) →
+  user-facing `list --column inlinks` / `{{ … .list("inlinks") }}`.
 - **Evidence:** `grep -rin "inlink\|outlink" tests/` returns **zero** matches —
   the only wikilink in `tests/` is the unasserted fixture `[[todo]]` in
   `tests/integration/index_query.rs:148`. The sole cross-module proof is
-  in-crate: `src/cli/mod.rs::query_workflows::derived_inlinks_are_queryable_from_page_queries_and_templates`
-  and `src/query/service.rs::{derives_inlinks_from_outlinks, derives_inlinks_from_multiple_notes_linking_to_the_same_target}`.
+  in-crate:
+  `src/cli/mod.rs::query_workflows::derived_inlinks_are_queryable_from_page_queries_and_templates`
+  and
+  `src/query/service.rs::{derives_inlinks_from_outlinks, derives_inlinks_from_multiple_notes_linking_to_the_same_target}`.
 - **Defect class:** a `#[cfg(any(test, feature = "test-utils"))]` gating mistake
   (see `src/index/mod.rs:33-36`) or a `pub` re-export break would leave every
   in-crate test green while the public `list("inlinks")` field fails for real
@@ -375,7 +413,7 @@ Ranked by (defect class uniqueness × production-path exposure).
   `hyperion.md` → `[[dune]]`, run `QueryService::run(QueryBuilder::pages(...))`,
   assert `list("inlinks")` output through the facade.
 
-### G3 — Five stdout-producing commands have zero stdout assertion anywhere (MEDIUM-HIGH)
+#### G3 — Five stdout-producing commands have zero stdout assertion anywhere (MEDIUM-HIGH)
 
 `println!`/`eprintln!` output is unobservable in-process (unit tests call
 `render`/`run` helpers deliberately split out "so tests can assert on rendered
@@ -400,35 +438,35 @@ supports it; `trust list` was simply never added.
   `stdout.contains(project root)`, and `run(&["template","--list"])` →
   `stdout.contains("daily")`.
 
-### G4 — Incremental refresh is only proven between two *in-process* invocations (MEDIUM)
+#### G4 — Incremental refresh is only proven between two *in-process* invocations (MEDIUM)
 
 - **Unprotected path:** `src/cli/mod.rs:346` `refresh_page_query` →
   `IndexerService::refresh_store` (`src/index/service.rs:106`) →
   `refresh_with_report` (`src/index/service.rs:122`).
 - **Evidence:** the only "edit a note between two CLI invocations" proof is
   `src/cli/mod.rs::query_workflows::table_reflects_a_note_edit_made_between_two_cli_invocations_with_no_explicit_index_command`
-  (component layer, same process, same `ConfigService`, same redb handle lifetime).
-  `tests/e2e/dispatch.rs` never edits a note between two spawned runs;
-  `list_persists_the_file_index_without_an_explicit_index_command` only checks
-  file existence.
+  (component layer, same process, same `ConfigService`, same redb handle
+  lifetime). `tests/e2e/dispatch.rs` never edits a note between two spawned
+  runs; `list_persists_the_file_index_without_an_explicit_index_command` only
+  checks file existence.
 - **Defect class unique to the process boundary:** staleness detection depending
-  on state that a fresh process re-reads (mtime/size backdating, `TRACES_STATE_DIR`
-  isolation in `tests/e2e/support.rs:191`), plus the case where the *first*
-  process wrote an index the *second* process must invalidate.
+  on state that a fresh process re-reads (mtime/size backdating,
+  `TRACES_STATE_DIR` isolation in `tests/e2e/support.rs:191`), plus the case
+  where the *first* process wrote an index the *second* process must invalidate.
 - **Fix:** one E2E: `Sandbox::trusted()` → write note → `list` → rewrite note
   with a changed frontmatter field → `list --column rating` → assert the new
   value on stdout.
 
-### G5 — `traces init` never runs as a spawned process; the golden path's `init` is in-process (MEDIUM)
+#### G5 — `traces init` never runs as a spawned process; the golden path's `init` is in-process (MEDIUM)
 
-- **Unprotected path:** `src/cli/init.rs:42` `Init::run` reachable from argv only
-  through `src/cli/mod.rs:187`.
+- **Unprotected path:** `src/cli/init.rs:42` `Init::run` reachable from argv
+  only through `src/cli/mod.rs:187`.
 - **Evidence:** `tests/e2e/golden_path.rs:51-54` runs
-  `Init.run(&PresetDialogProvider::new())` under `CwdGuard`; `tests/e2e/init.rs:34,45,58`
-  same. No `sandbox.run(&["init"])` exists anywhere. Consequently the exit code
-  for `CliError::InitAlreadyInitialized` (asserted only as an in-process `matches!`
-  at `tests/e2e/init.rs:62`) and the `miette` rendering of that error are
-  unverified.
+  `Init.run(&PresetDialogProvider::new())` under `CwdGuard`;
+  `tests/e2e/init.rs:34,45,58` same. No `sandbox.run(&["init"])` exists
+  anywhere. Consequently the exit code for `CliError::InitAlreadyInitialized`
+  (asserted only as an in-process `matches!` at `tests/e2e/init.rs:62`) and the
+  `miette` rendering of that error are unverified.
 - **Why the boundary matters:** `init` is the first command a new user runs and
   the only one that *creates* the config every other command then discovers; its
   failure mode (non-zero exit + readable message when `.traces` exists) is a
@@ -437,36 +475,39 @@ supports it; `trust list` was simply never added.
   `traces init` with piped stdin in `tests/e2e/init.rs` and add
   `assert_eq!(status, success)` + `stderr.contains("initialised traces in")`.
 
-### G6 — `[tasks] tag_filters` never flows from `config.toml` to the classifier outside unit tests (MEDIUM)
+#### G6 — `[tasks] tag_filters` never flows from `config.toml` to the classifier outside unit tests (MEDIUM)
 
-- **Unprotected path:** `src/config/builder.rs::uses_local_tag_filters_over_global_when_local_is_non_empty`
-  (config file → `TaskConfig`) → `Config::tasks` → `IndexerService::from(&config)`
-  → `src/note/parser/task.rs` classification.
+- **Unprotected path:**
+  `src/config/builder.rs::uses_local_tag_filters_over_global_when_local_is_non_empty`
+  (config file → `TaskConfig`) → `Config::tasks` →
+  `IndexerService::from(&config)` → `src/note/parser/task.rs` classification.
 - **Evidence:** both integration tests construct the filter **in code**:
   `tests/integration/task_tag_filters.rs:35` and
   `tests/integration/index_query.rs:187,261,318` all use
-  `project.config().with_tasks(TaskConfig::from_tags(&[…]))`, never the TOML key.
-  The only TOML→`TaskConfig` unit is
+  `project.config().with_tasks(TaskConfig::from_tags(&[…]))`, never the TOML
+  key. The only TOML→`TaskConfig` unit is
   `src/config/builder.rs::uses_local_tag_filters_over_global_when_local_is_non_empty`.
-- **Defect class:** a broken config key rename (or local/global precedence bug in
-  `src/config/model.rs:645-668` (`TryFrom<RawTaskConfig> for TaskConfig`, the
+- **Defect class:** a broken config key rename (or local/global precedence bug
+  in `src/config/model.rs:645-668` (`TryFrom<RawTaskConfig> for TaskConfig`, the
   only TOML→`tag_filters` conversion in production) would leave every
-  integration/E2E
-  classification test green, because none of them reads the key from disk.
+  integration/E2E classification test green, because none of them reads the key
+  from disk.
 - **Fix:** change one `task_tag_filters.rs` test to write
   `[tasks] tag_filters = ["#task"]` into `.traces/config.toml` and load via
   `ConfigService` instead of `with_tasks(...)`.
 - **Related:** `tests/e2e/dispatch.rs::task_*` all run with the default config
   (no tag filter), so no E2E covers a configured filter either.
 
-### G7 — Index-corruption recovery has no process-level contract (LOW-MEDIUM)
+#### G7 — Index-corruption recovery has no process-level contract (LOW-MEDIUM)
 
 - **Unprotected path:** `src/index/store.rs:142-143` (wipe-and-recreate on
-  corruption, implemented by `create_db` at `:769`) surfaced through `refresh_page_query` → `CliError`/exit code.
+  corruption, implemented by `create_db` at `:769`) surfaced through
+  `refresh_page_query` → `CliError`/exit code.
 - **Evidence:** only
   `tests/integration/index_persistence_roundtrip.rs::refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted`
   (asserts `upserted_count == 2`, `deleted_count == 0`) and store-level unit
-  tests (`recovers_by_rebuilding_when_the_files_table_has_the_old_str_key_schema`,
+  tests
+  (`recovers_by_rebuilding_when_the_files_table_has_the_old_str_key_schema`,
   `skips_missing_and_undecodable_notes_but_keeps_valid_ones`).
 - **Defect class:** whether a corrupted `.traces/index.redb` makes `traces list`
   exit non-zero (bad: unrecoverable for users) or silently rebuilds (good) is a
@@ -475,22 +516,22 @@ supports it; `trust list` was simply never added.
   `.traces/index.redb` with `0xFF` bytes → `list` → `assert!(is_success())` and
   `stdout` lists the note.
 
-### G8 — `trust --all` / subtree discovery not exercised past the in-process layer (LOW)
+#### G8 — `trust --all` / subtree discovery not exercised past the in-process layer (LOW)
 
 - **Path:** `src/cli/mod.rs:490` `resolve_trust_subjects` picks
   `DiscoveryScope::LocalSubtree` vs `NearestLocal` from `--all`
   (`src/cli/mod.rs:502-506`), consumed by `ConfigService::trust_requests`
   (`src/config/service.rs:303`).
 - **Evidence:** `src/cli/trust.rs::all_mode_trusts_descendant_configs` covers it
-  in-process; no E2E runs `traces trust --all` against a nested project tree, and
-  `tests/integration/config_lifecycle.rs` never touches scopes.
+  in-process; no E2E runs `traces trust --all` against a nested project tree,
+  and `tests/integration/config_lifecycle.rs` never touches scopes.
 - **Boundary value:** moderate — the scope choice is argv-driven and its user
-  visible output (`eprintln!("trusted {root}")` per subject, `src/cli/trust.rs:135`)
-  is unasserted (see G3). Bundle with G3.
+  visible output (`eprintln!("trusted {root}")` per subject,
+  `src/cli/trust.rs:135`) is unasserted (see G3). Bundle with G3.
 
 ---
 
-## Summary
+### Summary
 
 - **Worst wasteful duplications:** D1 (two byte-identical integration tests),
   D6 + the E2E query-commands block (sorting/formatting proven at 4-5 layers),
@@ -501,7 +542,8 @@ supports it; `trust list` was simply never added.
   G2 (inlinks: 46 unit tests, zero tests outside the crate), G3 (5 stdout
   commands with no stdout assertion anywhere), G6 (tag filters never read from
   `config.toml` outside unit tests).
-- **Net:** ~2,410 unit + 30 integration + 27 E2E tests; the waste is concentrated
-  in ~10 E2E tests and ~3 integration tests, i.e. **<2% of the suite** — the
-  architecture is sound, the layering rationale in the doc-comments is
-  genuinely good, and the fix is consolidation rather than restructuring.
+- **Net:** ~2,410 unit + 30 integration + 27 E2E tests; the waste is
+  concentrated in ~10 E2E tests and ~3 integration tests, i.e.
+  **<2% of the suite** — the architecture is sound, the layering rationale in
+  the doc-comments is genuinely good, and the fix is consolidation rather than
+  restructuring.

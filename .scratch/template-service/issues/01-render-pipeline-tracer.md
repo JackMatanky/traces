@@ -8,36 +8,83 @@ Status: implemented
 
 ## What to build
 
-The end-to-end tracer bullet for rendering. `TemplateService` holds a reference to `Config` and a `TemplateEngine` (which owns the minijinja `Environment` plus the `TemplateLoader`). Given a template name: ensure `Config` has been loaded by the CLI layer (trust already gated during `ConfigService::build()` — not a per-template concern), resolve the template via `TemplateEngine::resolve()`, render the source with minijinja (`{{ }}`/`{% %}` working), and write the result to the default output path `Config::output_dir() / <name>.md`.
+The end-to-end tracer bullet for rendering. `TemplateService` holds a reference
+to `Config` and a `TemplateEngine` (which owns the minijinja `Environment` plus
+the `TemplateLoader`). Given a template name: ensure `Config` has been loaded by
+the CLI layer (trust already gated during `ConfigService::build()` — not a
+per-template concern), resolve the template via `TemplateEngine::resolve()`,
+render the source with minijinja (`{{ }}`/`{% %}` working), and write the result
+to the default output path `Config::output_dir() / <name>.md`.
 
-Wire the CLI: `traces template -i <name>`, the `tmpl` alias, and the default `traces -i <name>` dispatch all route to this handler via clap derives.
+Wire the CLI: `traces template -i <name>`, the `tmpl` alias, and the default
+`traces -i <name>` dispatch all route to this handler via clap derives.
 
-Custom functions, output-path control, dry-run, and includes are separate slices (02–05). This slice proves a plain template renders to a file through all three invocation forms.
+Custom functions, output-path control, dry-run, and includes are separate slices
+(02–05). This slice proves a plain template renders to a file through all three
+invocation forms.
 
 ## Acceptance criteria
 
-- [x] `traces template -i <name>` renders a resolved template and writes `./<name>.md`
-- [x] `traces tmpl -i <name>` and `traces -i <name>` route to the same handler and produce identical results
+- [x] `traces template -i <name>` renders a resolved template and writes
+      `./<name>.md`
+- [x] `traces tmpl -i <name>` and `traces -i <name>` route to the same handler
+      and produce identical results
 - [x] minijinja syntax (conditionals, loops, filters) renders correctly
-- [x] Dispatch tests cover all three invocation forms end-to-end (argv parsing through render/write), using temp dirs and string templates
-- [x] Template resolution types and logic currently under `src/config/domain.rs` are moved to the template-service boundary: `ResolvedTemplate`, `ResolutionError`, `Config::resolve_template`, and its helper functions (`one_match`, `searched_directories`, `parent_dir`, `resolve_exact_path`, `direct_template_path`, `is_safe_template_relative_path`, `matching_files_in_dir`)
-- [x] Config keeps only config loading and resolved settings ownership: `TemplateConfig`, `Config::templates`, `local_template_dir`, `global_template_dir`, and `output_dir` remain usable by template-service without config owning template lookup behavior
-- [x] Template-directory parsing remains wired from config files: `RawConfig::directory`, `RawConfig::template_directory`, and `ConfigBuilder::merge` continue to populate `TemplateConfig.local_dir` / `global_dir` for template-service to consume
+- [x] Dispatch tests cover all three invocation forms end-to-end (argv parsing
+      through render/write), using temp dirs and string templates
+- [x] Template resolution types and logic currently under `src/config/domain.rs`
+      are moved to the template-service boundary: `ResolvedTemplate`,
+      `ResolutionError`, `Config::resolve_template`, and its helper functions
+      (`one_match`, `searched_directories`, `parent_dir`, `resolve_exact_path`,
+      `direct_template_path`, `is_safe_template_relative_path`,
+      `matching_files_in_dir`)
+- [x] Config keeps only config loading and resolved settings ownership:
+      `TemplateConfig`, `Config::templates`, `local_template_dir`,
+      `global_template_dir`, and `output_dir` remain usable by template-service
+      without config owning template lookup behavior
+- [x] Template-directory parsing remains wired from config files:
+      `RawConfig::directory`, `RawConfig::template_directory`, and
+      `ConfigBuilder::merge` continue to populate `TemplateConfig.local_dir` /
+      `global_dir` for template-service to consume
 
 ## Rust guidance
 
-Relevant skills: `domain-cli`, `m11-ecosystem`, `m06-error-handling`, `m01-ownership`.
+Relevant skills: `domain-cli`, `m11-ecosystem`, `m06-error-handling`,
+`m01-ownership`.
 
-- **CLI dispatch (domain-cli):** `tmpl` is a clap alias (`#[command(alias = "tmpl")]`); the default `traces -i <name>` dispatch is trickier — model it as an optional subcommand plus top-level `-i`, and route "no subcommand but `-i` present" to the template handler. Verify clap's derive resolves this without ambiguity against `init`/`trust`; a small `#[command(args_conflicts_with_subcommands = true)]` or a manual post-parse fallthrough may be needed.
-- **minijinja ownership (m11/m01):** the `Environment` lives inside `TemplateEngine`, which the service owns. The engine also owns the `TemplateLoader` — built once, cloned once for minijinja's `set_loader` callback, original kept for `resolve()`. TemplateService delegates both resolve and render to the engine, holding no separate loader reference.
-- **Trust is a config-level gate (m06):** trust is verified during `ConfigService::build()`, not per-template. TemplateService ensures config has been successfully loaded — that is the trust check. An untrusted workspace fails at config load time with `RootNotTrusted`/`StaleConfigContent` before TemplateService ever runs. Propagate ConfigService errors up as miette diagnostics; don't `unwrap`.
-- **Default output path:** `./<template-name>.md` is derived from the resolved template's stem, computed at write time — not stored during render (that's issue tmpl-02's concern).
-- **Config boundary cleanup:** Reviewed `src/config/`. Keep discovery/build/parsing plumbing in config (`candidate.rs`, `discovery.rs`, `raw.rs`, `builder.rs`, `service.rs`). Move only template lookup behavior out of `domain.rs`; do not move config-file discovery, config-source tracking, or raw TOML parsing into template-service.
+- **CLI dispatch (domain-cli):** `tmpl` is a clap alias
+  (`#[command(alias = "tmpl")]`); the default `traces -i <name>` dispatch is
+  trickier — model it as an optional subcommand plus top-level `-i`, and route
+  "no subcommand but `-i` present" to the template handler. Verify clap's derive
+  resolves this without ambiguity against `init`/`trust`; a small
+  `#[command(args_conflicts_with_subcommands = true)]` or a manual post-parse
+  fallthrough may be needed.
+- **minijinja ownership (m11/m01):** the `Environment` lives inside
+  `TemplateEngine`, which the service owns. The engine also owns the
+  `TemplateLoader` — built once, cloned once for minijinja's `set_loader`
+  callback, original kept for `resolve()`. TemplateService delegates both
+  resolve and render to the engine, holding no separate loader reference.
+- **Trust is a config-level gate (m06):** trust is verified during
+  `ConfigService::build()`, not per-template. TemplateService ensures config has
+  been successfully loaded — that is the trust check. An untrusted workspace
+  fails at config load time with `RootNotTrusted`/`StaleConfigContent` before
+  TemplateService ever runs. Propagate ConfigService errors up as miette
+  diagnostics; don't `unwrap`.
+- **Default output path:** `./<template-name>.md` is derived from the resolved
+  template's stem, computed at write time — not stored during render (that's
+  issue tmpl-02's concern).
+- **Config boundary cleanup:** Reviewed `src/config/`. Keep
+  discovery/build/parsing plumbing in config (`candidate.rs`, `discovery.rs`,
+  `raw.rs`, `builder.rs`, `service.rs`). Move only template lookup behavior out
+  of `domain.rs`; do not move config-file discovery, config-source tracking, or
+  raw TOML parsing into template-service.
 
 ## Blocked by
 
-- `.scratch/config-service/issues/02-template-directory-resolution.md` (implemented)
-- `.scratch/config-service/issues/04-trust-store.md` (implemented — transitive dep; trust is gated during config build, not a template concern)
+- `.scratch/config-service/issues/02-template-directory-resolution.md`
+  (implemented)
+- `.scratch/config-service/issues/04-trust-store.md` (implemented — transitive
+  dep; trust is gated during config build, not a template concern)
 
 ## Implementation notes
 
@@ -117,17 +164,16 @@ global relative path without extension — tried one directory at a time
 (a directory exhausted, both rules, before the next is even considered),
 so `local` always wins over `global` regardless of which rule matched.
 
-**Behavior note for future readers:** because there is only one search
-method, `{% include %}`/`{% extends %}` names now support the same
-stem-matching fallback as top-level `-i <name>` — e.g.
-`{% include "partial" %}` resolves `partial.md`. An earlier iteration had
-a separate exact-only `find_exact` for includes; it was removed in favor
-of one unified method with one fixed precedence, per explicit review
-direction. `TemplateLoader::find` validates the raw name first (rejecting
-absolute paths and `..` traversal before any directory is searched) and
-collapses *any* validation failure into the same `TemplatePathError::TemplateNotFound`
-an ordinary miss produces — deliberately no distinct oracle for "unsafe
-input" vs. "no such template".
+**Behavior note for future readers:** because there is only one search method,
+`{% include %}`/`{% extends %}` names now support the same stem-matching
+fallback as top-level `-i <name>` — e.g. `{% include "partial" %}` resolves
+`partial.md`. An earlier iteration had a separate exact-only `find_exact` for
+includes; it was removed in favor of one unified method with one fixed
+precedence, per explicit review direction. `TemplateLoader::find` validates the
+raw name first (rejecting absolute paths and `..` traversal before any directory
+is searched) and collapses *any* validation failure into the same
+`TemplatePathError::TemplateNotFound` an ordinary miss produces — deliberately
+no distinct oracle for "unsafe input" vs. "no such template".
 
 ### CLI wiring (`src/cli/template.rs`, `src/cli/error.rs`)
 

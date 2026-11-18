@@ -1,8 +1,9 @@
 # Bencher Compatibility Layer
 
-Criterion.rs provides a small crate which can be used as a drop-in replacement for most common
-usages of `bencher` in order to make it easy for existing `bencher` users to try out Criterion.rs.
-This page shows an example of how to use this crate.
+Criterion.rs provides a small crate which can be used as a drop-in replacement
+for most common usages of `bencher` in order to make it easy for existing
+`bencher` users to try out Criterion.rs. This page shows an example of how to
+use this crate.
 
 ## Example
 
@@ -30,8 +31,8 @@ benchmark_group!(benches, a, b);
 benchmark_main!(benches);
 ```
 
-The first step is to edit the Cargo.toml file to replace the bencher dependency with
-`criterion_bencher_compat`:
+The first step is to edit the Cargo.toml file to replace the bencher dependency
+with `criterion_bencher_compat`:
 
 Change:
 
@@ -76,11 +77,13 @@ Found 4 outliers among 100 measurements (4.00%)
 
 ## Limitations
 
-`criterion_bencher_compat` does not implement the full API of the `bencher` crate, only the most
-commonly-used subset. If your benchmarks require parts of the `bencher` crate which are not
-supported, you may need to temporarily disable them while trying Criterion.rs.
+`criterion_bencher_compat` does not implement the full API of the `bencher`
+crate, only the most commonly-used subset. If your benchmarks require parts of
+the `bencher` crate which are not supported, you may need to temporarily disable
+them while trying Criterion.rs.
 
-`criterion_bencher_compat` does not provide access to most of Criterion.rs' more advanced features.
-If the Criterion.rs benchmarks work well for you, it is recommended to convert your benchmarks to
-use the Criterion.rs interface directly. See [Migrating from libtest](./migrating_from_libtest.md)
-for more information on that.
+`criterion_bencher_compat` does not provide access to most of Criterion.rs' more
+advanced features. If the Criterion.rs benchmarks work well for you, it is
+recommended to convert your benchmarks to use the Criterion.rs interface
+directly. See [Migrating from libtest](./migrating_from_libtest.md) for more
+information on that.

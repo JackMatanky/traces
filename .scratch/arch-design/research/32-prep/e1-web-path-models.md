@@ -24,11 +24,12 @@ source. `[H]` marks an implication for ticket 32.
 ## B. Order-preserving portability (C5, C6)
 
 3. **SQLite4 key encoding.** [V] `memcmp`-ordered encodings with prefix
-   termination for text (`https://sqlite.org/src4/doc/trunk/www/key_encoding.wiki`).
-   Lesson for 32: C6 — a UTF-8 `/`-separated form sorts byte-wise. The folder
-   range and the release order check then agree by construction. The `notes/`
-   versus `notes-x.md` divergence disappears only if the persisted order is
-   byte order and the in-memory checks use the same comparison.
+   termination for text
+   (`https://sqlite.org/src4/doc/trunk/www/key_encoding.wiki`). Lesson for 32:
+   C6 — a UTF-8 `/`-separated form sorts byte-wise. The folder range and the
+   release order check then agree by construction. The `notes/` versus
+   `notes-x.md` divergence disappears only if the persisted order is byte order
+   and the in-memory checks use the same comparison.
 
 4. **CockroachDB canonical encodings.** [V] One encoding per type makes the
    datastore architecture-neutral and platform-independent

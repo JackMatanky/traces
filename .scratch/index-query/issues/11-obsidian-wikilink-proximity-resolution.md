@@ -1,6 +1,8 @@
 # 11 — Obsidian-Faithful Wikilink Ambiguity Resolution
 
-**What to build:** Ambiguous wikilink stem matches resolve using Obsidian's nearest-path rule instead of giving up, backed by a zero-copy `BaseNameRef` type and a decision on whether `Note` should carry `FileRecord` data.
+**What to build:** Ambiguous wikilink stem matches resolve using Obsidian's
+nearest-path rule instead of giving up, backed by a zero-copy `BaseNameRef` type
+and a decision on whether `Note` should carry `FileRecord` data.
 
 **Blocked by:** 10 — Derived Inlinks
 
@@ -8,23 +10,75 @@
 
 **Status:** completed
 
-- [x] Decide whether `Note` embeds or references its `FileRecord` (or just `folder`/`name`), or whether link resolution instead takes `&[FileRecord]` alongside `&[Note]`, so `resolve_target`/`find_unique_by_stem` can see folder placement without re-deriving it from `Path`.
-- [x] Add `BaseNameRef`, a borrowed counterpart to `BaseName` (mirroring the `&str`/`String` split), so stem comparisons in the resolution fallback path don't need an owned `BaseName` per candidate.
-- [x] Build a stem→candidate-paths index once per `derive_inlinks` call and thread it through `resolve_target`, replacing `find_unique_by_stem`'s O(n) rescan-per-unresolved-wikilink (fixes the documented O(l·n) worst case) and giving the proximity rule its same-stem candidate list in a single O(n) pass.
-- [x] An ambiguous wikilink stem match resolves via Obsidian's shortest-unique-path proximity rule (nearest common ancestor / fewest path segments from the linking Note) instead of unconditionally resolving to `None`.
-- [x] Ambiguity proximity itself cannot break (equal-distance candidates) still resolves to `None` rather than guessing.
-- [x] Existing `resolve_target`/`find_unique_by_stem` tests in `inlinks.rs` covering "ambiguous stem match resolves to None" are extended to cover proximity-resolved cases and the still-ambiguous equal-distance case.
+- [x] Decide whether `Note` embeds or references its `FileRecord` (or just
+      `folder`/`name`), or whether link resolution instead takes `&[FileRecord]`
+      alongside `&[Note]`, so `resolve_target`/`find_unique_by_stem` can see
+      folder placement without re-deriving it from `Path`.
+- [x] Add `BaseNameRef`, a borrowed counterpart to `BaseName` (mirroring the
+      `&str`/`String` split), so stem comparisons in the resolution fallback
+      path don't need an owned `BaseName` per candidate.
+- [x] Build a stem→candidate-paths index once per `derive_inlinks` call and
+      thread it through `resolve_target`, replacing `find_unique_by_stem`'s O(n)
+      rescan-per-unresolved-wikilink (fixes the documented O(l·n) worst case)
+      and giving the proximity rule its same-stem candidate list in a single
+      O(n) pass.
+- [x] An ambiguous wikilink stem match resolves via Obsidian's
+      shortest-unique-path proximity rule (nearest common ancestor / fewest path
+      segments from the linking Note) instead of unconditionally resolving to
+      `None`.
+- [x] Ambiguity proximity itself cannot break (equal-distance candidates) still
+      resolves to `None` rather than guessing.
+- [x] Existing `resolve_target`/`find_unique_by_stem` tests in `inlinks.rs`
+      covering "ambiguous stem match resolves to None" are extended to cover
+      proximity-resolved cases and the still-ambiguous equal-distance case.
 
 ## Comments
 
-> This ticket was raised during code review of #10's `find_unique_by_stem`, which deliberately implements only exact-uniqueness stem matching (a `ponytail:` note at `inlinks.rs:72-74` already flags the gap). Filed to track the upgrade path rather than build it speculatively — no real vault has demonstrated a need yet.
+> This ticket was raised during code review of #10's `find_unique_by_stem`,
+> which deliberately implements only exact-uniqueness stem matching (a
+> `ponytail:` note at `inlinks.rs:72-74` already flags the gap). Filed to track
+> the upgrade path rather than build it speculatively — no real vault has
+> demonstrated a need yet.
 
 ### Discussion
 
-- **Why `Note` doesn't already have this:** `derive_inlinks`/`resolve_target` (`inlinks.rs`) take `&[Note]` only; `Note` (`note/model.rs`) stores `path: PathBuf` but not folder-proximity-friendly data beyond that path. `FileRecord::name` (`index/file.rs:25`) is already a `BaseName`, but `FileRecord` and `Note` are separate parallel collections (`WorkspaceIndex::records`, `WorkspaceIndex::notes`) joined by path only where needed (`matched_pairs` in `mod.rs`). Obsidian's real algorithm needs to compare each ambiguous candidate's folder depth/shared-ancestor distance to the *linking* Note's folder, which isn't in scope for a function that only sees `&[Note]`.
-- **Why not just call `BaseName::from` today:** `BaseName` stores an owned `String` and is built via a two-step fallible conversion (`file_name.rs` `TryFrom<&Path> for FileName` → `From<&FileName> for BaseName`). `find_unique_by_stem`'s O(n) fallback scan runs per unresolved wikilink outlink; allocating a `BaseName` per candidate per scan is wasted work when `Path::file_stem()` gives the same string borrowed. A `BaseNameRef` (borrowed, `Deref<Target = str>` or similar, mirroring `&str` next to `String`) would let this path and any future proximity comparison reuse the shared type without paying for an allocation it doesn't need.
-- **Existing precedent for "ambiguous → error, don't guess":** `template/loader.rs::find_name_in` (`rejects_an_ambiguous_stem_match` test) already rejects ambiguous stem matches for template resolution rather than picking one. Any proximity rule added here should keep that same fallback: resolve when Obsidian's rule *can* disambiguate, still return `None`/error when it can't (e.g. two equally-nested candidates).
-- **Perf groundwork lands here, not a separate ticket:** the current `find_unique_by_stem` (`inlinks.rs:142-148`) rescans every Note per unresolved wikilink — the O(l·n) worst case already documented in `derive_inlinks`'s `# Performance` note. The proximity rule this ticket introduces needs the same thing that fixes that cost: a `HashMap<&str, Vec<&Path>>` stem→candidates index built once per `derive_inlinks` call and threaded through `resolve_target` (as `find_unique_by_stem`'s new argument). It turns both uniqueness checks and candidate enumeration into O(1)-average lookups — O(n) to build, O(l) total for `l` outlinks — and is a strict precondition for the proximity comparison, which cannot pick the nearest candidate without first enumerating every same-stem candidate. Building it here avoids shipping an intermediate form that scans the same Notes twice.
+- **Why `Note` doesn't already have this:** `derive_inlinks`/`resolve_target`
+  (`inlinks.rs`) take `&[Note]` only; `Note` (`note/model.rs`) stores
+  `path: PathBuf` but not folder-proximity-friendly data beyond that path.
+  `FileRecord::name` (`index/file.rs:25`) is already a `BaseName`, but
+  `FileRecord` and `Note` are separate parallel collections
+  (`WorkspaceIndex::records`, `WorkspaceIndex::notes`) joined by path only where
+  needed (`matched_pairs` in `mod.rs`). Obsidian's real algorithm needs to
+  compare each ambiguous candidate's folder depth/shared-ancestor distance to
+  the *linking* Note's folder, which isn't in scope for a function that only
+  sees `&[Note]`.
+- **Why not just call `BaseName::from` today:** `BaseName` stores an owned
+  `String` and is built via a two-step fallible conversion (`file_name.rs`
+  `TryFrom<&Path> for FileName` → `From<&FileName> for BaseName`).
+  `find_unique_by_stem`'s O(n) fallback scan runs per unresolved wikilink
+  outlink; allocating a `BaseName` per candidate per scan is wasted work when
+  `Path::file_stem()` gives the same string borrowed. A `BaseNameRef` (borrowed,
+  `Deref<Target = str>` or similar, mirroring `&str` next to `String`) would let
+  this path and any future proximity comparison reuse the shared type without
+  paying for an allocation it doesn't need.
+- **Existing precedent for "ambiguous → error, don't guess":**
+  `template/loader.rs::find_name_in` (`rejects_an_ambiguous_stem_match` test)
+  already rejects ambiguous stem matches for template resolution rather than
+  picking one. Any proximity rule added here should keep that same fallback:
+  resolve when Obsidian's rule *can* disambiguate, still return `None`/error
+  when it can't (e.g. two equally-nested candidates).
+- **Perf groundwork lands here, not a separate ticket:** the current
+  `find_unique_by_stem` (`inlinks.rs:142-148`) rescans every Note per unresolved
+  wikilink — the O(l·n) worst case already documented in `derive_inlinks`'s
+  `# Performance` note. The proximity rule this ticket introduces needs the same
+  thing that fixes that cost: a `HashMap<&str, Vec<&Path>>` stem→candidates
+  index built once per `derive_inlinks` call and threaded through
+  `resolve_target` (as `find_unique_by_stem`'s new argument). It turns both
+  uniqueness checks and candidate enumeration into O(1)-average lookups — O(n)
+  to build, O(l) total for `l` outlinks — and is a strict precondition for the
+  proximity comparison, which cannot pick the nearest candidate without first
+  enumerating every same-stem candidate. Building it here avoids shipping an
+  intermediate form that scans the same Notes twice.
 
 ### Triage Notes
 
@@ -32,12 +86,24 @@
 
 **What we've established so far:**
 
-- Maintainer reports having encountered this exact problem in their own Obsidian vault, converting the ticket's original "speculative, no real vault has demonstrated a need yet" caveat into a verified real-world requirement.
-- Codebase re-verified against current code: `find_unique_by_stem` (`index/inlinks.rs`) still resolves only when exactly one Note shares the wikilink's stem; ambiguous stems return `None`. `Note` (`note/model.rs`) still has no folder-proximity data beyond `path`; `FileRecord::name`/`folder` (`index/file.rs`) exist but are invisible to the resolution path; `BaseName` (`file_name.rs`) is owned with no borrowed counterpart. No proximity logic exists anywhere in `src/`.
-- Redundancy check: no existing implementation found (searched for `find_name_in`, proximity, shortest-path, common-ancestor, depth). Prior-rejection check: `.out-of-scope/` is empty — nothing resembles this request.
+- Maintainer reports having encountered this exact problem in their own Obsidian
+  vault, converting the ticket's original "speculative, no real vault has
+  demonstrated a need yet" caveat into a verified real-world requirement.
+- Codebase re-verified against current code: `find_unique_by_stem`
+  (`index/inlinks.rs`) still resolves only when exactly one Note shares the
+  wikilink's stem; ambiguous stems return `None`. `Note` (`note/model.rs`) still
+  has no folder-proximity data beyond `path`; `FileRecord::name`/`folder`
+  (`index/file.rs`) exist but are invisible to the resolution path; `BaseName`
+  (`file_name.rs`) is owned with no borrowed counterpart. No proximity logic
+  exists anywhere in `src/`.
+- Redundancy check: no existing implementation found (searched for
+  `find_name_in`, proximity, shortest-path, common-ancestor, depth).
+  Prior-rejection check: `.out-of-scope/` is empty — nothing resembles this
+  request.
 - Blocked by #10, which is `completed` — unblocked.
 
-**Recommended:** Category `enhancement`; State `ready-for-agent`. The ticket's existing agent brief is confirmed accurate and ready to execute.
+**Recommended:** Category `enhancement`; State `ready-for-agent`. The ticket's
+existing agent brief is confirmed accurate and ready to execute.
 
 ### Re-verified after #10's refactors
 
@@ -45,34 +111,79 @@
 
 **What we've established so far:**
 
-- All substantive claims re-verified against current code on 2026-08-04: `find_unique_by_stem` (`index/inlinks.rs:142-148`) still resolves only on unique stem; ambiguous → `None`. `Note` (`note/model.rs:20`) still stores only `path`; `FileRecord::name`/`folder` (`index/file.rs:25,92`) still invisible to `resolve_target`. `BaseName` still owned (`src/file_name.rs:54`), no `BaseNameRef` anywhere; no proximity logic in `src/`.
-- Spec-consistent: `spec.md` line 103 + user story #21 ("inlinks derived from outlinks") cover this; spec is silent on ambiguity resolution.
-- #10's Design Refinement pass gated the stem fallback on `LinkTarget::is_basename()` — the proximity rule inherits that constraint (bare-name wikilinks only), already implied by the brief.
-- Stale agent-brief line references fixed: `resolve_target` was `inlinks.rs:75-93` (now `114-138`), `find_unique_by_stem` was `inlinks.rs:103-109` (now `142-148`). `file_name.rs` lives at `src/file_name.rs` (was `src/note/file_name.rs`).
+- All substantive claims re-verified against current code on 2026-08-04:
+  `find_unique_by_stem` (`index/inlinks.rs:142-148`) still resolves only on
+  unique stem; ambiguous → `None`. `Note` (`note/model.rs:20`) still stores only
+  `path`; `FileRecord::name`/`folder` (`index/file.rs:25,92`) still invisible to
+  `resolve_target`. `BaseName` still owned (`src/file_name.rs:54`), no
+  `BaseNameRef` anywhere; no proximity logic in `src/`.
+- Spec-consistent: `spec.md` line 103 + user story #21 ("inlinks derived from
+  outlinks") cover this; spec is silent on ambiguity resolution.
+- #10's Design Refinement pass gated the stem fallback on
+  `LinkTarget::is_basename()` — the proximity rule inherits that constraint
+  (bare-name wikilinks only), already implied by the brief.
+- Stale agent-brief line references fixed: `resolve_target` was
+  `inlinks.rs:75-93` (now `114-138`), `find_unique_by_stem` was
+  `inlinks.rs:103-109` (now `142-148`). `file_name.rs` lives at
+  `src/file_name.rs` (was `src/note/file_name.rs`).
 
-**Recommended:** Category `enhancement`; State `ready-for-agent`. Brief is accurate with refreshed line references; unblocked (blocker #10 `completed`).
+**Recommended:** Category `enhancement`; State `ready-for-agent`. Brief is
+accurate with refreshed line references; unblocked (blocker #10 `completed`).
 
 ## Agent Brief
 
-**Category:** enhancement
-**Summary:** Extend derived-inlink wikilink resolution (`index/inlinks.rs`) to follow Obsidian's actual ambiguity tie-break (nearest file by path proximity to the linking Note) instead of only resolving stem matches that are already unique, and introduce a zero-copy `BaseNameRef` so the resolution path can reuse `file_name.rs`'s naming types without allocating per candidate.
+**Category:** enhancement **Summary:** Extend derived-inlink wikilink resolution
+(`index/inlinks.rs`) to follow Obsidian's actual ambiguity tie-break (nearest
+file by path proximity to the linking Note) instead of only resolving stem
+matches that are already unique, and introduce a zero-copy `BaseNameRef` so the
+resolution path can reuse `file_name.rs`'s naming types without allocating per
+candidate.
 
-**Current behavior:**
-`resolve_target` (`index/inlinks.rs:114-138`) tries an exact path match, then a `.md`-appended path match, then falls back to `find_unique_by_stem` (`inlinks.rs:142-148`), which resolves only when exactly one indexed Note shares the wikilink's file stem; two or more candidates resolve to `None` even when Obsidian itself would pick the nearest one. `Note` (`note/model.rs`) has no folder-proximity data beyond its own `path`, and `FileRecord`'s already-computed `BaseName` (`index/file.rs:25`) is never available where wikilink resolution runs.
+**Current behavior:** `resolve_target` (`index/inlinks.rs:114-138`) tries an
+exact path match, then a `.md`-appended path match, then falls back to
+`find_unique_by_stem` (`inlinks.rs:142-148`), which resolves only when exactly
+one indexed Note shares the wikilink's file stem; two or more candidates resolve
+to `None` even when Obsidian itself would pick the nearest one. `Note`
+(`note/model.rs`) has no folder-proximity data beyond its own `path`, and
+`FileRecord`'s already-computed `BaseName` (`index/file.rs:25`) is never
+available where wikilink resolution runs.
 
-**Desired behavior:**
-When a wikilink's stem matches more than one indexed Note, resolution picks the candidate Obsidian would: nearest by path proximity to the linking Note (shortest shared-ancestor distance), matching Obsidian's documented shortest-unique-path search. Genuine ties (no single nearest candidate) still resolve to `None` — this is a strictly more capable resolver, not a "guess when unsure" one. The comparison needs each candidate's folder placement relative to the linking Note, which requires either giving `Note` access to its `FileRecord`'s `folder`/`name`, or threading `&[FileRecord]` into the inlink derivation pass alongside `&[Note]` — pick one and justify it against the existing `matched_pairs`/parallel-collection design in `mod.rs` before implementing.
+**Desired behavior:** When a wikilink's stem matches more than one indexed Note,
+resolution picks the candidate Obsidian would: nearest by path proximity to the
+linking Note (shortest shared-ancestor distance), matching Obsidian's documented
+shortest-unique-path search. Genuine ties (no single nearest candidate) still
+resolve to `None` — this is a strictly more capable resolver, not a "guess when
+unsure" one. The comparison needs each candidate's folder placement relative to
+the linking Note, which requires either giving `Note` access to its
+`FileRecord`'s `folder`/`name`, or threading `&[FileRecord]` into the inlink
+derivation pass alongside `&[Note]` — pick one and justify it against the
+existing `matched_pairs`/parallel-collection design in `mod.rs` before
+implementing.
 
 **Key interfaces:**
-- `index/inlinks.rs` — `resolve_target`, `find_unique_by_stem`, and `derive_inlinks`'s doc comment (which currently states the O(n) stem-fallback cost and the ambiguous-resolves-to-`None` behavior; both need updating if the algorithm changes complexity or ambiguity handling).
-- `file_name.rs` — add `BaseNameRef` alongside `FileName`/`BaseName`, following the module's existing pattern of distinct newtypes for distinct semantics (see the module doc's rationale for keeping `FileName`/`BaseName` separate).
-- `index/mod.rs` — `WorkspaceIndex::records`/`WorkspaceIndex::notes` and `matched_pairs`, if the resolution path ends up needing both collections together.
-- `index/file.rs` — `FileRecord::name`/`FileRecord::folder`, the data a proximity comparison would read.
+
+- `index/inlinks.rs` — `resolve_target`, `find_unique_by_stem`, and
+  `derive_inlinks`'s doc comment (which currently states the O(n) stem-fallback
+  cost and the ambiguous-resolves-to-`None` behavior; both need updating if the
+  algorithm changes complexity or ambiguity handling).
+- `file_name.rs` — add `BaseNameRef` alongside `FileName`/`BaseName`, following
+  the module's existing pattern of distinct newtypes for distinct semantics (see
+  the module doc's rationale for keeping `FileName`/`BaseName` separate).
+- `index/mod.rs` — `WorkspaceIndex::records`/`WorkspaceIndex::notes` and
+  `matched_pairs`, if the resolution path ends up needing both collections
+  together.
+- `index/file.rs` — `FileRecord::name`/`FileRecord::folder`, the data a
+  proximity comparison would read.
 
 **Out of scope:**
-- Note-directory-relative resolution (`../sibling.md`) — a separate, already-flagged `ponytail:` gap in the same function, not part of this ticket unless naturally subsumed.
-- Any change to outlink extraction (`note/links.rs`) or to Markdown-style (non-wikilink) link resolution, which already resolves unambiguously by path.
-- Full Dataview/Obsidian parity beyond wikilink stem ambiguity (e.g. alias resolution, block references).
+
+- Note-directory-relative resolution (`../sibling.md`) — a separate,
+  already-flagged `ponytail:` gap in the same function, not part of this ticket
+  unless naturally subsumed.
+- Any change to outlink extraction (`note/links.rs`) or to Markdown-style
+  (non-wikilink) link resolution, which already resolves unambiguously by path.
+- Full Dataview/Obsidian parity beyond wikilink stem ambiguity (e.g. alias
+  resolution, block references).
 
 ### Resolution
 
@@ -81,10 +192,10 @@ When a wikilink's stem matches more than one indexed Note, resolution picks the 
 `folder_distance` (`inlinks.rs`) reads it directly via `Path::parent()`/
 `components()`, which is exactly the data `FileRecord::folder`/`name` would
 supply, without pulling a second, independently-sorted collection into a
-resolution pass that only ever needed `&[Note]`. Justified in `folder_distance`'s
-doc comment, which points at `matched_pairs` (`index/mod.rs`) as the actual seam
-where `FileRecord` and `Note` need joining (page-level query output) — this pass
-isn't that.
+resolution pass that only ever needed `&[Note]`. Justified in
+`folder_distance`'s doc comment, which points at `matched_pairs`
+(`index/mod.rs`) as the actual seam where `FileRecord` and `Note` need joining
+(page-level query output) — this pass isn't that.
 
 `BaseNameRef<'a>` added to `file_name.rs`, borrowed via `Path::file_stem()`,
 `Borrow<str>`-compatible for `HashMap` lookups. `build_stem_index` builds a
@@ -106,6 +217,7 @@ broader systems it touches (`WorkspaceIndex::build`/`refresh`/`load`/`persist`,
 `template/loader.rs`'s separate stem-resolution path), not just the diff.
 
 **Correctness, fuzz-verified beyond manual proof:**
+
 - `find_nearest_by_stem`'s tie-break reduce checked against a brute-force
   `min()` + `count(min) > 1` reference over 200,000 random distance-list
   trials (lengths 0–8, dense collisions) — 0 mismatches. The reduce's
@@ -120,6 +232,7 @@ broader systems it touches (`WorkspaceIndex::build`/`refresh`/`load`/`persist`,
   correct direction).
 
 **Systemic checks (no issues found):**
+
 - `WorkspaceIndex::refresh`'s `dirty = records != previous.records || notes !=
   previous.notes` (`mod.rs`) already catches every add/remove/modify as a
   full-collection comparison, so it correctly forces a full `derive_inlinks`
@@ -137,14 +250,15 @@ broader systems it touches (`WorkspaceIndex::build`/`refresh`/`load`/`persist`,
   resolution intentionally diverges from this ticket's proximity rule
   (different domains: template-file lookup vs. wikilink resolution), per the
   ticket's own Discussion section — not a maintenance-drift risk.
-- Noted, not fixed (pre-existing, not scoped to this ticket): `store.rs` has
-  no schema/algorithm version stamp, so a vault indexed before this feature
-  shipped keeps serving pre-proximity-resolved inlinks via `load()` until an
-  unrelated file change next triggers `dirty`. This is a property of the
-  whole `WorkspaceIndex` caching design (any `derive_inlinks` algorithm change has
+- Noted, not fixed (pre-existing, not scoped to this ticket): `store.rs` has no
+  schema/algorithm version stamp, so a vault indexed before this feature shipped
+  keeps serving pre-proximity-resolved inlinks via `load()` until an unrelated
+  file change next triggers `dirty`. This is a property of the whole
+  `WorkspaceIndex` caching design (any `derive_inlinks` algorithm change has
   it), not a defect introduced here.
 
 **Findings fixed in place:**
+
 - `find_nearest_by_stem`'s return was `(!tied).then(||
   nearest.map(|(_, path)| path)).flatten()` — an `Option<Option<T>>` built
   and immediately flattened for no reason. Simplified to a plain `if tied {

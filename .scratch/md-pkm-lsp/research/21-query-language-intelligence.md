@@ -1,8 +1,11 @@
 # Research: Query-Language Intelligence
 
-> Consolidated research for [ticket 21](../issues/21-query-language-intelligence.md).
+> Consolidated research for
+> [ticket 21](../issues/21-query-language-intelligence.md).
 >
-> **Sources:** Four parallel research subagents (Rust crate ecosystem, LSP mechanism survey, performance best practices, PKM plugin precedents) plus existing research from tickets 20, 34, 38, 39.
+> **Sources:** Four parallel research subagents (Rust crate ecosystem, LSP
+> mechanism survey, performance best practices, PKM plugin precedents) plus
+> existing research from tickets 20, 34, 38, 39.
 
 ---
 
@@ -33,20 +36,26 @@
 
 Two dialects sharing a boolean-expression core:
 
-- `SourceExpr` — tags (`#tag`), paths (`folder/`), File Classes (`@Book*`), boolean combinators
-- `FilterExpr` — field comparisons (`rating > 5`), function calls (`contains(tags, "#book")`), boolean logic
+- `SourceExpr` — tags (`#tag`), paths (`folder/`), File Classes (`@Book*`),
+  boolean combinators
+- `FilterExpr` — field comparisons (`rating > 5`), function calls
+  (`contains(tags, "#book")`), boolean logic
 - `Expr` — shared boolean-expression logic
 
 **Key parser files:**
+
 - `src/query/grammar/source.rs:108` — `SourceExpr::parse`
 - `src/query/grammar/filter.rs:45` — `FilterExpr::parse`
 - `src/query/grammar/field.rs` — `FieldPath` parsing, accessor namespaces
 - `src/query/grammar/expr.rs:275` — shared boolean-expression logic
-- `src/query/error.rs:106` — `QuerySyntaxError` with `miette::Diagnostic` + `SourceSpan`
+- `src/query/error.rs:106` — `QuerySyntaxError` with `miette::Diagnostic` +
+  `SourceSpan`
 
 ### Template Integration
 
-Query strings appear inside `{{ query.pages("...") }}` calls, registered via `src/template/engine/query.rs`. The LSP must detect "cursor is inside a query string argument" to provide completions.
+Query strings appear inside `{{ query.pages("...") }}` calls, registered via
+`src/template/engine/query.rs`. The LSP must detect "cursor is inside a query
+string argument" to provide completions.
 
 ### What Completion Should Cover
 
@@ -70,9 +79,12 @@ Query strings appear inside `{{ query.pages("...") }}` calls, registered via `sr
 Every studied LSP follows the same four-step completion pipeline:
 
 1. **Detect context**: "cursor is inside a query string in a MiniJinja template"
-2. **Narrow schema**: "what kind of completion is valid here?" (source vs filter, position within expression)
-3. **Match candidates**: fuzzy-match partial input against narrowed schema subset
-4. **Present**: format as `lsp_types::CompletionItem` with appropriate kind/detail/documentation
+2. **Narrow schema**: "what kind of completion is valid here?" (source vs
+   filter, position within expression)
+3. **Match candidates**: fuzzy-match partial input against narrowed schema
+   subset
+4. **Present**: format as `lsp_types::CompletionItem` with appropriate
+   kind/detail/documentation
 
 ### Context Detection Approaches
 
@@ -84,7 +96,9 @@ Every studied LSP follows the same four-step completion pipeline:
 | LookBehind + position | zk | N chars before cursor, check trigger chars | Simple, works for char-triggered contexts |
 | Line-prefix regex + fence detection | rumdl | Regex patterns for link targets, fence stack | Heuristic, fast |
 
-**Recommended for Traces:** Combine regex trigger (Templater pattern) for MiniJinja detection + position-based token classification from the query parser's token stream.
+**Recommended for Traces:** Combine regex trigger (Templater pattern) for
+MiniJinja detection + position-based token classification from the query
+parser's token stream.
 
 ### Completion Item Construction
 
@@ -148,7 +162,7 @@ pub struct QuerySyntaxError {
 
 ### Conversion Pipeline
 
-```
+```text
 QuerySyntaxError
   -> span.offset() + span.len()
   -> ropey: byte_to_line(), byte_to_char() -> char_to_utf16_cu()
@@ -192,7 +206,9 @@ QuerySyntaxError
 
 ### Execution-Dependent Hover
 
-The most valuable hover (execution result summary) requires running the query. **Recommendation:** Defer to Phase 2. Phase 1 provides schema-level hover (field types, tag counts, class definitions) which requires no query execution.
+The most valuable hover (execution result summary) requires running the query.
+**Recommendation:** Defer to Phase 2. Phase 1 provides schema-level hover (field
+types, tag counts, class definitions) which requires no query execution.
 
 ---
 
@@ -200,7 +216,8 @@ The most valuable hover (execution result summary) requires running the query. *
 
 ### Detection Algorithm
 
-1. Find all `{{ ... }}` regions in the document (regex or pulldown-cmark event scan)
+1. Find all `{{ ... }}` regions in the document (regex or pulldown-cmark event
+   scan)
 2. Check if cursor falls within any region (binary search on region ranges)
 3. If yes, parse the template expression to find function calls
 4. Check if the function is `query.pages` / `query.lists` / `query.tasks`
@@ -232,7 +249,10 @@ fn is_query_call(template_text: &str) -> bool {
 
 ### Alternative: logos Extras for State Tracking
 
-`logos::Extras` provides mutable state during lexing. A template-aware lexer could track `Normal -> InTemplate -> InQueryString` state transitions. More efficient for full-document scan but requires integrating with `pulldown-cmark`. For Phase 1, regex is simpler and sufficient.
+`logos::Extras` provides mutable state during lexing. A template-aware lexer
+could track `Normal -> InTemplate -> InQueryString` state transitions. More
+efficient for full-document scan but requires integrating with `pulldown-cmark`.
+For Phase 1, regex is simpler and sufficient.
 
 ---
 
@@ -280,22 +300,34 @@ fn is_query_call(template_text: &str) -> bool {
 
 ### Key Findings
 
-1. **Only zk has a real LSP** — all others use Obsidian's `EditorSuggest` API. zk is the only system with true LSP-shaped intelligence.
+1. **Only zk has a real LSP** — all others use Obsidian's `EditorSuggest` API.
+   zk is the only system with true LSP-shaped intelligence.
 
-2. **Dataview has the best parser architecture** (Parsimmon combinators, typed AST) but zero editor intelligence. Parser invoked only at render time, not edit time.
+2. **Dataview has the best parser architecture** (Parsimmon combinators, typed
+   AST) but zero editor intelligence. Parser invoked only at render time, not
+   edit time.
 
-3. **No PKM system provides query-language intelligence** — completion is for links/tags/file paths, not query DSL syntax. Traces would be the first.
+3. **No PKM system provides query-language intelligence** — completion is for
+   links/tags/file paths, not query DSL syntax. Traces would be the first.
 
-4. **Cursor-in-query detection** patterns: region boundaries (Metadata Menu), regex triggers (Templater), AST-guided position (Dataview), LookBehind + position (zk).
+4. **Cursor-in-query detection** patterns: region boundaries (Metadata Menu),
+   regex triggers (Templater), AST-guided position (Dataview), LookBehind +
+   position (zk).
 
-5. **Most actionable pattern for Traces:** Metadata Menu's boundary detection + Templater's regex trigger + completions from vault index (similar to zk).
+5. **Most actionable pattern for Traces:** Metadata Menu's boundary detection +
+   Templater's regex trigger + completions from vault index (similar to zk).
 
-6. **Rich completion-trigger-detection precedent across all four plugins, but zero diagnostics/hover/definition precedent.** Traces isn't playing catch-up — it would be the first system to bring hover/diagnostics/definition-grade intelligence to these languages at all.
+6. **Rich completion-trigger-detection precedent across all four plugins, but
+   zero diagnostics/hover/definition precedent.** Traces isn't playing catch-up
+   — it would be the first system to bring hover/diagnostics/definition-grade
+   intelligence to these languages at all.
 
 ### zk's LSP Architecture (Closest Precedent)
 
-- **Completion flow**: `LookBehind` for trigger chars -> `IsTagPosition` check -> build completion list from vault index
-  ```
+- **Completion flow**: `LookBehind` for trigger chars -> `IsTagPosition` check
+  -> build completion list from vault index
+
+  ```text
   handler.TextDocumentCompletion
     -> buildInvokedCompletionList (manual/typing trigger)
          -> check LookBehind for [[ or ((  -> buildLinkCompletionList
@@ -304,20 +336,41 @@ fn is_query_call(template_text: &str) -> bool {
          -> LookBehind for #  -> buildTagCompletionList
          -> LookBehind for :  -> buildTagCompletionList
   ```
-- **Completion item construction**: `completionTemplates` with configurable Label/FilterText/Detail via Handlebars templates; `newTextEditForLink()` builds TextEdit with optional `AdditionalTextEdits`
-- **Diagnostics**: `DidOpen`/`DidChange` with 1-second debounce; iterates document links, resolves each via `noteForLink()`, emits `publishDiagnostics`
+
+- **Completion item construction**: `completionTemplates` with configurable
+  Label/FilterText/Detail via Handlebars templates; `newTextEditForLink()`
+  builds TextEdit with optional `AdditionalTextEdits`
+- **Diagnostics**: `DidOpen`/`DidChange` with 1-second debounce; iterates
+  document links, resolves each via `noteForLink()`, emits `publishDiagnostics`
 - **Hover**: Shows full note content for link targets
-- **Cursor detection**: `LookBehind(pos, length)` + `WordAt(pos)` + `IsTagPosition`
+- **Cursor detection**: `LookBehind(pos, length)` + `WordAt(pos)` +
+  `IsTagPosition`
 
 ### Implementation Patterns (from Sub-Document Analysis)
 
-**Dataview** — Combinator-based parser (`P.createLanguage<ExpressionLanguage>()`), expression language separate from query language, error handling via `Result<Query, string>`. No editor intelligence at all — completion is third-party, unmaintained (`dnlbauer/obsidian-dataview-autocompletion`).
+**Dataview** — Combinator-based parser
+(`P.createLanguage<ExpressionLanguage>()`), expression language separate from
+query language, error handling via `Result<Query, string>`. No editor
+intelligence at all — completion is third-party, unmaintained
+(`dnlbauer/obsidian-dataview-autocompletion`).
 
-**Tasks** — `EditorSuggestorPopup` extends `EditorSuggest`; smart context gating (only on task lines matching `- [ ]`/`* [ ]`/`+ [ ]`); progressive suggestions (after priority, next menu shows remaining options); format-aware (detects Dataview bracket `[]` format); pluggable `TaskSerializer` implementations (`DefaultTaskSerializer`/`DataviewTaskSerializer`).
+**Tasks** — `EditorSuggestorPopup` extends `EditorSuggest`; smart context gating
+(only on task lines matching `- [ ]`/`* [ ]`/`+ [ ]`); progressive suggestions
+(after priority, next menu shows remaining options); format-aware (detects
+Dataview bracket `[]` format); pluggable `TaskSerializer` implementations
+(`DefaultTaskSerializer`/`DataviewTaskSerializer`).
 
-**Templater** — `Autocomplete` extends `EditorSuggest`; two-level completion (module names then functions); regex trigger `tp\.(?<module>[a-z]*)?(\.(?<fn>[a-zA-Z_.]*)?)?$`; documentation-as-data (loaded from structured source, not derived at runtime). Namespace mapping: `tp.file`/`tp.date`/`tp.system` → Traces `file.*`/`date.*`/`ui.*`.
+**Templater** — `Autocomplete` extends `EditorSuggest`; two-level completion
+(module names then functions); regex trigger
+`tp\.(?<module>[a-z]*)?(\.(?<fn>[a-zA-Z_.]*)?)?$`; documentation-as-data (loaded
+from structured source, not derived at runtime). Namespace mapping:
+`tp.file`/`tp.date`/`tp.system` → Traces `file.*`/`date.*`/`ui.*`.
 
-**Metadata Menu** — `ValueSuggest` extends `EditorSuggest<IValueCompletion>`; field-type-aware (Cycle/Multi/Select → option lists, File/MultiFile → vault files, tags → vault tag list); `onTrigger()` checks `isInFrontmatter()` via `---` delimiter scan or `getLineFields()` parser; `fileClass` inheritance mirrors Traces' Schema module. No live diagnostics — validates via modals.
+**Metadata Menu** — `ValueSuggest` extends `EditorSuggest<IValueCompletion>`;
+field-type-aware (Cycle/Multi/Select → option lists, File/MultiFile → vault
+files, tags → vault tag list); `onTrigger()` checks `isInFrontmatter()` via
+`---` delimiter scan or `getLineFields()` parser; `fileClass` inheritance
+mirrors Traces' Schema module. No live diagnostics — validates via modals.
 
 ### Diagnostics Patterns (from zk)
 
@@ -376,20 +429,30 @@ Debounce diagnostics (zk uses 1 second) to avoid lag during typing.
 | Schema lookups | field/tag name | Schema reload only | Unlimited | Rarely change |
 | Structural data (headings, links) | content hash of parse output | Only when structural diff non-empty | 256 | Larger than file count to cover recently closed |
 
-Content-hash keys (blake3), not mtime. Two-tier cache: raw parsed output + derived data separately. Derived data (links, tags, completions) is invalidated transitively only when the raw parse changes structurally.
+Content-hash keys (blake3), not mtime. Two-tier cache: raw parsed output +
+derived data separately. Derived data (links, tags, completions) is invalidated
+transitively only when the raw parse changes structurally.
 
 ### Durability-Based Invalidation (Salsa Pattern)
 
 Divide inputs by change frequency:
+
 - **Durable**: Schema definitions — rarely change
 - **Normal**: File headings, link targets — change on edit
 - **Volatile**: Query string content, cursor — every keystroke
 
-A link edit should not trigger re-evaluation of schema-based completions. Salsa's global version vector: maintain a version vector keyed by durability level. Incrementing a volatile input only bumps the volatile counter; durable queries skip re-validation entirely. This reduced rust-analyzer's per-edit overhead by ~300ms.
+A link edit should not trigger re-evaluation of schema-based completions.
+Salsa's global version vector: maintain a version vector keyed by durability
+level. Incrementing a volatile input only bumps the volatile counter; durable
+queries skip re-validation entirely. This reduced rust-analyzer's per-edit
+overhead by ~300ms.
 
 ### Same-Thread Revision Caching
 
-From rust-analyzer PR #20527: cache results within the same revision (same set of inputs) on the same thread. Avoids synchronization overhead while still providing cache hits for batch requests (highlighting + inlay hints + completions on the same file).
+From rust-analyzer PR #20527: cache results within the same revision (same set
+of inputs) on the same thread. Avoids synchronization overhead while still
+providing cache hits for batch requests (highlighting + inlay hints +
+completions on the same file).
 
 ### Diagnostic Publishing
 
@@ -404,15 +467,20 @@ From rust-analyzer PR #20527: cache results within the same revision (same set o
 ### 1. Query Intelligence Module
 
 Create `src/query/intelligence/` with:
-- `cursor.rs` — cursor-in-query detection (regex trigger + position classification)
+
+- `cursor.rs` — cursor-in-query detection (regex trigger + position
+  classification)
 - `completion.rs` — completion item generation from schema narrowing
 - `hover.rs` — hover content generation from schema lookup
-- `diagnostics.rs` — diagnostic forwarding from QuerySyntaxError + semantic checks
+- `diagnostics.rs` — diagnostic forwarding from QuerySyntaxError + semantic
+  checks
 
 ### 2. Phase 1 Scope
 
-- **Completion**: Source expressions (tags, paths, file classes) + filter expressions (field names, operators)
-- **Diagnostics**: Forward `QuerySyntaxError` spans + unknown tag/class/field warnings
+- **Completion**: Source expressions (tags, paths, file classes) + filter
+  expressions (field names, operators)
+- **Diagnostics**: Forward `QuerySyntaxError` spans + unknown tag/class/field
+  warnings
 - **Hover**: Schema-level info (field types, tag counts, class definitions)
 - **Cursor detection**: Regex-based MiniJinja region detection
 
@@ -436,15 +504,22 @@ Create `src/query/intelligence/` with:
 
 ## Part X: Open Questions
 
-1. **Execution-dependent hover**: Should Phase 1 include a lightweight "estimated row count" hover using index metadata (without full query execution), or defer all execution-dependent features to Phase 2?
+1. **Execution-dependent hover**: Should Phase 1 include a lightweight
+   "estimated row count" hover using index metadata (without full query
+   execution), or defer all execution-dependent features to Phase 2?
 
-2. **Diagnostic severity calibration**: Unknown tag = Warning? Information? Depends on whether tags are "expected to exist" or "optional metadata."
+2. **Diagnostic severity calibration**: Unknown tag = Warning? Information?
+   Depends on whether tags are "expected to exist" or "optional metadata."
 
-3. **Query string nesting**: Can query strings contain nested quotes (e.g., `contains(tags, "#book")`)? Affects regex detection accuracy.
+3. **Query string nesting**: Can query strings contain nested quotes (e.g.,
+   `contains(tags, "#book")`)? Affects regex detection accuracy.
 
-4. **Multi-argument queries**: Do `query.pages()` calls have additional arguments beyond the query string? Affects cursor detection scope.
+4. **Multi-argument queries**: Do `query.pages()` calls have additional
+   arguments beyond the query string? Affects cursor detection scope.
 
-5. **Performance at vault scale**: At 50k+ notes, does tag-class completion (which needs to scan the tag index) stay under 20ms? May need pre-computed tag frequency sorting.
+5. **Performance at vault scale**: At 50k+ notes, does tag-class completion
+   (which needs to scan the tag index) stay under 20ms? May need pre-computed
+   tag frequency sorting.
 
 ---
 
@@ -452,23 +527,44 @@ Create `src/query/intelligence/` with:
 
 ### Research Subagents
 
-1. **Rust crate ecosystem** — ropey, nucleo-matcher, fuzzy-matcher, miette LSP mapping, logos context-sensitive lexing, pulldown-cmark, tree-sitter, schema-aware completion patterns
-2. **LSP mechanism survey** — VS Code Markdown LS, Markdown Oxide, Marksman, rumdl completion/diagnostics/hover/embedded-detection patterns
-3. **Performance best practices** — Industry latency benchmarks, caching strategies, completion reduction techniques, diagnostic publishing, schema-aware architecture
-4. **PKM plugin precedents** — Dataview, Tasks, Templater, Metadata Menu, zk query-language intelligence patterns
+1. **Rust crate ecosystem** — ropey, nucleo-matcher, fuzzy-matcher, miette LSP
+   mapping, logos context-sensitive lexing, pulldown-cmark, tree-sitter,
+   schema-aware completion patterns
+2. **LSP mechanism survey** — VS Code Markdown LS, Markdown Oxide, Marksman,
+   rumdl completion/diagnostics/hover/embedded-detection patterns
+3. **Performance best practices** — Industry latency benchmarks, caching
+   strategies, completion reduction techniques, diagnostic publishing,
+   schema-aware architecture
+4. **PKM plugin precedents** — Dataview, Tasks, Templater, Metadata Menu, zk
+   query-language intelligence patterns
 
 ### Existing Research Files
 
-- `research/20-schema-fileclass-intelligence.md` — Schema system, file-class binding, type mapping, completion architecture
-- `research/39-source-span-position-model.md` — Source span model, LineIndex, ropey adoption
+- `research/20-schema-fileclass-intelligence.md` — Schema system, file-class
+  binding, type mapping, completion architecture
+- `research/39-source-span-position-model.md` — Source span model, LineIndex,
+  ropey adoption
 
 ### Sub-Documents (Merged — Retain for Reference Only)
 
-The following sub-documents' content has been consolidated into Parts VII and VIII above. They may be deleted from the research directory.
+The following sub-documents' content has been consolidated into Parts VII and
+VIII above. They may be deleted from the research directory.
 
-- `research/21-pkm-precedents-detail.md` — **Merged into Part VII.** Original content: Dataview/Templater/Metadata Menu/zk detailed precedents with source-line references, cursor detection approaches, completion item types, diagnostics patterns. All key content now in Part VII's "Implementation Patterns" and "Diagnostics Patterns" subsections.
-- `research/34-query-dsl-lsp-performance-patterns.md` — **Merged into Part VIII.** Original content: industry benchmark latency numbers (p95), LRU capacity rationale table, same-thread revision caching pattern. All key content now in Part VIII's "Verified Industry Benchmarks," "LRU Capacity Rationale," and "Same-Thread Revision Caching" subsections.
-- `research/08-dataview-templater-metadatamenu-parity.md` — **Merged into Part VII.** Original content: per-plugin implementation findings (what each plugin provides and lacks, EditorSuggest patterns, namespace mapping). All key content now in Part VII's "Key Findings" item 6 and "Implementation Patterns" subsection.
+- `research/21-pkm-precedents-detail.md` — **Merged into Part VII.** Original
+  content: Dataview/Templater/Metadata Menu/zk detailed precedents with
+  source-line references, cursor detection approaches, completion item types,
+  diagnostics patterns. All key content now in Part VII's "Implementation
+  Patterns" and "Diagnostics Patterns" subsections.
+- `research/34-query-dsl-lsp-performance-patterns.md` —
+  **Merged into Part VIII.** Original content: industry benchmark latency
+  numbers (p95), LRU capacity rationale table, same-thread revision caching
+  pattern. All key content now in Part VIII's "Verified Industry Benchmarks,"
+  "LRU Capacity Rationale," and "Same-Thread Revision Caching" subsections.
+- `research/08-dataview-templater-metadatamenu-parity.md` —
+  **Merged into Part VII.** Original content: per-plugin implementation findings
+  (what each plugin provides and lacks, EditorSuggest patterns, namespace
+  mapping). All key content now in Part VII's "Key Findings" item 6 and
+  "Implementation Patterns" subsection.
 
 ### Digests
 
@@ -484,7 +580,8 @@ The following sub-documents' content has been consolidated into Parts VII and VI
 
 ## Part XI: Stress Test Results — Round 1
 
-Four parallel stress tests challenged the initial decisions against the codebase, previous map decisions, performance claims, and LSP conventions.
+Four parallel stress tests challenged the initial decisions against the
+codebase, previous map decisions, performance claims, and LSP conventions.
 
 ### Decision Revisions from Round 1
 
@@ -573,19 +670,26 @@ Four parallel stress tests challenged the revised Round 2 decisions.
 | D8 | Use textEdit with explicit range for all completions | **Locked** | CRITICAL convention from LSP spec |
 | D9 | Declare capabilities: completionProvider (#, @), hoverProvider, textDocumentSync FULL | **Locked** | Without these, features don't activate |
 | D10 | Cursor detection is one context provider for T24's dispatcher | **Locked** | Not a standalone detection path |
-| D11 | Value completion mechanism: lexer-based token classification | **Locked** | Run logos lexer on text prefix before cursor, classify last token type. Covers `<field> <op> ` and `contains(tags, ` patterns. ~50 LOC. |
+| D11 | Value completion mechanism: lexer-based token classification | **Locked** | Run logos lexer on text prefix before cursor, classify last token type. Covers `<field> <op>` and `contains(tags,` patterns. ~50 LOC. |
 | D12 | Fenced code blocks: deferred to Phase 2 | **Locked** | Documented limitation; collision risk with third-party plugins |
 | D13 | Pre-conditions for hover: build `unique_tags()`, `unique_file_classes()`, `suggest_class()` | **Locked** | ~65 LOC total; must exist before hover can show counts |
 
 ### Phase 1 Scope (Locked)
 
-- **Completion**: Tags (`#`), file classes (`@`), field names (filter LHS), operators (`and`/`or`/`not`/comparisons), Select options + Boolean values (RHS via lexer token classification)
-- **Diagnostics**: Forward `QuerySyntaxError` spans; unknown field (Information); unknown class with close match via suggest_class (Warning); unknown class no match (Information)
-- **Hover**: Tag count ("Tag #book — 47 notes"), class instance count ("File class Book — 23 instances"), field type + constraints
-- **Cursor detection**: Depth counter over `{{`/`}}` delimiters, checking cursor falls within positive-depth region
+- **Completion**: Tags (`#`), file classes (`@`), field names (filter LHS),
+  operators (`and`/`or`/`not`/comparisons), Select options + Boolean values (RHS
+  via lexer token classification)
+- **Diagnostics**: Forward `QuerySyntaxError` spans; unknown field
+  (Information); unknown class with close match via suggest_class (Warning);
+  unknown class no match (Information)
+- **Hover**: Tag count ("Tag #book — 47 notes"), class instance count ("File
+  class Book — 23 instances"), field type + constraints
+- **Cursor detection**: Depth counter over `{{`/`}}` delimiters, checking cursor
+  falls within positive-depth region
 - **Debounce**: 300ms for all diagnostics
 - **Trigger chars**: `#` and `@` (requirements input for T24)
-- **Conventions**: textEdit with explicit range; capabilities declared in initialize; work-done progress for initial indexing
+- **Conventions**: textEdit with explicit range; capabilities declared in
+  initialize; work-done progress for initial indexing
 
 ### Phase 2 Scope (Deferred)
 

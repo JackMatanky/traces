@@ -1,8 +1,11 @@
 # 04 — Fresh Query Source Selection
 
-**What to build:** Query execution refreshes stale WorkspaceIndex entries before returning data and can produce page-level QueryOutcome values from all Notes, tag sources, and folder sources.
+**What to build:** Query execution refreshes stale WorkspaceIndex entries before
+returning data and can produce page-level QueryOutcome values from all Notes,
+tag sources, and folder sources.
 
-**Blocked by:** None — #03's Note inline fields and tags are present in the codebase.
+**Blocked by:** None — #03's Note inline fields and tags are present in the
+codebase.
 
 **Status:** completed
 
@@ -13,59 +16,117 @@
 ### Implementation Notes
 
 - **Tag Subtag Hierarchy (`src/note/tag.rs`)**:
-  - Implemented `Tag::is_nested_under(&self, other: &str) -> bool`, enforcing `/` boundary containment (`#projects` matches `#projects/active` and `#projects/active/urgent`, but `#project` does not match `#projects`).
+  - Implemented `Tag::is_nested_under(&self, other: &str) -> bool`, enforcing
+    `/` boundary containment (`#projects` matches `#projects/active` and
+    `#projects/active/urgent`, but `#project` does not match `#projects`).
   - Added unit test cases under `mod is_nested_under` using `rstest`.
 
 - **Page-Level Query Sources & Outcome Data Models (`src/index/query.rs`)**:
   - Defined `Source` enum (`All`, `Tag(String)`, `Folder(PathBuf)`).
-  - Defined `IndexRecord` combining `FileRecord` and `Note` to expose `file.*` and Note Metadata (`frontmatter`, `inline_fields`, `tags`).
-  - Defined `QueryOutcome` wrapping `Vec<IndexRecord>` with `.len()`, `.is_empty()`, `.get(usize)`, `.iter()`, `IntoIterator` for owned `QueryOutcome` and `&QueryOutcome`, deriving `Clone`, `Debug`, `Default`, `PartialEq`.
-  - Added unit test submodules `source_is_match`, `index_record`, and `query_outcome` in `query.rs`.
+  - Defined `IndexRecord` combining `FileRecord` and `Note` to expose `file.*`
+    and Note Metadata (`frontmatter`, `inline_fields`, `tags`).
+  - Defined `QueryOutcome` wrapping `Vec<IndexRecord>` with `.len()`,
+    `.is_empty()`, `.get(usize)`, `.iter()`, `IntoIterator` for owned
+    `QueryOutcome` and `&QueryOutcome`, deriving `Clone`, `Debug`, `Default`,
+    `PartialEq`.
+  - Added unit test submodules `source_is_match`, `index_record`, and
+    `query_outcome` in `query.rs`.
 
-- **Lazy WorkspaceIndex Refresh & Single-Pass Merge-Join Query (`src/index/mod.rs`)**:
-  - Implemented `WorkspaceIndex::refresh(root: &Path) -> Result<Self, WorkspaceIndexError>`: compares file `(created_at, modified_at, size)` via `FileRecord` equality against stored records, reuses unchanged parsed `Note`s, reparses changed/added markdown notes, drops deleted files, and persists back to redb only when dirty.
-  - Implemented `WorkspaceIndex::record(&self, path: &Path) -> Option<&FileRecord>` ($O(\log n)$ binary search).
-  - Implemented `WorkspaceIndex::query(self, source: &Source) -> QueryOutcome`: consumes `self` and executes an $O(n + m)$ single-pass iterator merge-join across sorted `records` and `notes` with zero per-note binary searches and zero redundant allocations.
-  - Added tests in `mod refresh` and `mod query` in `src/index/mod.rs` asserting observable note outcomes after creation, modification (content, timestamp), deletion, no-source, tag/nested-tag, folder prefix, and metadata field access.
+- **Lazy WorkspaceIndex Refresh & Single-Pass Merge-Join Query
+  (`src/index/mod.rs`)**:
+  - Implemented
+    `WorkspaceIndex::refresh(root: &Path) -> Result<Self, WorkspaceIndexError>`:
+    compares file `(created_at, modified_at, size)` via `FileRecord` equality
+    against stored records, reuses unchanged parsed `Note`s, reparses
+    changed/added markdown notes, drops deleted files, and persists back to redb
+    only when dirty.
+  - Implemented
+    `WorkspaceIndex::record(&self, path: &Path) -> Option<&FileRecord>`
+    ($O(\log n)$ binary search).
+  - Implemented `WorkspaceIndex::query(self, source: &Source) -> QueryOutcome`:
+    consumes `self` and executes an $O(n + m)$ single-pass iterator merge-join
+    across sorted `records` and `notes` with zero per-note binary searches and
+    zero redundant allocations.
+  - Added tests in `mod refresh` and `mod query` in `src/index/mod.rs` asserting
+    observable note outcomes after creation, modification (content, timestamp),
+    deletion, no-source, tag/nested-tag, folder prefix, and metadata field
+    access.
 
 - **Future Extensions Backlog**:
-  - Future Obsidian `Metadata Menu` File Class query source extensions (`Source::FileClass`) are now speced in `.scratch/metadata-schemas/spec.md` (`query.from_class`).
+  - Future Obsidian `Metadata Menu` File Class query source extensions
+    (`Source::FileClass`) are now speced in `.scratch/metadata-schemas/spec.md`
+    (`query.from_class`).
 
 - **Verification**:
   - Workspace test suite: 857/857 tests pass (`cargo nextest run`).
   - Clippy: 0 warnings (`mise run clippy`).
-  - Strict adherence to `rust-unit-testing`, `rust-testing`, `rust-doc`, and `pretty_assertions::assert_eq!`.
+  - Strict adherence to `rust-unit-testing`, `rust-testing`, `rust-doc`, and
+    `pretty_assertions::assert_eq!`.
 
 ## Agent Brief
 
-**Category:** enhancement
-**Summary:** Add page-level query source selection with lazy WorkspaceIndex freshness before query results are returned.
+**Category:** enhancement **Summary:** Add page-level query source selection
+with lazy WorkspaceIndex freshness before query results are returned.
 
-**Current behavior:**
-The WorkspaceIndex can build, persist, load, and enumerate File Records and parsed markdown Notes. The codebase now has Note Metadata for frontmatter fields, inline fields, tags, lists/tasks, outlinks, and code-region exclusions. No existing QueryOutcome, IndexRecord, no-source query, tag-source query, folder-source query, or lazy query refresh implementation was found in the source tree. Prior-rejection check found no `.out-of-scope/` records.
+**Current behavior:** The WorkspaceIndex can build, persist, load, and enumerate
+File Records and parsed markdown Notes. The codebase now has Note Metadata for
+frontmatter fields, inline fields, tags, lists/tasks, outlinks, and code-region
+exclusions. No existing QueryOutcome, IndexRecord, no-source query, tag-source
+query, folder-source query, or lazy query refresh implementation was found in
+the source tree. Prior-rejection check found no `.out-of-scope/` records.
 
-**Desired behavior:**
-Page-level query execution should return fresh Note results from the persisted WorkspaceIndex. Before returning data, query execution should compare current file freshness metadata against the stored File Records and refresh stale, added, changed, and removed entries so results reflect the project root on disk. A query with no source should return every markdown Note. Tag sources should return Notes whose existing Note Metadata contains matching markdown tags such as `#book` and nested tags such as `#projects/active`. Folder sources should return Notes whose File Record folder matches the requested folder source. Results should be represented as QueryOutcome values containing IndexRecord items that expose both `file.*` fields and Note Metadata fields.
+**Desired behavior:** Page-level query execution should return fresh Note
+results from the persisted WorkspaceIndex. Before returning data, query
+execution should compare current file freshness metadata against the stored File
+Records and refresh stale, added, changed, and removed entries so results
+reflect the project root on disk. A query with no source should return every
+markdown Note. Tag sources should return Notes whose existing Note Metadata
+contains matching markdown tags such as `#book` and nested tags such as
+`#projects/active`. Folder sources should return Notes whose File Record folder
+matches the requested folder source. Results should be represented as
+QueryOutcome values containing IndexRecord items that expose both `file.*`
+fields and Note Metadata fields.
 
 **Key interfaces:**
-- `WorkspaceIndex` — should provide a small caller-facing refresh/query seam over the existing File Record and Note Metadata models; callers should not inspect redb tables or implement their own freshness comparisons.
-- `QueryOutcome` — iterable page-level collection of IndexRecord values, ready for later filtering, Template namespace integration, and CLI query commands.
-- `IndexRecord` — single page-level record combining a File Record with the matching Note Metadata so Template authors can access `file.*`, frontmatter, inline fields, and tags through one value.
-- Source selection — should support all Notes, tag sources, and folder sources without introducing a Dataview Query Language parser.
+
+- `WorkspaceIndex` — should provide a small caller-facing refresh/query seam
+  over the existing File Record and Note Metadata models; callers should not
+  inspect redb tables or implement their own freshness comparisons.
+- `QueryOutcome` — iterable page-level collection of IndexRecord values, ready
+  for later filtering, Template namespace integration, and CLI query commands.
+- `IndexRecord` — single page-level record combining a File Record with the
+  matching Note Metadata so Template authors can access `file.*`, frontmatter,
+  inline fields, and tags through one value.
+- Source selection — should support all Notes, tag sources, and folder sources
+  without introducing a Dataview Query Language parser.
 
 **Acceptance criteria:**
-- [x] Query execution refreshes changed markdown Notes before returning results when stored `(created_at, modified_at, size)` no longer matches the filesystem.
-- [x] Query execution adds newly created markdown Notes before returning results.
+
+- [x] Query execution refreshes changed markdown Notes before returning results
+      when stored `(created_at, modified_at, size)` no longer matches the
+      filesystem.
+- [x] Query execution adds newly created markdown Notes before returning
+      results.
 - [x] Query execution removes deleted markdown Notes from results.
-- [x] Query execution with no source returns all markdown Notes and excludes non-markdown files.
-- [x] Tag-source queries return Notes with matching markdown tags, including nested tags such as `#projects/active`.
-- [x] Folder-source queries return Notes under the requested project-relative folder.
-- [x] QueryOutcome items expose IndexRecord values with File Record fields and Note Metadata fields, including frontmatter, inline fields, and tags.
-- [x] Freshness tests assert observable query results after file changes, not redb internals.
+- [x] Query execution with no source returns all markdown Notes and excludes
+      non-markdown files.
+- [x] Tag-source queries return Notes with matching markdown tags, including
+      nested tags such as `#projects/active`.
+- [x] Folder-source queries return Notes under the requested project-relative
+      folder.
+- [x] QueryOutcome items expose IndexRecord values with File Record fields and
+      Note Metadata fields, including frontmatter, inline fields, and tags.
+- [x] Freshness tests assert observable query results after file changes, not
+      redb internals.
 
 **Out of scope:**
-- Changing Inline Field or tag extraction behavior; this issue should consume the existing Note Metadata.
-- Query filtering, sorting, limiting, grouping, or flattening; that belongs to #05.
-- Registering the minijinja `query` namespace or Interactive Function integration; that belongs to #06.
+
+- Changing Inline Field or tag extraction behavior; this issue should consume
+  the existing Note Metadata.
+- Query filtering, sorting, limiting, grouping, or flattening; that belongs
+  to #05.
+- Registering the minijinja `query` namespace or Interactive Function
+  integration; that belongs to #06.
 - Terminal table/list/task renderers and CLI query commands.
-- Task-level query sources, inlinks, Dataview Query Language, DataviewJS, file watching, or JSON output.
+- Task-level query sources, inlinks, Dataview Query Language, DataviewJS, file
+  watching, or JSON output.

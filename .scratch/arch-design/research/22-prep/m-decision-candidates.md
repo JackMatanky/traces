@@ -1,7 +1,8 @@
 # Ticket 22: candidate decisions (grilling state, not yet recorded in the ticket)
 
-Status: accepted by the human in the grilling session unless noted; to be stress-tested before the Answer is written.
-Baseline HEAD `8064cf76`. Evidence: files a1-l in this folder. Tags: Q = grilling question id.
+Status: accepted by the human in the grilling session unless noted; to be
+stress-tested before the Answer is written. Baseline HEAD `8064cf76`. Evidence:
+files a1-l in this folder. Tags: Q = grilling question id.
 
 | Q | Sub-q | Candidate decision |
 |---|---|---|
@@ -21,4 +22,7 @@ Baseline HEAD `8064cf76`. Evidence: files a1-l in this folder. Tags: Q = grillin
 | Q14 | dates | `[date]` table owned and parsed by `config` into `DateConfig`; ticket 27 decides syntax (zone source, week rule, bare-year filenames). Zone precedence: host override, then config, then system. Filename-period subset flows into `IndexPolicy`; zone never in fingerprint. 22 reserves section and plumbing only. |
 | Q15 | merge | Keep global-then-local field-by-field merge; non-empty local task list replaces the global list, then built-ins layered; local paths resolve against project root, global paths against global config dir. |
 
-Open items not decided here: ticket 31 (held workspace, watcher, debounce), 33 (crate cuts; map steer to evaluate separating the CLI), 29 (`.traces` itself being a symlink; confinement), 31 (error types), 25 (freshness mechanics), 23/24 (status model, title/aliases/date at index time).
+Open items not decided here: ticket 31 (held workspace, watcher, debounce), 33
+(crate cuts; map steer to evaluate separating the CLI), 29 (`.traces` itself
+being a symlink; confinement), 31 (error types), 25 (freshness mechanics), 23/24
+(status model, title/aliases/date at index time).

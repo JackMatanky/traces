@@ -196,7 +196,7 @@ personal vault. All 50,000-note numbers are linear extrapolations [H].
   stored record. This is the whole remainder after lists, outlinks, headings,
   frontmatter and tags.
 - [H] Size arithmetic for the task payload. After the name `String` leaves,
-  `ListItemType` is about 48 bytes unboxed and 16 bytes boxed. `ListItem` is then
-  about 136 bytes unboxed and about 104 bytes boxed. Only 4.9% of items are
+  `ListItemType` is about 48 bytes unboxed and 16 bytes boxed. `ListItem` is
+  then about 136 bytes unboxed and about 104 bytes boxed. Only 4.9% of items are
   tasks, so boxing saves about 3 MB for 76,800 items and adds about 3,800
   allocations. Measure the real types before the choice.

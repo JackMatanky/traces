@@ -142,8 +142,8 @@ rejecting those values or adding an unsigned variant. Neither choice is part of
 the agreed model. Values beyond `u64::MAX` continue to error under the
 compatibility parser.
 
-Source references: [Noyalib 0.0.57
-`from_str_with_config`](https://docs.rs/noyalib/0.0.57/noyalib/fn.from_str_with_config.html),
+Source references:
+[Noyalib 0.0.57 `from_str_with_config`](https://docs.rs/noyalib/0.0.57/noyalib/fn.from_str_with_config.html),
 [ParserConfig::serde_yaml_compat](https://docs.rs/noyalib/0.0.57/noyalib/struct.ParserConfig.html#method.serde_yaml_compat),
 [Number](https://docs.rs/noyalib/0.0.57/noyalib/enum.Number.html).
 

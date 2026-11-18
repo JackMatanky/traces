@@ -30,6 +30,7 @@ Observable contracts that span modules or the process boundary. Ticket 08's
 layer boundaries and ticket 12's coverage method inherit these.
 
 ### G1. Numeric exit-code contract
+
 - **Contract**: any invocation resolves to exactly one of: `0` on success *and*
   on Escape-abort; `1` on any domain failure (miette report to stderr, empty
   stdout); `2` on clap argv/usage failure; `130` on Ctrl-C; never `101`.
@@ -47,11 +48,12 @@ layer boundaries and ticket 12's coverage method inherit these.
   table-shaped; the Ctrl-C leg needs signal delivery, flag as process-seam.
 
 ### G2. Stream split: stdout = payload, stderr = diagnostics
+
 - **Contract**: mutating commands (`trust`, `init`, …) print `""` to stdout and
   their report to stderr; query/table output never mixes with diagnostics.
-- **class**: invariant · **verdict**: intentional,
-  tests/e2e/workflow.rs:94 `stream_contracts_exact_outputs_and_mutating_empty_stdout`
-  (exact stdout/stderr strings asserted), ADR 0004:37 (CLI seam owns stderr
+- **class**: invariant · **verdict**: intentional, tests/e2e/workflow.rs:94
+  `stream_contracts_exact_outputs_and_mutating_empty_stdout` (exact
+  stdout/stderr strings asserted), ADR 0004:37 (CLI seam owns stderr
   presentation).
 - **pinned**: yes (workflow.rs:96-160; also config.rs:113-119 asserts empty
   stdout on failure).
@@ -59,6 +61,7 @@ layer boundaries and ticket 12's coverage method inherit these.
   contains …" is pure Given/When/Then.
 
 ### G3. Stable miette diagnostic codes (`traces::cli::<code>`)
+
 - **Contract**: every user-correctable failure emits one stable, greppable
   diagnostic code on stderr, identical regardless of the command that
   triggered it (e.g. `traces::cli::config_discovery_failed`,
@@ -74,6 +77,7 @@ layer boundaries and ticket 12's coverage method inherit these.
 - **Gherkin**: good, the assertion is literal stderr text.
 
 ### G4. Domain modules keep typed errors; miette lives only at the CLI seam
+
 - **Contract**: root/domain modules expose `thiserror` enums with source
   chains and **never** implement `miette::Diagnostic`; presentation is added
   once at the CLI edge.
@@ -92,6 +96,7 @@ layer boundaries and ticket 12's coverage method inherit these.
 - **Gherkin**: poor fit, compile-time property; belongs to gates/lints.
 
 ### G5. `test-utils` surface is a frozen, machine-pinned seam
+
 - **Contract**: `traces::testing` membership never changes except by explicit
   baseline edit; external test/bench targets reach the crate **only** through
   it.
@@ -107,6 +112,7 @@ layer boundaries and ticket 12's coverage method inherit these.
 - **Gherkin**: poor fit, already enforced better than any scenario could.
 
 ### G6. Layer discipline between test tiers (the seam ticket 08 builds on)
+
 - **Contract**: `tests/e2e/` never names `traces::` (spawned-process only;
   `std::process` confined to support.rs); `tests/integration/` never spawns
   processes or reads `CARGO_BIN_EXE`; no `env::set_current_dir` anywhere in
@@ -121,6 +127,7 @@ layer boundaries and ticket 12's coverage method inherit these.
 - **Gherkin**: poor fit, repo hygiene, not product behavior.
 
 ### G7. Root confinement of every filesystem path
+
 - **Contract**: relative paths are validated lexically (reject absolute, `..`,
   non-normal components) **and** against the filesystem (symlinks, Windows
   8.3/ADS via `strict-path`) before use; fixture writes panic with
@@ -140,6 +147,7 @@ layer boundaries and ticket 12's coverage method inherit these.
   testable, record as constraint.
 
 ### G8. One YAML config shared by frontmatter and template filters
+
 - **Contract**: `to_yaml`/`from_yaml` filters and frontmatter parsing use one
   `YAML_CONFIG` (noyalib `serde_yaml_compat`, YAML 1.2), so a document parses
   identically wherever it is read; doc'd quirks: leading-zero → string,
@@ -156,6 +164,7 @@ layer boundaries and ticket 12's coverage method inherit these.
   agree"); unit material for the individual quirks.
 
 ### G9. `Defect class:` / `//! Proves` test-documentation conventions
+
 - **Contract (de facto)**: each test carries a `Proves …` statement (34 uses),
   an `Executes vs asserts:` block (33), and a `Defect class: <tag>` rationale
   (33 in tests/, 1 in src/); 16 distinct tags in use (`unwitnessed-contract` ×5,
@@ -177,6 +186,7 @@ layer boundaries and ticket 12's coverage method inherit these.
   Scenario/coverage annotations; ticket 14 should decide absorb vs keep.
 
 ### G10. No panic crosses the process boundary ("never 101")
+
 - **Contract**: production code never panics/exits/prints to stdout, so a
   spawned `traces` never returns 101; `assert_never_exit_101` is asserted on
   essentially every e2e run.
@@ -256,7 +266,8 @@ module's own tests. 278 inline `#[test]`s total (§0).
   `owns_a_string_needing_escape_processing`) · unit material.
 - **task**: status symbols resolve through `TaskStatusMap`; unknown symbol →
   incomplete-Todo preserving it (src/task.rs:1-30). class: state transition ·
-  intentional · **pinned** (`resolves_an_unknown_symbol_to_an_incomplete_todo_preserving_it`,
+  intentional · **pinned**
+  (`resolves_an_unknown_symbol_to_an_incomplete_todo_preserving_it`,
   `default_statuses_do_not_use_prohibited_delimiters`, postcard round-trip
   `preserves_slots_across_postcard_roundtrip`, `decodes_pre_c1_wire_fixture`) ·
   Gherkin: good (wire-compat fixture is a natural Given).
@@ -280,7 +291,8 @@ module's own tests. 278 inline `#[test]`s total (§0).
 - **dirtree**: traversal errors are classified by *where* they occur
   (MissingRoot / RootInaccessible / NodeInaccessible) and callers choose
   absorption via `missing_as_empty` (src/dirtree.rs:1-27). class: error
-  semantics · intentional · **pinned** (`returns_missing_root_error_when_root_is_missing`,
+  semantics · intentional · **pinned**
+  (`returns_missing_root_error_when_root_is_missing`,
   `missing_as_empty_still_surfaces_root_inaccessible`,
   `returns_node_inaccessible_error_when_descendant_is_unreadable`) plus
   determinism (`returns_entries_in_per_directory_order`,
@@ -291,18 +303,20 @@ module's own tests. 278 inline `#[test]`s total (§0).
   (`matches_blake3_hex_formula_for_path_bytes`,
   `length_prefixes_keep_adjacent_fields_apart`,
   `paths_differing_only_in_non_utf8_bytes_stay_distinct`) · unit material.
-  Unpinned doc caveat: "hash then re-read is a TOCTOU window" (src/hash.rs:24-27).
-- **lexer**: one-token lookahead stream plus `lexical_unquote` string
-  unescaping (src/lexer.rs:1-10). class: invariant · intentional ·
-  **pinned** (27 tests incl. `does_not_skip_whitespace_or_consume_trailing_text`,
+  Unpinned doc caveat: "hash then re-read is a TOCTOU window"
+  (src/hash.rs:24-27).
+- **lexer**: one-token lookahead stream plus `lexical_unquote` string unescaping
+  (src/lexer.rs:1-10). class: invariant · intentional · **pinned** (27 tests
+  incl. `does_not_skip_whitespace_or_consume_trailing_text`,
   `strips_escape_before_quote`, `keeps_trailing_backslash`) · unit material.
 - **yaml**: see G8 (shared-config parity); 0 tests in-module.
 - **tag**: `#`-prefixed validated identifier; containment = segment prefix,
-  computed on demand (src/tag.rs:1-6; GLOSSARY src/GLOSSARY.md:30-33).
-  class: invariant · intentional · **pinned** (`rejects_dot_in_body`,
-  `rejects_a_doubled_hash_prefix`, `returns_the_byte_offset_for_a_multi_byte_invalid_character`,
-  containment trio) plus doc examples (src/tag.rs:23-30) · Gherkin: good
-  ("#projects/active is contained in #projects").
+  computed on demand (src/tag.rs:1-6; GLOSSARY src/GLOSSARY.md:30-33). class:
+  invariant · intentional · **pinned** (`rejects_dot_in_body`,
+  `rejects_a_doubled_hash_prefix`,
+  `returns_the_byte_offset_for_a_multi_byte_invalid_character`, containment
+  trio) plus doc examples (src/tag.rs:23-30) · Gherkin: good ("#projects/active
+  is contained in #projects").
 - **position**: 1-indexed `SourceLine` (rejects 0), `BytePos` ≤ u32::MAX,
   half-open spans with start ≤ end (src/position.rs:1-23). class: invariant ·
   intentional · **pinned** (`source_line_rejects_zero`,

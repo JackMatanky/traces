@@ -24,19 +24,19 @@ Accepted
 
 ## Context
 
-Traces needs a queryable WorkspaceIndex to replace Obsidian Dataview in the terminal.
-The index must scan the project root, extract general metadata from every file,
-extract richer metadata from markdown Notes (frontmatter, inline fields, tags,
-tasks, lists, links), and expose a query API from within minijinja templates and
-through CLI commands. The core questions were: (1) persistence format and schema
-design; (2) query API shape — a single from() entry point with a source
-expression grammar (see ADR-0008); (3) automatic vs explicit re-indexing; (4)
-inline field parsing scope; (5) CLI command structure.
+Traces needs a queryable WorkspaceIndex to replace Obsidian Dataview in the
+terminal. The index must scan the project root, extract general metadata from
+every file, extract richer metadata from markdown Notes (frontmatter, inline
+fields, tags, tasks, lists, links), and expose a query API from within minijinja
+templates and through CLI commands. The core questions were: (1) persistence
+format and schema design; (2) query API shape — a single from() entry point with
+a source expression grammar (see ADR-0008); (3) automatic vs explicit
+re-indexing; (4) inline field parsing scope; (5) CLI command structure.
 
 ## Decision
 
-Use a redb database with eight tables for the WorkspaceIndex. Expose the query API
-through a QueryOps minijinja namespace Object with a single from() method,
+Use a redb database with eight tables for the WorkspaceIndex. Expose the query
+API through a QueryOps minijinja namespace Object with a single from() method,
 method chaining for transforms, and pipeline terminal filters for output
 rendering.
 
@@ -64,9 +64,10 @@ Key design choices:
 3. Query API: A single query.from() method accepting no argument (all files), a
    source expression string (see ADR-0008 for the grammar), or a Schema file
    field (SourceSelector smuggled through minijinja via downcast). QuerySet
-   objects support method chaining: filter/where, sort, limit, group_by, flatten,
-   with_children, with_descendants. Terminal methods: table, list, task_list,
-   count. All terminal methods are also registered as pipeline filters.
+   objects support method chaining: filter/where, sort, limit, group_by,
+   flatten, with_children, with_descendants. Terminal methods: table, list,
+   task_list, count. All terminal methods are also registered as pipeline
+   filters.
 
 4. Pipeline safety: Non-terminal pipeline filters accept and return QuerySet.
    Terminal filters accept QuerySet and return String. Attempting to sequence a

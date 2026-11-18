@@ -204,9 +204,9 @@ that edit.
   Its non-retrying requests return `ContentModified` after cancellation
   (`.scratch/md-pkm-lsp/research/x-rust-lsp-implementation-patterns.md:402`)
   [V].
-- markdown-oxide runs `Vault::update_vault` on each `didChange` under the
-  write lock. It then calls `schedule_diagnostics`. The 300 ms debounce
-  applies only to diagnostics
+- markdown-oxide runs `Vault::update_vault` on each `didChange` under the write
+  lock. It then calls `schedule_diagnostics`. The 300 ms debounce applies only
+  to diagnostics
   (`docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt:1659-1668,1726-1744,1876-1890,2236-2242`)
   [V].
 - IWE writes the buffer into the graph at once. It batches only its BM25
@@ -584,8 +584,10 @@ They do not measure the amended architecture.
 - Give every retained closed entry a proof time. For a save, use receipt time.
   Otherwise use the known disk snapshot's observation time.
 - An eligible scan validates and installs the coherent base atomically with
-  entry removal. Failed scans release nothing. No-change scans need no new revision.
-- Remove the `Note`-equality early release. It does not prove byte size or notices.
+  entry removal. Failed scans release nothing. No-change scans need no new
+  revision.
+- Remove the `Note`-equality early release. It does not prove byte size or
+  notices.
 - A validated deletion supersedes older saved snapshots. A later save creates
   a new proof obligation.
 - Separate lexical admission from existing-node checks. A new final component

@@ -1,14 +1,19 @@
 # Ticket 21 decision ledger (historical pre-decision hypotheses)
 
-The [resolved Answer](../../issues/21-ambient-environment-and-execution-context.md#answer)
-supersedes these provisional leans; do not treat L1-L18 below as the specification.
+The
+[resolved Answer](../../issues/21-ambient-environment-and-execution-context.md#answer)
+supersedes these provisional leans; do not treat L1-L18 below as the
+specification.
 
 Source: the grilling of
-[the ticket](../../issues/21-ambient-environment-and-execution-context.md) on 2026-10-22. The user said they are
-"leaning toward agreeing with every recommendation" and asked for a stress test plus alternative-design research before
-locking in. Treat every item below as a hypothesis to attack, not a conclusion. The goal of the codebase: a lean,
-performant, idiomatic, deep, robust Rust core that is a stable, maintainable, expandable foundation for all other
-features and crates (CLI, LSP, MCP, templates). Caution is not a goal; correctness and design quality are.
+[the ticket](../../issues/21-ambient-environment-and-execution-context.md) on
+2026-10-22. The user said they are "leaning toward agreeing with every
+recommendation" and asked for a stress test plus alternative-design research
+before locking in. Treat every item below as a hypothesis to attack, not a
+conclusion. The goal of the codebase: a lean, performant, idiomatic, deep,
+robust Rust core that is a stable, maintainable, expandable foundation for all
+other features and crates (CLI, LSP, MCP, templates). Caution is not a goal;
+correctness and design quality are.
 
 ## The decisions (L1-L18)
 
@@ -35,55 +40,79 @@ features and crates (CLI, LSP, MCP, templates). Caution is not a goal; correctne
 
 ## Premises the user ratified in their own words (do not re-litigate without new evidence)
 
-Sole consumer, library surface is free; frozen: vault-format parsing, fresh-index equivalence, trust-before-parse ORDER,
-exit codes and stdout shapes; reduce visibility, `pub` only for outward items; LSP committed, MCP likely and stateless;
-sync core ("Q3: yes"); naive datetimes are civil, `Date` is civil, cache holds no zone, zone and now are supplied at
-evaluation (accepted inside a bundle, so still open to a hostile reading); workspace-of-crates direction with the CLI as
-one consumer of core; `FileClassExpander` removal; write-back out of scope. Provenance for each: `r2-premise-audit.md`
-(key U1-U15).
+Sole consumer, library surface is free; frozen: vault-format parsing,
+fresh-index equivalence, trust-before-parse ORDER, exit codes and stdout shapes;
+reduce visibility, `pub` only for outward items; LSP committed, MCP likely and
+stateless; sync core ("Q3: yes"); naive datetimes are civil, `Date` is civil,
+cache holds no zone, zone and now are supplied at evaluation (accepted inside a
+bundle, so still open to a hostile reading); workspace-of-crates direction with
+the CLI as one consumer of core; `FileClassExpander` removal; write-back out of
+scope. Provenance for each: `r2-premise-audit.md` (key U1-U15).
 
 ## Premises NOT ratified (attack freely)
 
-Functions-only layering (ticket 20 line 72 is assistant-introduced); "no one-implementor trait" as a blanket rule;
-"CwdGuard sound"; ADR-0009 as authority (duplicate numbers, both `proposed`); host-policy `ignore|warn|reject`.
+Functions-only layering (ticket 20 line 72 is assistant-introduced); "no
+one-implementor trait" as a blanket rule; "CwdGuard sound"; ADR-0009 as
+authority (duplicate numbers, both `proposed`); host-policy
+`ignore|warn|reject`.
 
 ## Evidence base (read, do not redo)
 
-- `.scratch/arch-design/research/21-prep/`: `brief-r3.md` (the synthesis), `r2-premise-audit.md`, `r2-defect-hunt.md`
-  (defects D1-D12), `r2-fact-audit-a-d.md`, `r3-engine-coupling-precedent.md` (Spark, DataFusion, PostgreSQL, DuckDB,
-  CockroachDB patterns), `r3-query-engine-options.md` (DataFusion probe: Date vs Timestamp promotes at UTC midnight),
-  `a-code-inventory.md` .. `g-design-topology-and-redteam.md` (round-1 material, some leans withdrawn; see brief-r3 s.0-1).
-- Lab (compiled, 24 tests pass): `.design/2026-10-22-review-ambient-execution-context/models/ctx-lab/`
-  (`cargo test --offline`; shapes A raw pair, B opaque `Frame`, C bound plan, D ambient thread-local, R resolve plus
-  `Calendar`; host snapshot, trust-gated open, dialog policy, minijinja carriers). DataFusion probe:
+- `.scratch/arch-design/research/21-prep/`: `brief-r3.md` (the synthesis),
+  `r2-premise-audit.md`, `r2-defect-hunt.md` (defects D1-D12),
+  `r2-fact-audit-a-d.md`, `r3-engine-coupling-precedent.md` (Spark, DataFusion,
+  PostgreSQL, DuckDB, CockroachDB patterns), `r3-query-engine-options.md`
+  (DataFusion probe: Date vs Timestamp promotes at UTC midnight),
+  `a-code-inventory.md` .. `g-design-topology-and-redteam.md` (round-1 material,
+  some leans withdrawn; see brief-r3 s.0-1).
+- Lab (compiled, 24 tests pass):
+  `.design/2026-10-22-review-ambient-execution-context/models/ctx-lab/`
+  (`cargo test --offline`; shapes A raw pair, B opaque `Frame`, C bound plan, D
+  ambient thread-local, R resolve plus `Calendar`; host snapshot, trust-gated
+  open, dialog policy, minijinja carriers). DataFusion probe:
   `.design/.../models/df-probe/`.
-- The wayfinder map and tickets: `.scratch/arch-design/map.md` and `.scratch/arch-design/issues/*.md` (tickets 1-20
-  resolved, 21-36 open). Refer to tickets by title with a relative link, never by bare number.
-- Verified code facts (HEAD around `d6b63e0d`): 24 production `local_zone()` calls (`temporal/datetime.rs`,
-  `temporal/point.rs:780`, `query/grammar/filter.rs`, `template/engine/date.rs`); 3 production `Timestamp::now()` calls (all
-  in `template/engine/date.rs`); `ZoneGuard` and `CwdGuard` are `#[cfg(test)]`; nextest runs one process per test;
-  `FileMeta.day` is `src/file.rs:88-98`; `scan_date_prefix` accepts only `YYYY-MM-DD` and `YYYY-MM`
-  (`src/temporal/lexer.rs:18-26`); `NoteFieldValueRef::compare` promotes Date at ambient-zone midnight
-  (`src/note/field.rs:273-310`); sort keys `src/query/sort.rs`; composition written twice (`src/cli/mod.rs:335-366`,
-  `src/template/engine.rs:128-135`); `clippy.toml` bans only `current_dir`/`set_current_dir`.
+- The wayfinder map and tickets: `.scratch/arch-design/map.md` and
+  `.scratch/arch-design/issues/*.md` (tickets 1-20 resolved, 21-36 open). Refer
+  to tickets by title with a relative link, never by bare number.
+- Verified code facts (HEAD around `d6b63e0d`): 24 production `local_zone()`
+  calls (`temporal/datetime.rs`, `temporal/point.rs:780`,
+  `query/grammar/filter.rs`, `template/engine/date.rs`); 3 production
+  `Timestamp::now()` calls (all in `template/engine/date.rs`); `ZoneGuard` and
+  `CwdGuard` are `#[cfg(test)]`; nextest runs one process per test;
+  `FileMeta.day` is `src/file.rs:88-98`; `scan_date_prefix` accepts only
+  `YYYY-MM-DD` and `YYYY-MM` (`src/temporal/lexer.rs:18-26`);
+  `NoteFieldValueRef::compare` promotes Date at ambient-zone midnight
+  (`src/note/field.rs:273-310`); sort keys `src/query/sort.rs`; composition
+  written twice (`src/cli/mod.rs:335-366`, `src/template/engine.rs:128-135`);
+  `clippy.toml` bans only `current_dir`/`set_current_dir`.
 
 ## Rules for every agent
 
-- This is research and design review. Lazy, minimal or "ponytail" modes do NOT apply: be thorough, be adversarial, read
-  real code, run things when a claim can be checked by running it.
-- Create your output file first, then append sections as you go (agents have stopped early before). Verify the file
-  exists and is complete before you finish.
-- Do not edit repository source, tickets, the map, or the ledger. Write only your named output file under
-  `.scratch/arch-design/research/21-prep/` and scratch work under `/tmp`.
-- Tag every claim: [V] you read the source, ran the code, or fetched the primary page; [H] inference; [S] search snippet
-  only. Cite file:line (repo) or URL. Never fabricate a citation. State what you could not verify.
-- Migration cost and churn are never a design criterion; report them separately and neutrally if relevant. Judge by
-  correctness, coupling and cohesion, performance, idiomatic Rust, robustness, and the ability to extend.
-- Challenge upstream artifacts (tickets, ADRs, surveys, earlier briefs, the lab). They are fallible.
-- Keep dissents honest: for each recommendation give the strongest opposing design and the one fact that would flip it.
-- Repo conventions you must respect when you sketch code: Rust edition 2024; `thiserror` for errors; no `unwrap` in
-  library code; borrow over clone; `Cow` where ownership is conditional; doc comments on public items; tests use
-  `pretty_assertions`; mise tasks for build/test (`mise run verify` is the repo gate, but do not run it).
-- Benchmarks: NEVER run benchmarks in parallel; only the performance agent runs benchmarks; release mode only; no
-  RUSTFLAGS; use criterion.
-- Your final chat message is a short summary (under 300 words) plus the path of your file. The file is the deliverable.
+- This is research and design review. Lazy, minimal or "ponytail" modes do NOT
+  apply: be thorough, be adversarial, read real code, run things when a claim
+  can be checked by running it.
+- Create your output file first, then append sections as you go (agents have
+  stopped early before). Verify the file exists and is complete before you
+  finish.
+- Do not edit repository source, tickets, the map, or the ledger. Write only
+  your named output file under `.scratch/arch-design/research/21-prep/` and
+  scratch work under `/tmp`.
+- Tag every claim: [V] you read the source, ran the code, or fetched the primary
+  page; [H] inference; [S] search snippet only. Cite file:line (repo) or URL.
+  Never fabricate a citation. State what you could not verify.
+- Migration cost and churn are never a design criterion; report them separately
+  and neutrally if relevant. Judge by correctness, coupling and cohesion,
+  performance, idiomatic Rust, robustness, and the ability to extend.
+- Challenge upstream artifacts (tickets, ADRs, surveys, earlier briefs, the
+  lab). They are fallible.
+- Keep dissents honest: for each recommendation give the strongest opposing
+  design and the one fact that would flip it.
+- Repo conventions you must respect when you sketch code: Rust edition 2024;
+  `thiserror` for errors; no `unwrap` in library code; borrow over clone; `Cow`
+  where ownership is conditional; doc comments on public items; tests use
+  `pretty_assertions`; mise tasks for build/test (`mise run verify` is the repo
+  gate, but do not run it).
+- Benchmarks: NEVER run benchmarks in parallel; only the performance agent runs
+  benchmarks; release mode only; no RUSTFLAGS; use criterion.
+- Your final chat message is a short summary (under 300 words) plus the path of
+  your file. The file is the deliverable.

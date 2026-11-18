@@ -1,6 +1,10 @@
 "# Research 12: Coverage-gap methodology, evidence dossier
 
-Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+Layout note (2026-11-05): this record is older than the move of the scenarios to
+`tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read
+`mod steps` and `tests/features/steps/`. Where it names a flat feature file,
+read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is
+current.
 
 This file supports
 [12: Coverage-gap methodology](../issues/12-coverage-gap-methodology.md).
@@ -547,8 +551,8 @@ Anderson did later work. Kent McDonald gave the three-step framing.
 |---|---|
 | [Adzic, *Specification by Example*, ch. 2 sample (Manning)](https://manning-content.s3.amazonaws.com/download/d/5a22dfb-908c-408d-aaa1-46873b6b18c9/adzic_ch02.pdf) | Source: "With Specification by Example, functional requirements, specifications, and acceptance tests are the same thing." The seven key process patterns are: derive scope from goals, specify collaboratively, illustrate using examples, refine, automate validation *without changing the specifications*, validate frequently, and evolve living documentation. |
 | Same chapter | Source: living documentation is "a reliable and authoritative source of information on system functionality that anyone can access. It's as reliable as the code but much easier to read and understand." The "specification with examples" lives in a repository: a FitNesse wiki or "a directory structure of Cucumber feature files". |
-| [Cucumber: Introduction](https://cucumber.io/docs) | Source: Gherkin serves three purposes: "Unambiguous executable specification", "Automated testing using Cucumber", "Document how the system _actually_ behaves". Feature files are versioned in source control next to the software. This is the "Single source of truth". |
-| [Cucumber: Gherkin reference](https://cucumber.io/docs/gherkin/reference) | Source: "In addition to being a specification and documentation, an example is also a _test_. As a whole, your examples are an _executable specification_ of the system." |
+| [Cucumber: Introduction](https://cucumber.io/docs) | Source: Gherkin serves three purposes: "Unambiguous executable specification", "Automated testing using Cucumber", "Document how the system *actually* behaves". Feature files are versioned in source control next to the software. This is the "Single source of truth". |
+| [Cucumber: Gherkin reference](https://cucumber.io/docs/gherkin/reference) | Source: "In addition to being a specification and documentation, an example is also a *test*. As a whole, your examples are an *executable specification* of the system." |
 | [North, "Introducing BDD" (2006)](https://dannorth.net/introducing-bdd) | Source: BDD's core template is "Given some initial context, When an event occurs, Then ensure some outcomes". Behavior is specified as observable outcomes, not implementation. |
 | [North, "What's in a Story?" (2007)](https://dannorth.net/whats-in-a-story/) | Source: BDD is outside-in: business outcome → feature set → stories. Each story defines scope plus its acceptance criteria (the ATM withdrawal example). |
 
@@ -614,10 +618,9 @@ Primary sources: [Wynne, "Introducing Example Mapping", Cucumber blog,
 
 #### Feature Injection (Chris Matts; framing by Kent McDonald)
 
-Primary sources: [Matts & Adzic, "Feature Injection: three steps to
-success", InfoQ, 2011-12-14](https://www.infoq.com/articles/feature-injection-success);
-[Smart, *BDD in Action* ch. 3 (Manning
-livebook)](https://livebook.manning.com/book/bdd-in-action/chapter-3/ch03fig02).
+Primary sources:
+[Matts & Adzic, "Feature Injection: three steps to success", InfoQ, 2011-12-14](https://www.infoq.com/articles/feature-injection-success);
+[Smart, *BDD in Action* ch. 3 (Manning livebook)](https://livebook.manning.com/book/bdd-in-action/chapter-3/ch03fig02).
 
 | Source | Finding |
 |---|---|
@@ -629,9 +632,8 @@ livebook)](https://livebook.manning.com/book/bdd-in-action/chapter-3/ch03fig02).
 
 #### Specification workshops and cadence (Gojko Adzic)
 
-Primary source: [Adzic, "Specification workshops - an agile way to get
-better requirements"
-(2008-11-12)](https://gojko.net/2008/11/12/specification-workshops-an-agile-way-to-get-better-requirements/).
+Primary source:
+[Adzic, "Specification workshops - an agile way to get better requirements" (2008-11-12)](https://gojko.net/2008/11/12/specification-workshops-an-agile-way-to-get-better-requirements/).
 
 | Source | Finding |
 |---|---|
@@ -692,6 +694,7 @@ of activities that already carry intrinsic value: Discovery conversations and
 executable specs in SCM. It must be queryable.
 
 **Inference**: an RTM is overhead when three conditions hold:
+
 1. The mapping lives outside the executable corpus and must be updated by
    hand.
 2. It is anchored to transient artifacts.
@@ -812,11 +815,11 @@ These facts belong in the ticket record:
    maintained matrices are overhead. Traceability should be a queryable
    by-product.
 4. **specificationbyexample.com is offline** (HTTP 301 →
-   gojko.net/books/specification-by-example, per [Wayback
-   2023-12-31](https://web.archive.org/web/20231231094811/https://www.specificationbyexample.com/?src=/)).
-   SBE chapter 3 ("Living documentation") full text is paywalled. Findings
-   for SBE rest on the free Manning sample chapters 1 and 2 and the book's
-   own summaries.
+   gojko.net/books/specification-by-example, per
+   [Wayback 2023-12-31](https://web.archive.org/web/20231231094811/https://www.specificationbyexample.com/?src=/)).
+   SBE chapter 3 ("Living documentation") full text is paywalled. Findings for
+   SBE rest on the free Manning sample chapters 1 and 2 and the book's own
+   summaries.
 5. **impactmapping.org was unreachable** during research (transport error).
    Impact Mapping claims rest on gojko.net's book page and *BDD in Action*
    ch. 3 excerpts.
@@ -1008,11 +1011,11 @@ plus this repo's committed research notes (cited as local docs). Claims
 marked **Inference** are reasoned from sourced facts but are not stated
 directly by a primary source.
 
-Standing repo facts, from local docs, not re-researched: mutation runs
-through `mise run test:mutants` (mutarust, a tool-agnostic task entrypoint).
-Coverage comes from cargo-llvm-cov plus nextest. Mutation is deliberately outside
-`verify`/hk/CI. Scenarios are rstest-bdd tests folded into `tests/e2e.rs`.
-They spawn the CLI binary. Sources:
+Standing repo facts, from local docs, not re-researched: mutation runs through
+`mise run test:mutants` (mutarust, a tool-agnostic task entrypoint). Coverage
+comes from cargo-llvm-cov plus nextest. Mutation is deliberately outside
+`verify`/hk/CI. Scenarios are rstest-bdd tests folded into `tests/e2e.rs`. They
+spawn the CLI binary. Sources:
 [`docs/refs/mutation_testing.md`](../../../docs/refs/mutation_testing.md),
 [`docs/refs/quality_gates_mise_adoption.md`](../../../docs/refs/quality_gates_mise_adoption.md).
 

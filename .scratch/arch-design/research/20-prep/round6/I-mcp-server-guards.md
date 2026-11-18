@@ -28,9 +28,10 @@ claims replace it.
   per subscription; on stdio the client must re-send it after a restart.
 - Roots, Sampling and Logging are deprecated. Logging notifications are
   emitted only for requests that carry a per-request log level.
-- `tools/call` results carry a `content` array and `isError`; `structuredContent`
-  may be any JSON value. Tool annotations remain, and clients must treat them as
-  untrusted. List results carry `ttlMs` and `cacheScope`.
+- `tools/call` results carry a `content` array and `isError`;
+  `structuredContent` may be any JSON value. Tool annotations remain, and
+  clients must treat them as untrusted. List results carry `ttlMs` and
+  `cacheScope`.
 - stdio: the server is a client subprocess; on unexpected exit the client should
   restart it and in-flight requests are lost.
 - Skills over MCP is an extension; in the community client matrix only ChatGPT,

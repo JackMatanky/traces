@@ -61,4 +61,5 @@ belongs to the decision tickets that list this ticket in Blocked by.
 
 ## Resolution
 
-Resolved by comparative research deliverable: [.scratch/arch-design/research/02-value-model-precedent.md](../research/02-value-model-precedent.md).
+Resolved by comparative research deliverable:
+[.scratch/arch-design/research/02-value-model-precedent.md](../research/02-value-model-precedent.md).

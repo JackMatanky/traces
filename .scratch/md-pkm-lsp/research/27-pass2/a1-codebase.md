@@ -481,7 +481,7 @@ own answer text.
 | QueryService expects Arc<WorkspaceIndex>; miette span-aware QuerySyntaxError | **Holds** | service.rs:126; query/error.rs:134 area (`SourceSpan::from((span.start, span.len()))` at :137) |
 | SchemaService load-once; no runtime validator | **Holds** | schema/service.rs:36; no note-walking validation |
 | Template rendering interactive/unsafe for analysis; no static analysis; no AST cache | **Holds** | ui.rs DialogProvider helpers; no analysis.rs/machinery; engine re-parses per render |
-| rumdl ships its own LSP with the three ceding settings | **Not verifiable from Traces code** — consistent with research corpus; flagging as externally-sourced, unchanged |
+| rumdl ships its own LSP with the three ceding settings | **Not verifiable from Traces code** — consistent with research corpus; flagging as externally-sourced, unchanged |  |
 | `byte_to_utf16_cu` promised by ticket 11 / retained by 26 | **Design-only — does NOT exist in code** | zero utf16 hits in src/; not a contradiction of the baseline (baseline doesn't claim it exists) but important for 27 planning |
 | `unique_tags()`/`unique_file_classes()`/`suggest_class()` (21 prerequisites) | **Design-only — do NOT exist** | zero grep hits; store has `paths_with_tag`/`paths_with_file_class` instead |
 | Frontmatter `spans` map (20), `SchemaFieldDef::origin/description` (20) | **Design-only — do NOT exist** | fields.rs:53-57, metadata.rs:96-99 |
@@ -500,16 +500,18 @@ itself*.
 
 ## Sources
 
-- Ticket 27: `.scratch/md-pkm-lsp/issues/27-structural-symbols-and-editor-intelligence.md`
+- Ticket 27:
+  `.scratch/md-pkm-lsp/issues/27-structural-symbols-and-editor-intelligence.md`
 - Map: `.scratch/md-pkm-lsp/map.md` (baseline facts :46-59; decisions :61-103)
 - Code: `src/note/{model,heading,links,lists,metadata,field}.rs`,
-  `src/note/parser.rs` (+ `parser/{input,inline,lexer,list,marker,task}.rs`
-  as named), `src/position.rs`, `src/tag.rs`, `src/file.rs`,
+  `src/note/parser.rs` (+ `parser/{input,inline,lexer,list,marker,task}.rs` as
+  named), `src/position.rs`, `src/tag.rs`, `src/file.rs`,
   `src/index/{entry,inlinks,refresh,service,store,tables}.rs`,
   `src/query/{service,error}.rs`, `src/config/{mod,model}.rs`,
-  `src/schema/{model,fields,service}.rs`, `src/template/{engine,loader,service}.rs`,
-  `src/yaml.rs`, `Cargo.toml`
-- Design-only ticket text: issues `10` (:27,:31), `11` (:33,:37,:47,:62,:68,:78,:80),
-  `13` (:10,:31-33,:45), `14` (:27,:42), `15` (:26,:52,:66,:85,:195-206,:242,:256-260),
-  `17` (:16-17,:26,:60,:67,:73-87,:96), `21` (map :88), `22` (:12,:16,:43-51,:58,:70),
-  `23` (:9,:41-50,:63), `26` (:23,:25,:27,:35,:45)
+  `src/schema/{model,fields,service}.rs`,
+  `src/template/{engine,loader,service}.rs`, `src/yaml.rs`, `Cargo.toml`
+- Design-only ticket text: issues `10` (:27,:31), `11`
+  (:33,:37,:47,:62,:68,:78,:80), `13` (:10,:31-33,:45), `14` (:27,:42), `15`
+  (:26,:52,:66,:85,:195-206,:242,:256-260), `17`
+  (:16-17,:26,:60,:67,:73-87,:96), `21` (map :88), `22`
+  (:12,:16,:43-51,:58,:70), `23` (:9,:41-50,:63), `26` (:23,:25,:27,:35,:45)

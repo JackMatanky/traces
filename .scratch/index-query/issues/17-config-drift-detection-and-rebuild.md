@@ -157,9 +157,9 @@ Config Fingerprint) is merged to `main` (`1b1d9ff1`); this ticket consumes
 >   constructor outside `config` can only destructure exhaustively if the
 >   fields are visible. `IndexFingerprint::new` is that constructor, pinned
 >   against `..` by a source-scanning test.
-> - `IndexFingerprint` is 320 bytes, so `PersistRequest` and `PendingApply::apply`
->   borrow it, `StoredFingerprint::Recorded` boxes it, and `IndexerService`
->   keeps it boxed (clippy `large_types_passed_by_value`,
+> - `IndexFingerprint` is 320 bytes, so `PersistRequest` and
+>   `PendingApply::apply` borrow it, `StoredFingerprint::Recorded` boxes it, and
+>   `IndexerService` keeps it boxed (clippy `large_types_passed_by_value`,
 >   `large_enum_variant`, and the bench stack-frame lint).
 > - Found and fixed in this ticket: the incremental persist path only opened
 >   the tables it wrote, so a first build into a virgin store of notes with no

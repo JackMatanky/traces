@@ -20,9 +20,8 @@ Tickets 25, 28, 29 and 32 use the words "pre-release" and "before release".
 They treat a wipe or an epoch bump as free until a release. This ticket must
 define that boundary.
 
-Answer each numbered question separately.
-Use [ticket 36's decision-record
-rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
+Answer each numbered question separately. Use
+[ticket 36's decision-record rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
 Keep decision evidence separate from implementation gates.
 
 1. Define when "pre-release" stops.

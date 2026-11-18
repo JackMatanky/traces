@@ -4,12 +4,17 @@ This report stress-tests decisions Q1–Q15 against resolved tickets 01–21.
 
 ## Executive Summary
 
-This document maps candidate decisions from `m-decision-candidates.md` (Q1–Q15) against the technical resolved tickets (01–21). It surfaces conflicts, gaps, and refinements required before finalizing the Answer for ticket 22.
+This document maps candidate decisions from `m-decision-candidates.md` (Q1–Q15)
+against the technical resolved tickets (01–21). It surfaces conflicts, gaps, and
+refinements required before finalizing the Answer for ticket 22.
 
 ## Methodology
 
-- **Classification**: Findings are classified as *Hard Conflict* (direct contradiction), *Soft Conflict* (mismatch of intent/direction), *Gap* (missing definition/boundary), or *Fine* (aligned).
-- **Citations**: All findings reference specific tickets/ADRs via line-number anchored quotes.
+- **Classification**: Findings are classified as *Hard Conflict* (direct
+  contradiction), *Soft Conflict* (mismatch of intent/direction), *Gap* (missing
+  definition/boundary), or *Fine* (aligned).
+- **Citations**: All findings reference specific tickets/ADRs via line-number
+  anchored quotes.
 
 ## Targeted Hunts
 
@@ -32,9 +37,12 @@ This document maps candidate decisions from `m-decision-candidates.md` (Q1–Q15
 
 ### Q5 vs Ticket 16 (Hard Conflict)
 
-- **Ticket 16 context**: "frozen = vault-format parsing, index result equivalence with fresh parse..."
-- **Q5 proposal**: Keep two stores (trust keyed by canonical ROOT; tracker keyed by config path).
-- **Conflict**: The requirement for index result equivalence (Ticket 16) is harder to guarantee with separate tracker/trust stores (Q5).
+- **Ticket 16 context**: "frozen = vault-format parsing, index result
+  equivalence with fresh parse..."
+- **Q5 proposal**: Keep two stores (trust keyed by canonical ROOT; tracker keyed
+  by config path).
+- **Conflict**: The requirement for index result equivalence (Ticket 16) is
+  harder to guarantee with separate tracker/trust stores (Q5).
 
 ## Alternatives Analysis
 

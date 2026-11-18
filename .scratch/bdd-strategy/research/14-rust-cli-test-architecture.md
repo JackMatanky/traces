@@ -1,18 +1,26 @@
 # Research 14: Rust CLI Test Architecture Landscape
 
-Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+Layout note (2026-11-05): this record is older than the move of the scenarios to
+`tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read
+`mod steps` and `tests/features/steps/`. Where it names a flat feature file,
+read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is
+current.
 
-This document supports [ticket 14](../issues/14-adoption-roadmap.md).
-It investigates how mature Rust CLI and developer tooling projects structure end-to-end and behavioral tests.
-The document evaluates test layouts, execution harnesses, snapshot tools, hermetic sandboxing, PTY testing, and real-world BDD adopters (`rstest-bdd` and `cucumber-rs`).
+This document supports [ticket 14](../issues/14-adoption-roadmap.md). It
+investigates how mature Rust CLI and developer tooling projects structure
+end-to-end and behavioral tests. The document evaluates test layouts, execution
+harnesses, snapshot tools, hermetic sandboxing, PTY testing, and real-world BDD
+adopters (`rstest-bdd` and `cucumber-rs`).
 
 ---
 
 ## 1. Question
 
-How do mature Rust CLI and tooling projects structure end-to-end and behavior tests?
-How do they isolate environments, manage compile times, separate specifications from bug regressions, and pin contracts?
-How do real adopters of `rstest-bdd` and `cucumber-rs` manage features, steps, and fixtures in production?
+How do mature Rust CLI and tooling projects structure end-to-end and behavior
+tests? How do they isolate environments, manage compile times, separate
+specifications from bug regressions, and pin contracts? How do real adopters of
+`rstest-bdd` and `cucumber-rs` manage features, steps, and fixtures in
+production?
 
 ---
 
@@ -345,11 +353,12 @@ The table below summarizes test layouts and practices across evaluated projects.
   `https://github.com/leynos/ortho-config/pull/237`, 2026-11-03, primary, high
   confidence.
 - `[B30]` In `ortho-config`, `rstest-bdd` binds feature files via compile-time
-  proc-macros: `scenarios!("tests/features/...feature", fixtures =
-  [hello_world_harness: Harness])`. This expands into regular `#[test]`
-  functions that cargo-nextest discovers and runs out of the box. Tag filtering
-  happens at compile time using standard Rust attributes (e.g. `#[cfg(feature =
-  "yaml")]`), avoiding runtime tag evaluation overhead. Source:
+  proc-macros:
+  `scenarios!("tests/features/...feature", fixtures = [hello_world_harness: Harness])`.
+  This expands into regular `#[test]` functions that cargo-nextest discovers and
+  runs out of the box. Tag filtering happens at compile time using standard Rust
+  attributes (e.g. `#[cfg(feature = "yaml")]`), avoiding runtime tag evaluation
+  overhead. Source:
   `https://github.com/leynos/ortho-config/blob/main/examples/hello_world/tests/rstest_bdd/behaviour/scenarios.rs`,
   2026-11-03, primary, high confidence.
 - `[B31]` Step functions in `ortho-config` take standard `rstest` fixtures via

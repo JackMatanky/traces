@@ -1,30 +1,113 @@
 # 08: Docs & decision records
 
-**What to build:** Every behavioral decision this effort made becomes durable documentation instead of tribal knowledge: the glossary states the calendar owner, the duration regime, the interface facts, and the strictness rules; the null-ordering divergence is an ADR, not a code comment; every intentional difference from Dataview/Templater lives in one divergence register; there's one source of truth for the default date format; and all touched public items meet the rust-doc completion bar.
+**What to build:** Every behavioral decision this effort made becomes durable
+documentation instead of tribal knowledge: the glossary states the calendar
+owner, the duration regime, the interface facts, and the strictness rules; the
+null-ordering divergence is an ADR, not a code comment; every intentional
+difference from Dataview/Templater lives in one divergence register; there's one
+source of truth for the default date format; and all touched public items meet
+the rust-doc completion bar.
 
-**Blocked by:** 05, 06, 07 (glossary describes final behavior including query functions, template dialects, and remaining parity; 03/04 transitive).
+**Blocked by:** 05, 06, 07 (glossary describes final behavior including query
+functions, template dialects, and remaining parity; 03/04 transitive).
 
-Status: resolved
-**Category:** enhancement — documentation and decision records plus value-neutral constant consolidation; no user-facing defect is fixed.
+Status: resolved **Category:** enhancement — documentation and decision records
+plus value-neutral constant consolidation; no user-facing defect is fixed.
 
-Skills: `rust-doc`, `writing-for-agents`, `domain-modeling`. Rules: rust-doc completion checklist (one-sentence summaries, real `# Errors` variants, intra-doc links); ADRs via the `adrs` MCP tools start `proposed`; GLOSSARY.md entries must not use glossary *Avoid* terms as concept names. Design record: `../review.md` §7 (a–g), §9 (S13); spec stories 35–42.
+Skills: `rust-doc`, `writing-for-agents`, `domain-modeling`. Rules: rust-doc
+completion checklist (one-sentence summaries, real `# Errors` variants,
+intra-doc links); ADRs via the `adrs` MCP tools start `proposed`; GLOSSARY.md
+entries must not use glossary *Avoid* terms as concept names. Design record:
+`../review.md` §7 (a–g), §9 (S13); spec stories 35–42.
 
-- [x] GLOSSARY.md clauses (a)–(g): funnel claim incl. deserialization, calendar owner, duration regime; calendar frame = local wall clock; day/week/month/year calendar, sub-hour exact (test-backed by ticket 03's pinning test; clause text written here), date interface facts (four-digit year, `YYYY-MM`, precision layer, naive = local → UTC), single `*Avoid*` rule, registry ownership without caveat, strictness-by-seam + ISO Monday + DST policy (resolver cited to Temporal 'compatible'/RFC 5545)
-- [x] ADR: null ordering — sort: null ranks below every non-null value (current behavior, pinned by existing tests `null_sorts_below_every_non_null_key` and `auto_placement_puts_null_first_ascending_and_last_descending`); filter: null never satisfies any ordering (explicit guard, ADR supersedes the code comment) — status `proposed`
-- [x] Divergence register records (exact mirror of spec story 42): UTC instants, space-separated datetimes, magnitude-vs-calendar identity, explicit `NoteFieldType` rank, canonical duration Eq, null ordering, ISO Monday weeks, local-naive + DST, strictness-by-seam, strftime dialect, DST overlap resolves earlier (ecosystem consensus: Temporal/jiff/BigQuery; PostgreSQL resolves later — the outlier), first day of week pinned ISO Monday (elsewhere it is CLDR locale data — deliberately not followed), null ordering unique among engines (SQL engines themselves disagree: PG nulls-largest, Trino/DuckDB always-last, SQLite first), day/week/month/year calendar vs sub-hour exact (PG `1 day` ≠ `24 hours` parity), wasm `Local` caveat (chrono #1701) documented, out-of-scope Luxon features, plus the two new decisions closed 2026-10-05
-- [x] Config default-format constant removed; callers use the crate's `DEFAULT_DATETIME_FORMAT` (config const is named for a *date* but holds a datetime pattern — naming is misleading, values are identical, consolidation is value-neutral)
-- [x] Every public item touched by tickets 01–07 meets rust-doc completion (errors documented, links resolve); `mise run doc --all-features` clean with `-D warnings`
-- [x] Docs cite the prior-art research base: ../research/sql-temporal-conventions.md, ../research/general-temporal-libraries.md, ../research/rust-temporal-ecosystem.md (linked from spec and review)
-- [x] **(added 2026-10-05, §13 RPT-F3) Decide the sub-second Serialize truncation — this ticket owns the decision.** Switched to `SecondsFormat::AutoSi` (option a): preserves decimals on sub-second values, whole seconds without decimals, round-trips losslessly via `DateTimeFormat::Rfc3339`, pinned by unit test
-- [x] **(added 2026-10-05, §13 NU-1) Register wording:** an arithmetic result's `Display` is not a faithful encoding of its parts — identity stays `seconds`; `raw` is display-only per spec L90; equal-seconds values may display a spelling their `parts` won't apply (e.g. adding `0s` to `1mo` renders `"4w 2d"`).
+- [x] GLOSSARY.md clauses (a)–(g): funnel claim incl. deserialization, calendar
+      owner, duration regime; calendar frame = local wall clock;
+      day/week/month/year calendar, sub-hour exact (test-backed by ticket 03's
+      pinning test; clause text written here), date interface facts (four-digit
+      year, `YYYY-MM`, precision layer, naive = local → UTC), single `*Avoid*`
+      rule, registry ownership without caveat, strictness-by-seam + ISO Monday +
+      DST policy (resolver cited to Temporal 'compatible'/RFC 5545)
+- [x] ADR: null ordering — sort: null ranks below every non-null value (current
+      behavior, pinned by existing tests `null_sorts_below_every_non_null_key`
+      and `auto_placement_puts_null_first_ascending_and_last_descending`);
+      filter: null never satisfies any ordering (explicit guard, ADR supersedes
+      the code comment) — status `proposed`
+- [x] Divergence register records (exact mirror of spec story 42): UTC instants,
+      space-separated datetimes, magnitude-vs-calendar identity, explicit
+      `NoteFieldType` rank, canonical duration Eq, null ordering, ISO Monday
+      weeks, local-naive + DST, strictness-by-seam, strftime dialect, DST
+      overlap resolves earlier (ecosystem consensus: Temporal/jiff/BigQuery;
+      PostgreSQL resolves later — the outlier), first day of week pinned ISO
+      Monday (elsewhere it is CLDR locale data — deliberately not followed),
+      null ordering unique among engines (SQL engines themselves disagree: PG
+      nulls-largest, Trino/DuckDB always-last, SQLite first),
+      day/week/month/year calendar vs sub-hour exact (PG `1 day` ≠ `24 hours`
+      parity), wasm `Local` caveat (chrono #1701) documented, out-of-scope Luxon
+      features, plus the two new decisions closed 2026-10-05
+- [x] Config default-format constant removed; callers use the crate's
+      `DEFAULT_DATETIME_FORMAT` (config const is named for a *date* but holds a
+      datetime pattern — naming is misleading, values are identical,
+      consolidation is value-neutral)
+- [x] Every public item touched by tickets 01–07 meets rust-doc completion
+      (errors documented, links resolve); `mise run doc --all-features` clean
+      with `-D warnings`
+- [x] Docs cite the prior-art research base:
+      ../research/sql-temporal-conventions.md,
+      ../research/general-temporal-libraries.md,
+      ../research/rust-temporal-ecosystem.md (linked from spec and review)
+- [x] **(added 2026-10-05, §13 RPT-F3) Decide the sub-second Serialize
+      truncation — this ticket owns the decision.** Switched to
+      `SecondsFormat::AutoSi` (option a): preserves decimals on sub-second
+      values, whole seconds without decimals, round-trips losslessly via
+      `DateTimeFormat::Rfc3339`, pinned by unit test
+- [x] **(added 2026-10-05, §13 NU-1) Register wording:** an arithmetic result's
+      `Display` is not a faithful encoding of its parts — identity stays
+      `seconds`; `raw` is display-only per spec L90; equal-seconds values may
+      display a spelling their `parts` won't apply (e.g. adding `0s` to `1mo`
+      renders `"4w 2d"`).
 - [x] `mise run verify` green
 
-**Review amendments (2026-10-05 adversarial rust-design pass; source: `../review.md` §11):**
+**Review amendments (2026-10-05 adversarial rust-design pass; source:
+`../review.md` §11):**
 
-- [x] **(X4, decided 2026-10-05 — option (a): keep `From`).** Spec's D14 line now carries the declared exception: on zone-lookup failure the `DateValue`→`DateTimeValue` promotion degrades to the neutral UTC frame (civil date read as UTC — deterministic, shift-free) instead of surfacing `LocalZoneLookup`, because the infallible conversion serves equality/sort-key/ordering paths that cannot propagate an error, while `TryFrom` would duplicate that fallback at each of them (`Ordering::cmp` cannot propagate an error; promotion callers include filter equality `is_equal_to_date` `src/date.rs:681-683`, sort-key coercion `src/query/sort.rs:375`/`:396`, cross-type ordering `src/note/field.rs:269-272`, and the promotion call site in the engine at `src/template/engine/date.rs:230`). Recorded in divergence register; rustdoc rewritten to state spec rationale without chrono-parity defense.
-- [x] **(U1/F1, decided 2026-10-05 — option (b): list-first at the inline value seam).** Comma precedence is pinned as follows: list reading wins when `,` follows a complete atom with remaining content (`1h, 30m` → two-element list); commas keep duration-separator meaning in explicit contexts (`dur(…)` args, YAML scalars — YAML splits lists before coercion, so that path is unchanged). The register entry records exactly this split (entry number assigned when the register is written).
-- [x] **(F5, decided 2026-10-05 — doctrine record here, extraction to 09).** Record the signed-zero doctrine alongside "canonical duration Eq" in GLOSSARY/ADR (its numeric sibling): one crate-level `normalize_zero` helper owns the two raw-`f64` sites (`src/note/field.rs:468-474`, `src/query/sort.rs:445`, third consumer `src/note/field.rs:263`), while `DurationSeconds::normalized` stays (construction ≠ comparison idiom) — the duplication introduced by `21ae8b1d` is the drift risk the doctrine names. The crate-level helper extraction itself moves to ticket 09 (cleanup lane); this ticket writes only the record.
-- [x] **(F2, decided 2026-10-05 — sync doctrine/doc record here, derived test to 04).** Document the `UNIT_HINT`↔`UNIT_MAP` sync contract where the doctrine belongs (alongside the `unknown_unit_error` claim it backs: every hint spelling resolves against `UNIT_MAP`, every `UNIT_MAP` family is hinted — prose at `src/duration.rs:39-46`, claim at `src/template/engine/date.rs:756-758`). The derived executable test asserting that contract lives in ticket 04 (parse-ownership lane, next to the merges); this ticket records the doctrine and the test's home, one line, and does not write the test.
+- [x] **(X4, decided 2026-10-05 — option (a): keep `From`).** Spec's D14 line
+      now carries the declared exception: on zone-lookup failure the
+      `DateValue`→`DateTimeValue` promotion degrades to the neutral UTC frame
+      (civil date read as UTC — deterministic, shift-free) instead of surfacing
+      `LocalZoneLookup`, because the infallible conversion serves
+      equality/sort-key/ordering paths that cannot propagate an error, while
+      `TryFrom` would duplicate that fallback at each of them (`Ordering::cmp`
+      cannot propagate an error; promotion callers include filter equality
+      `is_equal_to_date` `src/date.rs:681-683`, sort-key coercion
+      `src/query/sort.rs:375`/`:396`, cross-type ordering
+      `src/note/field.rs:269-272`, and the promotion call site in the engine at
+      `src/template/engine/date.rs:230`). Recorded in divergence register;
+      rustdoc rewritten to state spec rationale without chrono-parity defense.
+- [x] **(U1/F1, decided 2026-10-05 — option (b): list-first at the inline value
+      seam).** Comma precedence is pinned as follows: list reading wins when `,`
+      follows a complete atom with remaining content (`1h, 30m` → two-element
+      list); commas keep duration-separator meaning in explicit contexts
+      (`dur(…)` args, YAML scalars — YAML splits lists before coercion, so that
+      path is unchanged). The register entry records exactly this split (entry
+      number assigned when the register is written).
+- [x] **(F5, decided 2026-10-05 — doctrine record here, extraction to 09).**
+      Record the signed-zero doctrine alongside "canonical duration Eq" in
+      GLOSSARY/ADR (its numeric sibling): one crate-level `normalize_zero`
+      helper owns the two raw-`f64` sites (`src/note/field.rs:468-474`,
+      `src/query/sort.rs:445`, third consumer `src/note/field.rs:263`), while
+      `DurationSeconds::normalized` stays (construction ≠ comparison idiom) —
+      the duplication introduced by `21ae8b1d` is the drift risk the doctrine
+      names. The crate-level helper extraction itself moves to ticket 09
+      (cleanup lane); this ticket writes only the record.
+- [x] **(F2, decided 2026-10-05 — sync doctrine/doc record here, derived test to
+      04).** Document the `UNIT_HINT`↔`UNIT_MAP` sync contract where the
+      doctrine belongs (alongside the `unknown_unit_error` claim it backs: every
+      hint spelling resolves against `UNIT_MAP`, every `UNIT_MAP` family is
+      hinted — prose at `src/duration.rs:39-46`, claim at
+      `src/template/engine/date.rs:756-758`). The derived executable test
+      asserting that contract lives in ticket 04 (parse-ownership lane, next to
+      the merges); this ticket records the doctrine and the test's home, one
+      line, and does not write the test.
 
 ## Comments
 
@@ -34,71 +117,208 @@ Skills: `rust-doc`, `writing-for-agents`, `domain-modeling`. Rules: rust-doc com
 
 **What we've established so far:**
 
-- Category `enhancement`, state `needs-info` — two OPEN DECISIONs gate content this ticket must *write* (X4 changes glossary/register/rustdoc text; U1 pins behavior and may add tests), so `ready-for-agent` did not hold (ticket 04 precedent: maintainer closed all four of its questions before its brief was written).
-- Claims verified at current HEAD: both null-sorting tests exist at the cited locations; `DEFAULT_DATETIME_FORMAT` (core) and the config's `DEFAULT_DATE_FORMAT` hold identical datetime patterns (a third const in core holds a date-only pattern); `normalize_zero` is byte-identical at both cited sites with a third consumer, introduced by `21ae8b1d`; all X4 citations confirmed (`unwrap_or_else` UTC-midnight fallback, equality caller, sort-key and field-ordering promotion sites); `UNIT_HINT` has no test.
-- Redundancy check: no divergence register file exists; no null-ordering ADR exists (8 ADRs, none related — the code comment it would supersede is live); `src/GLOSSARY.md` lacks the calendar-owner/duration-regime/strictness/Avoid/registry clauses.
-- Prior rejection: no `.out-of-scope/` directory exists — not a previously rejected request.
-- Comma-outcome trace (U1) remains PREDICTED, unexecuted — the probe still needs running whichever way you rule.
+- Category `enhancement`, state `needs-info` — two OPEN DECISIONs gate content
+  this ticket must *write* (X4 changes glossary/register/rustdoc text; U1 pins
+  behavior and may add tests), so `ready-for-agent` did not hold (ticket 04
+  precedent: maintainer closed all four of its questions before its brief was
+  written).
+- Claims verified at current HEAD: both null-sorting tests exist at the cited
+  locations; `DEFAULT_DATETIME_FORMAT` (core) and the config's
+  `DEFAULT_DATE_FORMAT` hold identical datetime patterns (a third const in core
+  holds a date-only pattern); `normalize_zero` is byte-identical at both cited
+  sites with a third consumer, introduced by `21ae8b1d`; all X4 citations
+  confirmed (`unwrap_or_else` UTC-midnight fallback, equality caller, sort-key
+  and field-ordering promotion sites); `UNIT_HINT` has no test.
+- Redundancy check: no divergence register file exists; no null-ordering ADR
+  exists (8 ADRs, none related — the code comment it would supersede is live);
+  `src/GLOSSARY.md` lacks the
+  calendar-owner/duration-regime/strictness/Avoid/registry clauses.
+- Prior rejection: no `.out-of-scope/` directory exists — not a previously
+  rejected request.
+- Comma-outcome trace (U1) remains PREDICTED, unexecuted — the probe still needs
+  running whichever way you rule.
 
 **What we still need from you (@maintainer):**
 
-- **X4 (gates)** — `From<DateValue> for DateTimeValue` UTC-midnight fallback: (a) keep `From`, register the fallback as a divergence entry, amend the rustdoc (this ticket leans (a): `Ordering::cmp` cannot propagate an error and the promotion has three more callers), or (b) `TryFrom` refactor (knowing sort/field comparison sites force a declared fallback or a rank-comparison rework). Also pin the entry number: this ticket says **#17**, spec/review mostly say **#18**.
-- **U1/F1 (gates)** — pin `,` precedence: (a) duration-wins — pin the five traced outcomes with tests + register entry, or (b) list-first when `,` follows a complete atom (note-parser precedence change). And: do any test changes ride in this ticket, or hand back to 04?
-- **F5 (housekeeping)** — `normalize_zero` helper extraction home: 08 (breaks the docs-only lane), 09 (cleanup lane), or leave as a tracked candidate? (The doctrine *record* is this ticket's either way.)
-- **F2 (housekeeping)** — `UNIT_HINT`↔`UNIT_MAP` sync test home: 04, 08, or 09? One line in whichever ticket picks it up.
+- **X4 (gates)** — `From<DateValue> for DateTimeValue` UTC-midnight fallback:
+  (a) keep `From`, register the fallback as a divergence entry, amend the
+  rustdoc (this ticket leans (a): `Ordering::cmp` cannot propagate an error and
+  the promotion has three more callers), or (b) `TryFrom` refactor (knowing
+  sort/field comparison sites force a declared fallback or a rank-comparison
+  rework). Also pin the entry number: this ticket says **#17**, spec/review
+  mostly say **#18**.
+- **U1/F1 (gates)** — pin `,` precedence: (a) duration-wins — pin the five
+  traced outcomes with tests + register entry, or (b) list-first when `,`
+  follows a complete atom (note-parser precedence change). And: do any test
+  changes ride in this ticket, or hand back to 04?
+- **F5 (housekeeping)** — `normalize_zero` helper extraction home: 08 (breaks
+  the docs-only lane), 09 (cleanup lane), or leave as a tracked candidate? (The
+  doctrine *record* is this ticket's either way.)
+- **F2 (housekeeping)** — `UNIT_HINT`↔`UNIT_MAP` sync test home: 04, 08, or 09?
+  One line in whichever ticket picks it up.
 
 > *This was generated by AI during triage.*
 
 **2026-10-05 (decisions — maintainer):**
 
-1. **X4 → option (a): keep `From`.** Spec D14 now carries the **declared exception** — quoting the decided spec line: keep `From`, "with a **declared exception** to the sentence above: on zone-lookup failure this promotion degrades to the neutral UTC frame (the civil date read as UTC — deterministic and shift-free) instead of surfacing `LocalZoneLookup`, because the infallible conversion is consumed by equality, sort-key, and ordering paths that cannot propagate an error, while `TryFrom` would duplicate the same fallback at each of them." This ticket therefore delivers (i) a divergence-register entry — **entry number assigned when the register is written**; stop hardcoding `#17`/`#18` anywhere (the triage question's "#17 vs #18" pin is void: every cite becomes "number assigned at write") — and (ii) a rustdoc rewrite on the impl stating THAT spec rationale, replacing the "chrono does the same" parity argument (which spec explicitly does not accept). Every other path still surfaces `LocalZoneLookup`. This answers the X4 notes question; no `TryFrom` refactor.
-2. **U1 → option (b): list-first at the inline value seam.** The register entry records: list reading wins when `,` follows a complete atom (`1h, 30m` → two-element list); commas keep duration-separator meaning in explicit contexts (`dur(…)` args, YAML scalars). **The five outcome pins are owned by ticket 04** — they ride its inline-seam edit (the precedence change and its asserts land together there). This ticket RECORDS the entry (number assigned at write) and does not claim the asserts. This answers the U1 notes question, including "does any test change ride here": no — hand back to 04.
-3. **F5/U5 extraction → ticket 09.** This ticket keeps only the doctrine record (signed-zero alongside "canonical duration Eq": one crate-level `normalize_zero` helper for the raw-`f64` comparison sites, `DurationSeconds::normalized` retained); the helper extraction moves to 09's cleanup lane. This answers the F5 notes question.
-4. **F2/U2 executable test → ticket 04.** This ticket keeps only the sync doctrine/documentation record (every hint spelling resolves against `UNIT_MAP`, every `UNIT_MAP` family is hinted); the derived `UNIT_MAP`↔`UNIT_HINT` test lives in 04's parse-ownership lane. This answers the F2 notes question.
+1. **X4 → option (a): keep `From`.** Spec D14 now carries the
+   **declared exception** — quoting the decided spec line: keep `From`, "with a
+   **declared exception** to the sentence above: on zone-lookup failure this
+   promotion degrades to the neutral UTC frame (the civil date read as UTC —
+   deterministic and shift-free) instead of surfacing `LocalZoneLookup`, because
+   the infallible conversion is consumed by equality, sort-key, and ordering
+   paths that cannot propagate an error, while `TryFrom` would duplicate the
+   same fallback at each of them." This ticket therefore delivers (i) a
+   divergence-register entry —
+   **entry number assigned when the register is written**; stop hardcoding
+   `#17`/`#18` anywhere (the triage question's "#17 vs #18" pin is void: every
+   cite becomes "number assigned at write") — and (ii) a rustdoc rewrite on the
+   impl stating THAT spec rationale, replacing the "chrono does the same" parity
+   argument (which spec explicitly does not accept). Every other path still
+   surfaces `LocalZoneLookup`. This answers the X4 notes question; no `TryFrom`
+   refactor.
+2. **U1 → option (b): list-first at the inline value seam.** The register entry
+   records: list reading wins when `,` follows a complete atom (`1h, 30m` →
+   two-element list); commas keep duration-separator meaning in explicit
+   contexts (`dur(…)` args, YAML scalars).
+   **The five outcome pins are owned by ticket 04** — they ride its inline-seam
+   edit (the precedence change and its asserts land together there). This ticket
+   RECORDS the entry (number assigned at write) and does not claim the asserts.
+   This answers the U1 notes question, including "does any test change ride
+   here": no — hand back to 04.
+3. **F5/U5 extraction → ticket 09.** This ticket keeps only the doctrine record
+   (signed-zero alongside "canonical duration Eq": one crate-level
+   `normalize_zero` helper for the raw-`f64` comparison sites,
+   `DurationSeconds::normalized` retained); the helper extraction moves to 09's
+   cleanup lane. This answers the F5 notes question.
+4. **F2/U2 executable test → ticket 04.** This ticket keeps only the sync
+   doctrine/documentation record (every hint spelling resolves against
+   `UNIT_MAP`, every `UNIT_MAP` family is hinted); the derived
+   `UNIT_MAP`↔`UNIT_HINT` test lives in 04's parse-ownership lane. This answers
+   the F2 notes question.
 
 > *This was generated by AI during triage.*
 
 ## Agent Brief
 
-**Category:** enhancement
-**Summary:** Turn every behavioral decision of this effort into durable documentation — glossary clauses, a null-ordering ADR, a divergence register that now includes the four decisions closed 2026-10-05, one source of truth for the default datetime format, the two doctrine records handed to this ticket, and rust-doc-completion on all touched public items.
+**Category:** enhancement **Summary:** Turn every behavioral decision of this
+effort into durable documentation — glossary clauses, a null-ordering ADR, a
+divergence register that now includes the four decisions closed 2026-10-05, one
+source of truth for the default datetime format, the two doctrine records handed
+to this ticket, and rust-doc-completion on all touched public items.
 
-**Current behavior:**
-The decisions live in the spec, the review, and tribal memory. The module GLOSSARY has no calendar-owner, duration-regime, strictness, or *Avoid* clauses; there is no ADR for null ordering (the behavior is pinned only by tests and a code comment); there is no divergence register at all, so intentional differences from Dataview/Templater/SQL engines and the two 2026-10-05 decisions (the `DateValue`→`DateTimeValue` promotion's neutral-UTC-frame exception, and list-first comma precedence at the inline seam) have nowhere to live; the config module carries a default-format constant named for a date that holds a datetime pattern, duplicating the crate constant; the signed-zero policy exists as a byte-identical duplicated helper with no written doctrine; the unit-hint/unit-map sync contract is prose-only; and the `From<DateValue> for DateTimeValue` impl documents a chrono-parity argument that the spec explicitly rejects.
+**Current behavior:** The decisions live in the spec, the review, and tribal
+memory. The module GLOSSARY has no calendar-owner, duration-regime, strictness,
+or *Avoid* clauses; there is no ADR for null ordering (the behavior is pinned
+only by tests and a code comment); there is no divergence register at all, so
+intentional differences from Dataview/Templater/SQL engines and the two
+2026-10-05 decisions (the `DateValue`→`DateTimeValue` promotion's
+neutral-UTC-frame exception, and list-first comma precedence at the inline seam)
+have nowhere to live; the config module carries a default-format constant named
+for a date that holds a datetime pattern, duplicating the crate constant; the
+signed-zero policy exists as a byte-identical duplicated helper with no written
+doctrine; the unit-hint/unit-map sync contract is prose-only; and the
+`From<DateValue> for DateTimeValue` impl documents a chrono-parity argument that
+the spec explicitly rejects.
 
 **Desired behavior:**
-- The module GLOSSARY states, as clauses: the funnel claim (incl. deserialization), the calendar owner, the duration regime, calendar frame = local wall clock, the day/week/month/year calendar vs sub-hour exact split, the date interface facts (four-digit year, `YYYY-MM`, precision layer, naive = local → UTC), a single *Avoid* rule, registry ownership without caveat, and strictness-by-seam + ISO Monday + DST policy (resolver cited to Temporal `'compatible'`/RFC 5545). Clause text is written here even where a ticket-03 test provides the backing pin.
-- A null-ordering ADR exists, status `proposed`: null ranks below every non-null value in sort; null never satisfies any ordering in filter; it supersedes the code comment.
-- A divergence register exists as the single home for every intentional engine difference (the spec-story-42 mirror list), **plus** two new entries whose numbers are assigned when the register is written: (i) the `From<DateValue> for DateTimeValue` zone-lookup fallback to the neutral UTC frame, recorded as an accepted divergence under spec D14's declared exception; (ii) list-first comma precedence at the inline value seam — list reading wins when `,` follows a complete atom, duration-separator meaning retained in explicit contexts (`dur(…)` args, YAML scalars).
-- The signed-zero doctrine and the `UNIT_HINT`↔`UNIT_MAP` sync doctrine are recorded in the docs (this ticket's share of F5/F2); their code counterparts (helper extraction, derived test) are explicitly other tickets' work.
-- The `From<DateValue> for DateTimeValue` rustdoc states the spec rationale — neutral UTC frame, because the infallible conversion serves equality/sort-key/ordering paths that cannot propagate an error, with every other path still surfacing `LocalZoneLookup` — and contains no chrono-parity argument.
-- Config callers use the crate's `DEFAULT_DATETIME_FORMAT`; the misleadingly named config constant is gone (value-neutral).
-- Every public item touched by tickets 01–07 meets the rust-doc completion bar (one-sentence summaries, real `# Errors` variants, resolving intra-doc links), docs cite the prior-art research base, and `mise run doc --all-features` is clean with `-D warnings`.
+
+- The module GLOSSARY states, as clauses: the funnel claim (incl.
+  deserialization), the calendar owner, the duration regime, calendar frame =
+  local wall clock, the day/week/month/year calendar vs sub-hour exact split,
+  the date interface facts (four-digit year, `YYYY-MM`, precision layer, naive =
+  local → UTC), a single *Avoid* rule, registry ownership without caveat, and
+  strictness-by-seam + ISO Monday + DST policy (resolver cited to Temporal
+  `'compatible'`/RFC 5545). Clause text is written here even where a ticket-03
+  test provides the backing pin.
+- A null-ordering ADR exists, status `proposed`: null ranks below every non-null
+  value in sort; null never satisfies any ordering in filter; it supersedes the
+  code comment.
+- A divergence register exists as the single home for every intentional engine
+  difference (the spec-story-42 mirror list), **plus** two new entries whose
+  numbers are assigned when the register is written: (i) the
+  `From<DateValue> for DateTimeValue` zone-lookup fallback to the neutral UTC
+  frame, recorded as an accepted divergence under spec D14's declared exception;
+  (ii) list-first comma precedence at the inline value seam — list reading wins
+  when `,` follows a complete atom, duration-separator meaning retained in
+  explicit contexts (`dur(…)` args, YAML scalars).
+- The signed-zero doctrine and the `UNIT_HINT`↔`UNIT_MAP` sync doctrine are
+  recorded in the docs (this ticket's share of F5/F2); their code counterparts
+  (helper extraction, derived test) are explicitly other tickets' work.
+- The `From<DateValue> for DateTimeValue` rustdoc states the spec rationale —
+  neutral UTC frame, because the infallible conversion serves
+  equality/sort-key/ordering paths that cannot propagate an error, with every
+  other path still surfacing `LocalZoneLookup` — and contains no chrono-parity
+  argument.
+- Config callers use the crate's `DEFAULT_DATETIME_FORMAT`; the misleadingly
+  named config constant is gone (value-neutral).
+- Every public item touched by tickets 01–07 meets the rust-doc completion bar
+  (one-sentence summaries, real `# Errors` variants, resolving intra-doc links),
+  docs cite the prior-art research base, and `mise run doc --all-features` is
+  clean with `-D warnings`.
 
 **Key interfaces:**
-- Divergence register (new document): entry format must accommodate an accepted-divergence record with rationale and spec citation; entry numbers come from the register's own sequencing at write time — no number may be pre-assigned in any ticket, checklist, or brief
-- `From<DateValue> for DateTimeValue`: no signature change (option (a) — `TryFrom` rejected); rustdoc text changes only
-- `DateError::LocalZoneLookup`: unchanged; still what every non-promotion path returns
+
+- Divergence register (new document): entry format must accommodate an
+  accepted-divergence record with rationale and spec citation; entry numbers
+  come from the register's own sequencing at write time — no number may be
+  pre-assigned in any ticket, checklist, or brief
+- `From<DateValue> for DateTimeValue`: no signature change (option (a) —
+  `TryFrom` rejected); rustdoc text changes only
+- `DateError::LocalZoneLookup`: unchanged; still what every non-promotion path
+  returns
 - GLOSSARY.md clauses (a)–(g): concept names must not use glossary *Avoid* terms
-- Null-ordering ADR: created via the `adrs` MCP tools with initial status `proposed` (human acceptance required), linked with `link_adrs` where it relates to other records
+- Null-ordering ADR: created via the `adrs` MCP tools with initial status
+  `proposed` (human acceptance required), linked with `link_adrs` where it
+  relates to other records
 - `DEFAULT_DATETIME_FORMAT`: the one constant; config's duplicate removed
-- Doctrine records: signed-zero (one crate-level helper for raw-`f64` comparison sites; `DurationSeconds::normalized` retained) and unit-map sync (every hint spelling resolves; every family hinted)
+- Doctrine records: signed-zero (one crate-level helper for raw-`f64` comparison
+  sites; `DurationSeconds::normalized` retained) and unit-map sync (every hint
+  spelling resolves; every family hinted)
 
 **Acceptance criteria:**
-- [x] The divergence register exists and contains the spec-story-42 mirror list plus an entry for the `From<DateValue> for DateTimeValue` fallback to the neutral UTC frame, cited to spec D14's declared exception, whose entry number is whatever the register assigns at write time
-- [x] The divergence register contains the comma-precedence entry in list-first wording (list reading wins when `,` follows a complete atom such as `1h, 30m` → two-element list; duration-separator meaning retained in explicit `dur(…)` and YAML-scalar contexts), entry number assigned at write time
-- [x] The signed-zero doctrine is recorded alongside canonical duration Eq (one crate-level helper for the raw-`f64` comparison sites; `DurationSeconds::normalized` retained as the construction idiom), naming ticket 09 as the extraction home
-- [x] The unit-spelling sync doctrine is recorded (every hint spelling resolves against `UNIT_MAP`, every `UNIT_MAP` family is hinted), naming ticket 04 as the derived test's home
-- [x] The `From<DateValue> for DateTimeValue` impl's rustdoc states the spec rationale — neutral UTC frame on zone-lookup failure, because infallible equality/sort-key/ordering paths cannot propagate an error, all other paths still surface `LocalZoneLookup` — and the "chrono does the same" parity argument is gone
-- [x] No divergence-register number (`#17`, `#18`, or any other pre-assigned number) appears in any deliverable of this ticket; every register-number reference reads "number assigned at write"
-- [x] GLOSSARY clauses (a)–(g) all present, with no glossary *Avoid* term used as a concept name
-- [x] The null-ordering ADR exists with status `proposed`, covering both sort rank and filter non-satisfaction
-- [x] Config's misleadingly named default-format constant is removed; callers use `DEFAULT_DATETIME_FORMAT`, with identical rendered values before and after
-- [x] `mise run doc --all-features` clean with `-D warnings`, `mise run verify` green, and every checklist item in this ticket's body is checked
+
+- [x] The divergence register exists and contains the spec-story-42 mirror list
+      plus an entry for the `From<DateValue> for DateTimeValue` fallback to the
+      neutral UTC frame, cited to spec D14's declared exception, whose entry
+      number is whatever the register assigns at write time
+- [x] The divergence register contains the comma-precedence entry in list-first
+      wording (list reading wins when `,` follows a complete atom such as
+      `1h, 30m` → two-element list; duration-separator meaning retained in
+      explicit `dur(…)` and YAML-scalar contexts), entry number assigned at
+      write time
+- [x] The signed-zero doctrine is recorded alongside canonical duration Eq (one
+      crate-level helper for the raw-`f64` comparison sites;
+      `DurationSeconds::normalized` retained as the construction idiom), naming
+      ticket 09 as the extraction home
+- [x] The unit-spelling sync doctrine is recorded (every hint spelling resolves
+      against `UNIT_MAP`, every `UNIT_MAP` family is hinted), naming ticket 04
+      as the derived test's home
+- [x] The `From<DateValue> for DateTimeValue` impl's rustdoc states the spec
+      rationale — neutral UTC frame on zone-lookup failure, because infallible
+      equality/sort-key/ordering paths cannot propagate an error, all other
+      paths still surface `LocalZoneLookup` — and the "chrono does the same"
+      parity argument is gone
+- [x] No divergence-register number (`#17`, `#18`, or any other pre-assigned
+      number) appears in any deliverable of this ticket; every register-number
+      reference reads "number assigned at write"
+- [x] GLOSSARY clauses (a)–(g) all present, with no glossary *Avoid* term used
+      as a concept name
+- [x] The null-ordering ADR exists with status `proposed`, covering both sort
+      rank and filter non-satisfaction
+- [x] Config's misleadingly named default-format constant is removed; callers
+      use `DEFAULT_DATETIME_FORMAT`, with identical rendered values before and
+      after
+- [x] `mise run doc --all-features` clean with `-D warnings`, `mise run verify`
+      green, and every checklist item in this ticket's body is checked
 
 **Out of scope:**
-- Writing the five comma-outcome asserts (ticket 04 — they ride its inline-seam edit, which also implements the list-first precedence change)
+
+- Writing the five comma-outcome asserts (ticket 04 — they ride its inline-seam
+  edit, which also implements the list-first precedence change)
 - Extracting the crate-level `normalize_zero` helper (ticket 09)
 - The derived `UNIT_MAP`↔`UNIT_HINT` executable test (ticket 04)
-- Engine behavior changes (ticket 06) and any other code change beyond the value-neutral constant consolidation and the rustdoc rewrite named above
-- Accepting the ADR (human status transition from `proposed`); query functions (05), template dialects (06), shorthands/`parse_with` (07)
+- Engine behavior changes (ticket 06) and any other code change beyond the
+  value-neutral constant consolidation and the rustdoc rewrite named above
+- Accepting the ADR (human status transition from `proposed`); query functions
+  (05), template dialects (06), shorthands/`parse_with` (07)

@@ -2,8 +2,8 @@
 
 This note supports the grilling of
 `issues/24-index-read-model-and-query-execution.md`. It lists the stores that
-the comparison measures. It says how a user of each store would lay out the data.
-A fair comparison needs this. A SQL store with a key-value layout, or a
+the comparison measures. It says how a user of each store would lay out the
+data. A fair comparison needs this. A SQL store with a key-value layout, or a
 key-value store with a SQL layout, shows the layout, not the engine.
 
 Tags: [V] verified in a source or a run. [H] hypothesis.
@@ -118,8 +118,8 @@ store-side pruning.
    facet bytes. The facet bytes come from the real parser and postcard.
 2. Every store answers the same pipelines and returns the same row set. The
    probe checks the row counts against the redb result.
-3. A store uses its native strengths. SQL stores filter in SQL with indexes. Key-value
-   stores use ranges and point reads. The snapshot filters in memory.
+3. A store uses its native strengths. SQL stores filter in SQL with indexes.
+   Key-value stores use ranges and point reads. The snapshot filters in memory.
 4. The time includes opening the store, the query and a sort of the result. It
    does not include process start.
 5. Each run is a new process. The first run after a build is discarded.

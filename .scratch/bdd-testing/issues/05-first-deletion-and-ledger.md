@@ -1,8 +1,11 @@
 # 05: First deletion with proof and ledger
 
-**What to build:** The first old Rust test is deleted with the full proof of spec section 7, and the migration ledger starts. Read spec sections 7 and 9.4 (commit 2).
+**What to build:** The first old Rust test is deleted with the full proof of
+spec section 7, and the migration ledger starts. Read spec sections 7 and 9.4
+(commit 2).
 
-**Current state:** The old untrust test and S2 both guard the guarantee. No ledger exists.
+**Current state:** The old untrust test and S2 both guard the guarantee. No
+ledger exists.
 
 **Spec:** `.scratch/bdd-testing/spec.md`
 
@@ -12,15 +15,22 @@
 
 **Status:** done
 
-- [x] The kill demonstration is recorded: make `untrust` keep the grant, and the old test and S2 both fail.
-- [x] The relative mutation compare on the trust module is run before and after the deletion in the background. Both escape sets are in the ledger. No new escape appears. The mutation baseline file is untouched.
+- [x] The kill demonstration is recorded: make `untrust` keep the grant, and the
+      old test and S2 both fail.
+- [x] The relative mutation compare on the trust module is run before and after
+      the deletion in the background. Both escape sets are in the ledger. No new
+      escape appears. The mutation baseline file is untouched.
 - [x] The twin test is re-read and recorded.
-- [x] The old untrust test is deleted and the nextest name list before and after shows exactly that name removed.
-- [x] The ledger has its first section and one complete row, as spec section 7 defines it.
-- [x] A `mutarust` probe on a test-only diff is recorded, and the result is labelled as evidence.
+- [x] The old untrust test is deleted and the nextest name list before and after
+      shows exactly that name removed.
+- [x] The ledger has its first section and one complete row, as spec section 7
+      defines it.
+- [x] A `mutarust` probe on a test-only diff is recorded, and the result is
+      labelled as evidence.
 - [x] `mise run verify` passes.
 
 **Out of scope:**
+
 - Other test deletions.
 - A change to the mutation baseline file.
 - Mutation runs with a diff or per-test mode.

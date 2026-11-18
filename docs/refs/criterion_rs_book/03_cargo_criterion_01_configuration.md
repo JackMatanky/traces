@@ -1,7 +1,7 @@
 # Configuring cargo-criterion
 
-cargo-criterion can be configured by placing a `Criterion.toml` file in your crate, alongside your
-`Cargo.toml`.
+cargo-criterion can be configured by placing a `Criterion.toml` file in your
+crate, alongside your `Cargo.toml`.
 
 The available settings are documented below:
 

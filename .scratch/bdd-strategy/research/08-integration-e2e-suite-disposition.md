@@ -59,7 +59,8 @@ It does not adopt their per-test classification.
 
 ### Canonical runner phases and filtersets
 
-The script `.mise/tasks/test/_default:98-122` coordinates four canonical phases. Each phase passes `--no-tests fail` (`_default:81`):
+The script `.mise/tasks/test/_default:98-122` coordinates four canonical phases.
+Each phase passes `--no-tests fail` (`_default:81`):
 
 1. **Unit**: `cargo nextest run -p traces --no-default-features --lib --bin
    traces` (`_default:99`)

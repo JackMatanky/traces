@@ -117,9 +117,10 @@ Options per boundary:
 
 ### Template inspection and DryRun
 
-Evidence: inspection accepts absolute paths (`src/template/engine/path.rs:161-170`)
-[V]; the writer confines through `SafeRelativePath` (`src/template/writer.rs:303-336`)
-[V]; survey H4 counters that external tool checks are legitimate [V].
+Evidence: inspection accepts absolute paths
+(`src/template/engine/path.rs:161-170`) [V]; the writer confines through
+`SafeRelativePath` (`src/template/writer.rs:303-336`) [V]; survey H4 counters
+that external tool checks are legitimate [V].
 
 Options:
 

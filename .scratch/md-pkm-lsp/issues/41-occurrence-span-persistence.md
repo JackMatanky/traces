@@ -96,8 +96,8 @@ follow-up ticket once this decides) and md-pkm-lsp ticket 11 §1/§8.
 
 - (amended 2026-10-21 by iwe research) iwe's rebuild-every-start (~958ms @ 20k
   docs, indexed load) corroborates that a markdown graph rebuild is cheap. Its
-  raw-markdown `ServerParams.state` handoff corroborates that content handoff beats
-  serialized indexes ([tool-iwe](../research/tool-iwe.md) Part 3, Part 4).
+  raw-markdown `ServerParams.state` handoff corroborates that content handoff
+  beats serialized indexes ([tool-iwe](../research/tool-iwe.md) Part 3, Part 4).
 
 ## Input from 27 (2026-10-22)
 

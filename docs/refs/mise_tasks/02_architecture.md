@@ -144,7 +144,8 @@ When you run `mise run build`, mise:
 
 ### Task Resolution Across Directories
 
-Tasks from parent directories are available in subdirectories and can be overridden:
+Tasks from parent directories are available in subdirectories and can be
+overridden:
 
 ```text
 project/
@@ -285,7 +286,9 @@ Solution: Define the missing task or remove the dependency.
 **Slow Parallel Execution**:
 
 - Check if tasks have unnecessary dependencies
-- Use `mise tasks deps` to verify the declared dependency graph (`depends`, `wait_for`, `depends_post`)
+- Use `mise tasks deps` to verify the declared dependency graph (`depends`,
+  `wait_for`, `depends_post`)
 - Consider increasing `--jobs` if you have CPU cores available
 
-The task architecture is designed to scale from simple single-task projects to complex multi-service applications with intricate build dependencies.
+The task architecture is designed to scale from simple single-task projects to
+complex multi-service applications with intricate build dependencies.

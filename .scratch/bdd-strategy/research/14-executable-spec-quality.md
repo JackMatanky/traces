@@ -1,6 +1,10 @@
 # Research 14: Executable Specification Quality and Maintenance
 
-Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+Layout note (2026-11-05): this record is older than the move of the scenarios to
+`tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read
+`mod steps` and `tests/features/steps/`. Where it names a flat feature file,
+read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is
+current.
 
 This document supports [ticket 14](../issues/14-adoption-roadmap.md). It
 collects evidence on how to write high-quality Gherkin feature files and step
@@ -118,9 +122,10 @@ each source text directly.
   2026-11-03, Type: secondary, Confidence: high): Every scenario must cover
   exactly one behavior. Multiple `When`-`Then` pairs in a scenario indicate
   combined behaviors that require splitting.
-- `[F5]` (Source: <http://www.thinkcode.se/blog/2016/06/22/cucumber-antipatterns>,
-  Date: 2026-11-03, Type: primary interview, Confidence: high): A scenario title
-  must summarize the business rule under test. Authors should apply the "Friends
+- `[F5]` (Source:
+  <http://www.thinkcode.se/blog/2016/06/22/cucumber-antipatterns>, Date:
+  2026-11-03, Type: primary interview, Confidence: high): A scenario title must
+  summarize the business rule under test. Authors should apply the "Friends
   episode" naming convention: "This is the one where...". Titles listing
   procedural actions obscure intent.
 - `[F6]` (Source: Cyrille Martraire, "Living Documentation", 2019, Date:
@@ -131,16 +136,16 @@ each source text directly.
 
 ### 3.2 Gherkin Syntax and Anti-Patterns
 
-- `[F7]` (Source: <https://cucumber.io/docs/gherkin/reference/>, Date: 2026-11-03,
-  Type: primary, Confidence: high): `Background` moves repeated `Given` setup
-  out of individual scenarios. Official guidance limits `Background` to 1 to 4
-  lines of truly common context. Large backgrounds hide test preconditions and
-  recreate the "General Fixture" smell.
-- `[F8]` (Source: <https://cucumber.io/docs/gherkin/reference/>, Date: 2026-11-03,
-  Type: primary, Confidence: high): `Rule` (introduced in Gherkin v6) groups
-  scenarios under explicit business rules. *Contradiction with this repository*:
-  Ticket 11 banned `Rule:`. `rstest-bdd` 0.6.0 does not generate tests for
-  `Rule:` blocks under the `scenarios!` macro.
+- `[F7]` (Source: <https://cucumber.io/docs/gherkin/reference/>, Date:
+  2026-11-03, Type: primary, Confidence: high): `Background` moves repeated
+  `Given` setup out of individual scenarios. Official guidance limits
+  `Background` to 1 to 4 lines of truly common context. Large backgrounds hide
+  test preconditions and recreate the "General Fixture" smell.
+- `[F8]` (Source: <https://cucumber.io/docs/gherkin/reference/>, Date:
+  2026-11-03, Type: primary, Confidence: high): `Rule` (introduced in Gherkin
+  v6) groups scenarios under explicit business rules.
+  *Contradiction with this repository*: Ticket 11 banned `Rule:`. `rstest-bdd`
+  0.6.0 does not generate tests for `Rule:` blocks under the `scenarios!` macro.
 - `[F9]` (Source: <https://cucumber.io/docs/guides/anti-patterns/>, Date:
   2026-11-03, Type: primary, Confidence: high): "Feature-coupled step
   definitions" is a major anti-pattern. Step definitions must bind to domain
@@ -197,11 +202,11 @@ each source text directly.
   blocking I/O, < 1 minute, typically < 100ms), Medium (single host, localhost
   network/processes, < 5 minutes), Large (multi-host or system-level,
   unconstrained).
-- `[F19]` (Source: `.scratch/bdd-strategy/map.md` lines 97-124, Date: 2026-11-03,
-  Type: primary, Confidence: high): Ticket 07 and 08 place scenarios in the e2e
-  binary (`tests/e2e.rs`). Scenarios spawn the compiled CLI binary in a
-  temporary sandbox. Under Google classification, these tests are "Medium" size
-  (multi-process, single machine, disk I/O). Measured budget: an isolated
+- `[F19]` (Source: `.scratch/bdd-strategy/map.md` lines 97-124, Date:
+  2026-11-03, Type: primary, Confidence: high): Ticket 07 and 08 place scenarios
+  in the e2e binary (`tests/e2e.rs`). Scenarios spawn the compiled CLI binary in
+  a temporary sandbox. Under Google classification, these tests are "Medium"
+  size (multi-process, single machine, disk I/O). Measured budget: an isolated
   scenario running the compiled binary should finish within 200ms to 1000ms.
 
 ### 3.6 Mutation Testing

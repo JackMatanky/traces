@@ -72,9 +72,9 @@ already known defaults.
 
 `expression/context-nil` accepts `Some(value)`, `Option::Some(value)`, and the
 fully qualified `::core` or `::std` form when one of these expressions is a
-direct function or method argument. It uses `::core::option::Option::None`. It does not
-change an indirect option value, an existing `None`, or an unqualified name
-that a local item shadows. A replacement that Cargo cannot type-check is
+direct function or method argument. It uses `::core::option::Option::None`. It
+does not change an indirect option value, an existing `None`, or an unqualified
+name that a local item shadows. A replacement that Cargo cannot type-check is
 `Skipped` before tests run. For a custom test command, Mutarust runs a candidate
 only when a concrete local function parameter proves the option type. It marks
 other candidates `Skipped` because the custom command selects its own compiler.

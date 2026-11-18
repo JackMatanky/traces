@@ -329,8 +329,9 @@ from ticket 26 before choosing the rebuild candidate.
 - Check the complete path set against the original source snapshot.
 - Combine the base store file records with the journal changes.
 - Use the original scan start for the racy rule.
-- Record content digests for racy files, including unchanged files. Recheck these
-  digests. Get the digest from the parser's read buffer for a changed file.
+- Record content digests for racy files, including unchanged files. Recheck
+  these digests. Get the digest from the parser's read buffer for a changed
+  file.
 - Discard the whole journal if any source, policy, identity or writer-base check
   fails. Do not re-parse a single changed file inside the replay.
 

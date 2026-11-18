@@ -3,7 +3,8 @@
 ## Destination
 
 An implementation-ready **BDD adoption and implementation strategy** for this
-workspace, delivered as [`spec.md`](../bdd-testing/spec.md). The strategy contains:
+workspace, delivered as [`spec.md`](../bdd-testing/spec.md). The strategy
+contains:
 
 - the behavioral domains and contracts that earn executable specifications
 - the testing architecture that they live in (BDD vs
@@ -91,10 +92,11 @@ fresh session can start slice 1 with zero open design questions.
   [research/05](research/05-cross-cutting-contracts.md).
 - [06: Framework re-validation](issues/06-framework-revalidation.md): adopt
   `rstest-bdd` =0.6.0 with caveats. Do not change `clippy.toml`. Put one
-  `#[expect(clippy::disallowed_methods)]` on the module that holds the steps, because
-  the step wrappers call `catch_unwind`. Bare `{name}` placeholders avoid a
-  lint. A `build.rs` for new feature files costs a package rebuild (ticket 11
-  decides). Ticket 08 decided: fold scenarios into the e2e binary only.
+  `#[expect(clippy::disallowed_methods)]` on the module that holds the steps,
+  because the step wrappers call `catch_unwind`. Bare `{name}` placeholders
+  avoid a lint. A `build.rs` for new feature files costs a package rebuild
+  (ticket 11 decides). Ticket 08 decided: fold scenarios into the e2e binary
+  only.
 - [07: Boundary tiering, b versus c](issues/07-boundary-tiering.md): option (b)
   wins, with a sharper boundary. Scenarios address the spawned process by
   default. A facade seam is allowed only if a frozen baseline already holds the
@@ -144,8 +146,8 @@ fresh session can start slice 1 with zero open design questions.
   the first decision was a flat directory).
   - Steps live in `tests/features/steps/mod.rs` and domain-concept files, never
     one file per feature.
-  - Use `#[path = "features/steps/mod.rs"]` in `tests/features.rs`. A plain `mod`
-    in a crate-root test file picks up the wrong path.
+  - Use `#[path = "features/steps/mod.rs"]` in `tests/features.rs`. A plain
+    `mod` in a crate-root test file picks up the wrong path.
   - Use bare `{name}` placeholders with quotes in the pattern.
   - Use two plain fixtures, `Sandbox` and `LastRun`, with no World.
   - Prefer 3 to 5 steps.

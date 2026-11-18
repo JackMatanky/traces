@@ -8,7 +8,8 @@ Each proposal is tagged [P].
 ## 1. The main finding: one event loop cannot feed both shapes cheaply
 
 - [V] The parser does not scan source text. It builds transformed buffers. Link
-  starts add a synthetic `[` and link ends add `]` (`src/note/parser.rs:411-439`).
+  starts add a synthetic `[` and link ends add `]`
+  (`src/note/parser.rs:411-439`).
 - [V] The field scanner and the tag scanner drop their Logos spans
   (`src/note/parser/lexer.rs:19-37`). Task token spans refer to the joined item
   buffer, not to the source (`src/note/parser/task.rs:22-45`).
@@ -34,8 +35,8 @@ Two shapes remain:
 - [P] One rules module holds the event options, the link classifier, the tag
   grammar, the field lexer and the slug rule. Both builders call it.
 - [P] A differential test compares full ranges, not counts. Each range must
-  slice the source to the expected text. Each fact needs one document occurrence.
-  The test also checks that `doc` on or off gives the same `Note`.
+  slice the source to the expected text. Each fact needs one document
+  occurrence. The test also checks that `doc` on or off gives the same `Note`.
 - [P] A convenience call `parse_with_doc` runs both for an open buffer.
 
 ## 2. Other findings and the proposed fix
@@ -69,8 +70,8 @@ Two shapes remain:
   range. It prefers an absent span to a false span. Noyalib `Spanned` is not the
   sole source.
 - [P] A link keeps three parts: path, heading and block id. Block targets stay
-  unresolved. Do not persist a resolution. Keep every occurrence, even when links
-  share one target.
+  unresolved. Do not persist a resolution. Keep every occurrence, even when
+  links share one target.
 - [P] Ticket 24 gets two options: item text out of line (text is 93% of item
   bytes) and the zk idea "select only the bytes a plan reads". A columnar layout
   and a separate task table are rejected for now.
@@ -91,10 +92,10 @@ Two shapes remain:
 24: one facts-only `Note` record; item text option. 25: the version bump rule.
 26: item order, `item_idx`, list membership, multi-value item fields. 28: check
 the external-link reader. 30: revision gate, background range index, settings
-snapshot. 31: notice channel. 32: visibility of the internal-link fact, `NoteLink`
-and the buffer parser. 34: buffer wins over disk and background work. 35: the
-accessor is not the schema field resolution. 36: section extents and source
-slices.
+snapshot. 31: notice channel. 32: visibility of the internal-link fact,
+`NoteLink` and the buffer parser. 34: buffer wins over disk and background work.
+35: the accessor is not the schema field resolution. 36: section extents and
+source slices.
 
 ## 6. Not checked
 

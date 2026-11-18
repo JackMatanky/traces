@@ -1,9 +1,10 @@
 # messrust — PHPMD-style Mess Detector for Rust
 
-Research into [`quality-gates/messrust`](https://github.com/quality-gates/messrust)
-as a candidate quality gate for this repo: what it is, how it runs, how it
-differs from the existing stack (cargo-mutants, clippy, cargo-crap), and how it
-would be installed via mise.
+Research into
+[`quality-gates/messrust`](https://github.com/quality-gates/messrust) as a
+candidate quality gate for this repo: what it is, how it runs, how it differs
+from the existing stack (cargo-mutants, clippy, cargo-crap), and how it would be
+installed via mise.
 
 ---
 
@@ -15,19 +16,21 @@ types, tangled dependencies, dead private code, muddy naming, and other mess
 that reviews keep rediscovering." It "parses Rust source, never builds or runs
 your project, and needs no project dependencies installed"
 ([README](https://github.com/quality-gates/messrust/blob/main/README.md)).
-The package self-describes as "A PHPMD-style mess detector for Rust source
-code" ([Cargo.toml](https://github.com/quality-gates/messrust/blob/main/Cargo.toml)).
+The package self-describes as "A PHPMD-style mess detector for Rust source code"
+([Cargo.toml](https://github.com/quality-gates/messrust/blob/main/Cargo.toml)).
 
 **Name origin.** The repository never states an explicit etymology. The only
 first-party statement tying the name to a lineage is the `description` field
 "PHPMD-style mess detector for Rust source code" plus the GitHub repo
-description "Mess detector for Rust." ([README](https://github.com/quality-gates/messrust/blob/main/README.md),
+description "Mess detector for Rust."
+([README](https://github.com/quality-gates/messrust/blob/main/README.md),
 [repo metadata](https://api.github.com/repos/quality-gates/messrust)). The name
 reads as *mess* (from that phrase) + *rust*; anything beyond that is inference
 and is not claimed here.
 
 **What it measures/checks.** Rule inventory read directly from the shipped
-rulesets ([rulesets/](https://github.com/quality-gates/messrust/tree/main/rulesets)):
+rulesets
+([rulesets/](https://github.com/quality-gates/messrust/tree/main/rulesets)):
 
 | Ruleset | Rules |
 | --- | --- |
@@ -47,14 +50,16 @@ several exclusions), `opinionated` adds the checks `rust` deliberately omits
 
 **Maturity** (queried 2026-09-25):
 
-- Version `0.1.12` ([Cargo.toml](https://github.com/quality-gates/messrust/blob/main/Cargo.toml)),
+- Version `0.1.12`
+  ([Cargo.toml](https://github.com/quality-gates/messrust/blob/main/Cargo.toml)),
   13 GitHub releases, v0.1.12 published 2026-09-23
   ([releases API](https://api.github.com/repos/quality-gates/messrust/releases)).
 - Created 2026-07-31, last push 2026-09-25 — very active: 257 commits, releases
   roughly every 1–2 days during September 2026
   ([repo metadata](https://api.github.com/repos/quality-gates/messrust),
   [commits](https://api.github.com/repos/quality-gates/messrust/commits)).
-- License: MIT ([README badge / LICENSE](https://github.com/quality-gates/messrust/blob/main/LICENSE),
+- License: MIT
+  ([README badge / LICENSE](https://github.com/quality-gates/messrust/blob/main/LICENSE),
   [repo metadata](https://api.github.com/repos/quality-gates/messrust)).
 - Traction: **0 stars, 0 forks**, 12 open issues, single visible author
   (`jonbaldie` in release notes) — effectively a one-person project under an
@@ -63,8 +68,9 @@ several exclusions), `opinionated` adds the checks `rust` deliberately omits
 - crates.io: only **0.1.0** published (2026-08-01), 306 total downloads — the
   registry copy is 12 releases behind GitHub
   ([crates.io API](https://crates.io/api/v1/crates/messrust/versions)).
-- Self-gating: the project runs messrust on its own source in CI and treats
-  exit 2 as failure ([README](https://github.com/quality-gates/messrust/blob/main/README.md),
+- Self-gating: the project runs messrust on its own source in CI and treats exit
+  2 as failure
+  ([README](https://github.com/quality-gates/messrust/blob/main/README.md),
   [ci.yml](https://github.com/quality-gates/messrust/blob/main/.github/workflows/ci.yml)).
 
 ---
@@ -89,7 +95,8 @@ no rustc, no build, no project dependencies required
 ([README](https://github.com/quality-gates/messrust/blob/main/README.md)).
 
 **Config file.** There is **no project config file** (no `.messrust.toml` or
-equivalent is documented in [docs/usage.md](https://github.com/quality-gates/messrust/blob/main/docs/usage.md)
+equivalent is documented in
+[docs/usage.md](https://github.com/quality-gates/messrust/blob/main/docs/usage.md)
 or present in the repo tree — searched). Policy is supplied per invocation as
 built-in ruleset names and/or a path to an XML ruleset using the PMD ruleset
 schema (`xmlns="http://pmd.sf.net/ruleset/1.0.0"`), with `<rule ref=...>`,
@@ -107,7 +114,8 @@ line annotations), `gitlab` (Code Quality), `checkstyle`, `sarif`
 formats carry path/line/rule/priority/message/context/suppression fields and
 sort by file and line.
 
-**Exit codes** ([docs/usage.md](https://github.com/quality-gates/messrust/blob/main/docs/usage.md)):
+**Exit codes**
+([docs/usage.md](https://github.com/quality-gates/messrust/blob/main/docs/usage.md)):
 
 | Code | Meaning |
 | ---: | --- |
@@ -212,10 +220,10 @@ while several of its rules duplicate lints this repo already denies.
 - Published on crates.io but only at **0.1.0** (2026-08-01), 12 releases behind
   GitHub's v0.1.12
   ([crates.io versions API](https://crates.io/api/v1/crates/messrust/versions)).
-- GitHub releases carry **darwin-only** assets — `messrust_<v>_darwin_amd64.tar.gz`,
-  `messrust_<v>_darwin_arm64.tar.gz`, `checksums.txt` — explicitly by design:
-  "The immutable GitHub release contains only these assets" built on "Native
-  Intel and Apple Silicon runners"
+- GitHub releases carry **darwin-only** assets —
+  `messrust_<v>_darwin_amd64.tar.gz`, `messrust_<v>_darwin_arm64.tar.gz`,
+  `checksums.txt` — explicitly by design: "The immutable GitHub release contains
+  only these assets" built on "Native Intel and Apple Silicon runners"
   ([docs/homebrew-release.md](https://github.com/quality-gates/messrust/blob/main/docs/homebrew-release.md),
   verified across all 13 releases via the
   [releases API](https://api.github.com/repos/quality-gates/messrust/releases)).
@@ -241,8 +249,8 @@ while several of its rules duplicate lints this repo already denies.
 (mise cargo-backend git syntax documented at
 [mise.jdx.dev/dev-tools/backends/cargo.html](https://mise.jdx.dev/dev-tools/backends/cargo.html);
 `tag:` is one of `tag:`/`branch:`/`rev:`. `locked` (use the crate's committed
-`Cargo.lock`) defaults to on. The `github:` backend behavior cited above is
-from [mise.jdx.dev/dev-tools/backends/github.html](https://mise.jdx.dev/dev-tools/backends/github.html).)
+`Cargo.lock`) defaults to on. The `github:` backend behavior cited above is from
+[mise.jdx.dev/dev-tools/backends/github.html](https://mise.jdx.dev/dev-tools/backends/github.html).)
 
 **Caveats:**
 
@@ -276,8 +284,9 @@ a verified figure. Structurally it is orders of magnitude cheaper than
 
 **1h mutants template**: unrelated — `[task_templates.mutants]` with
 `timeout = "1h"` only binds tasks that `extends = "mutants"`
-([mise.toml:279](../../mise.toml), [`.mise/tasks/test/mutants`](../../.mise/tasks/test/mutants)).
-A messrust task inherits nothing from it; give it its own short timeout or none.
+([mise.toml:279](../../mise.toml),
+[`.mise/tasks/test/mutants`](../../.mise/tasks/test/mutants)). A messrust task
+inherits nothing from it; give it its own short timeout or none.
 
 **Integration options, cheapest first:**
 
@@ -379,7 +388,8 @@ slower `cargo:`-git install path anyway.
 
 Staged path:
 
-1. Install via `"cargo:https://github.com/quality-gates/messrust" = { version = "tag:v0.1.12" }`,
+1. Install via
+   `"cargo:https://github.com/quality-gates/messrust" = { version = "tag:v0.1.12" }`,
    `mise lock`, no gate changes.
 2. Run `messrust src text rust --ignore-tests`, review findings; write a repo
    XML policy that drops the §3.2-redundant rules and keeps codesize,
@@ -399,21 +409,22 @@ Queried 2026-09-25:
   `docs/{codesize,naming,unusedcode,cleancode,design,controversial,explicitness}.md`,
   `rulesets/{rust,opinionated,codesize,...}.xml`, `src/` tree,
   `.github/workflows/{ci,release,mutation}.yml` —
-  https://github.com/quality-gates/messrust
+  <https://github.com/quality-gates/messrust>
 - GitHub API: repo metadata, commits, releases, tags, issues —
-  https://api.github.com/repos/quality-gates/messrust
-- crates.io API (crate + versions): https://crates.io/api/v1/crates/messrust
+  <https://api.github.com/repos/quality-gates/messrust>
+- crates.io API (crate + versions): <https://crates.io/api/v1/crates/messrust>
 - mise backend docs (cargo git syntax, github asset autodetection):
-  https://mise.jdx.dev/dev-tools/backends/cargo.html,
-  https://mise.jdx.dev/dev-tools/backends/github.html
+  <https://mise.jdx.dev/dev-tools/backends/cargo.html>,
+  <https://mise.jdx.dev/dev-tools/backends/github.html>
 - This repo (integration surface): `mise.toml`, `hk.pkl`, `Cargo.toml`
-  `[lints]`, `.github/workflows/ci.yml`, `.mise/tasks/`, `docs/refs/mutation_testing.md`,
-  `docs/refs/crap_metric.md`, `docs/refs/clippy_lint_config.md`
+  `[lints]`, `.github/workflows/ci.yml`, `.mise/tasks/`,
+  `docs/refs/mutation_testing.md`, `docs/refs/crap_metric.md`,
+  `docs/refs/clippy_lint_config.md`
 
 Not verifiable from primary sources (stated as such in text above): messrust's
 runtime on this codebase, Windows binary compatibility, whether mise's `github:`
-asset autodetection accepts the `*_darwin_arm64.tar.gz` naming, and any etymology
-of the name beyond the "PHPMD-style mess detector" description.
+asset autodetection accepts the `*_darwin_arm64.tar.gz` naming, and any
+etymology of the name beyond the "PHPMD-style mess detector" description.
 
 ---
 
@@ -433,7 +444,8 @@ repo's `mise.toml`, `.mise/tasks/mutants/_default`, `.cargo/mutants.toml`.
   `messrust <paths> <format> <ruleset[,ruleset...]> [options]`
   ([docs/usage.md](https://github.com/quality-gates/messrust/blob/main/docs/usage.md)).
   A repo-committed XML passed by path *is* the supported team-policy mechanism.
-- **XML policy composition** (PMD schema `xmlns="http://pmd.sf.net/ruleset/1.0.0"`):
+- **XML policy composition** (PMD schema
+  `xmlns="http://pmd.sf.net/ruleset/1.0.0"`):
   - `<rule ref="rust">` / `ref="codesize"` / `ref="rulesets/x.xml"` / relative
     file path — refs nest; **later refs override earlier priority/properties**.
   - `<exclude name="RuleName"/>` removes a rule from the referenced set.
@@ -539,8 +551,8 @@ fire.) **[corrected in §8 review: these are not all `maximum`]**
 
 3. **Task** — a TOML task in the "Formatting & Linting" section, matching the
    repo's `arg "[args]" var=#true` passthrough idiom (no USAGE flags worth
-   exposing beyond passthrough; flags like `--only`/`--strict` change per
-   triage session):
+   exposing beyond passthrough; flags like `--only`/`--strict` change per triage
+   session):
 
    ```toml
    [tasks.mess]
@@ -569,17 +581,17 @@ fire.) **[corrected in §8 review: these are not all `maximum`]**
 ### 7.4 Day-to-day leverage
 
 - **First run / triage:** `mise run mess` (exit 2 with findings); re-run
-  narrowing with `--only CyclomaticComplexity` or `--minimumpriority 2`;
-  full machine triage via `--reportfile messrust.json --ignore-violations-on-exit`.
+  narrowing with `--only CyclomaticComplexity` or `--minimumpriority 2`; full
+  machine triage via `--reportfile messrust.json --ignore-violations-on-exit`.
 - **Tuning loop:** findings that are true-but-won't-fix → bump `<priority>`
   (then filter with `--minimumpriority`) or in-source
   `// messrust-disable-next-line Rule` with a reason; findings that are
-   redundant-with-clippy → `<exclude>` in `messrust.xml`; threshold noise →
-   a per-rule property — names are heterogeneous (`reportLevel` for
-   `CyclomaticComplexity`, `minimum` for length/count rules, `maximum` only
-   for `ExcessiveClassComplexity`/`LongVariable`/`LongClassName`/
-   `CouplingBetweenObjects`/`LackOfCohesionOfMethods`, `maxfields`/`maxmethods`
-   for `TooMany*`). **[corrected in §8 review — full table in §8.4]**
+  redundant-with-clippy → `<exclude>` in `messrust.xml`; threshold noise →
+  a per-rule property — names are heterogeneous (`reportLevel` for
+  `CyclomaticComplexity`, `minimum` for length/count rules, `maximum` only
+  for `ExcessiveClassComplexity`/`LongVariable`/`LongClassName`/
+  `CouplingBetweenObjects`/`LackOfCohesionOfMethods`, `maxfields`/`maxmethods`
+  for `TooMany*`). **[corrected in §8 review — full table in §8.4]**
 - **Cadence:** on-demand (`mise run mess`) after refactors of large modules;
   when quiet, promote to the `hk` `quality` group (§5 option 2) so `check` →
   `verify` picks it up — one-line change, no verify restructuring.
@@ -613,15 +625,16 @@ codebase uses `Cargo.toml` `[lints.clippy]`, `clippy.toml`,
   messrust capability — ignore it.** It is byte-identical to the file upstream
   commits as `mutarust.yml` (verified by `diff` against
   [raw](https://raw.githubusercontent.com/quality-gates/messrust/main/mutarust.yml);
-  upstream has no `mutarust.yml.example` — [contents API](https://api.github.com/repos/quality-gates/messrust/contents/)).
+  upstream has no `mutarust.yml.example` —
+  [contents API](https://api.github.com/repos/quality-gates/messrust/contents/)).
   It is the *messrust project's own* mutation-testing policy (`min_msi: 75`,
   `min_covered_msi: 80` — the exact thresholds its README documents in the
   Maintainers section), renamed `.example` during vendoring. It says nothing
   about messrust's analysis; this repo's mutarust material lives separately in
   [docs/refs/mutarust/](mutarust/) and
-  [docs/refs/quality_gates_mutarust.md](quality_gates_mutarust.md).
-  (It is *not* a copy of that directory's `mutarust.yml.example`, which differs
-  — `min_msi: 80`.)
+  [docs/refs/quality_gates_mutarust.md](quality_gates_mutarust.md). (It is *not*
+  a copy of that directory's `mutarust.yml.example`, which differs —
+  `min_msi: 80`.)
 - **Missing from the snapshot** (linked by vendored docs, not vendored):
   first-party exploratory reports
   [2026-09-26-messrust](https://github.com/quality-gates/messrust/tree/main/docs/exploratory-testing)
@@ -1127,7 +1140,7 @@ measurement had `CyclomaticComplexity` at 50 — see decisions). Produced by:
 
 (counts as measured, key excerpts):
 
-```
+```text
   29 "rule": "LackOfCohesionOfMethods"
   26 "rule": "CyclomaticComplexity"
    9 "rule": "CouplingBetweenObjects"
@@ -1138,9 +1151,9 @@ measurement had `CyclomaticComplexity` at 50 — see decisions). Produced by:
 ```
 
 Action thresholds applied (from the quality-gates triage plan): any rule with
-count > 25 → consider exclusion (written reason required); `CyclomaticComplexity`
-count > 15 → retune `reportLevel`; `NPathComplexity` count > 10 → retune
-`minimum`.
+count > 25 → consider exclusion (written reason required);
+`CyclomaticComplexity` count > 15 → retune `reportLevel`; `NPathComplexity`
+count > 10 → retune `minimum`.
 
 Decision-table rows, count → action:
 

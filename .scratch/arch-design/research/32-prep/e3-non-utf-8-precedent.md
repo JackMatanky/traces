@@ -76,7 +76,8 @@ Qualitative signals [V unless marked]:
 - The camino README says non-Unicode paths are "vanishingly uncommon". It names
   "legacy codebases ... in encodings like Shift JIS". This is a claim, not data.
 - rclone says: "A common source of invalid UTF-8 bytes are local filesystems,
-  that store names in a different encoding ... like latin1" (`local/#filenames`).
+  that store names in a different encoding ... like latin1"
+  (`local/#filenames`).
 - The `convmv` man page (Debian testing 2.06) says the tool exists "to switch
   over from old 8-bit locales to UTF-8 locales".
 - Nextcloud issue 59056 (2026-03): `files:scan` failed on `\xF1` (Latin-1
@@ -316,11 +317,11 @@ Collision:
 
 Link resolution:
 
-- Both link types percent-decode with a lossy UTF-8 decode. `Key::from_rel_link_url`
-  in `liwe/src/model.rs` runs `percent_decode_str(without_fragment)
-  .decode_utf8_lossy()`. It then strips the extension and joins the path to
-  the linking document. A leading `/` resolves from the workspace root
-  (`docs/keys.md`).
+- Both link types percent-decode with a lossy UTF-8 decode.
+  `Key::from_rel_link_url` in `liwe/src/model.rs` runs
+  `percent_decode_str(without_fragment) .decode_utf8_lossy()`. It then strips
+  the extension and joins the path to the linking document. A leading `/`
+  resolves from the workspace root (`docs/keys.md`).
 - Wikilinks use `decoded_name` in `liwe/src/model/key_index.rs:319-322`. It is
   the same decode.
 - Wikilinks also match by case-folded suffix. `fold` is `to_lowercase`, and an
@@ -455,8 +456,9 @@ Plugin API (`obsidianmd/obsidian-api` `obsidian.d.ts`):
 Canonicalization is the closest precedent to a collision. Forum 95629
 (2025-06 and 2026-10-27, v1.14.5, Windows):
 
-- A non-NFC name is canonicalized inside the app. Post 4: `getFullRealPath(F.path)`
-  returns the NFC path while the disk holds the NFD name.
+- A non-NFC name is canonicalized inside the app. Post 4:
+  `getFullRealPath(F.path)` returns the NFC path while the disk holds the NFD
+  name.
 - If both spellings exist, the vault shows one note and "the last file written
   wins". The other file "appears nowhere".
 - NBSP against space behaves the same way. The edit goes only to the kept file.

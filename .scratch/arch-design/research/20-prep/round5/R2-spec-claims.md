@@ -15,10 +15,9 @@
 - **Round-4 Citation:**
   `.scratch/arch-design/research/20-prep/round4/D-schema-languages-and-linters.md:13-14,26-29,131-186`
   [V: file read];
-  `.scratch/arch-design/research/20-prep/round4/report.md:48,84-85`
-  (Table 3: "LDAP MUST/MAY: all classes apply, no winner [H]";
-  Section 5: "LDAP semantics (MUST/MAY union) ... are [H], standard but unread
-  here") [V: file read].
+  `.scratch/arch-design/research/20-prep/round4/report.md:48,84-85` (Table 3:
+  "LDAP MUST/MAY: all classes apply, no winner [H]"; Section 5: "LDAP semantics
+  (MUST/MAY union) ... are [H], standard but unread here") [V: file read].
 
 ### 1.2 Verdict
 
@@ -95,10 +94,9 @@ either class declares them.
 - **Round-4 Citation:**
   `.scratch/arch-design/research/20-prep/round4/D-schema-languages-and-linters.md:66-70,287-309`
   [V: file read];
-  `.scratch/arch-design/research/20-prep/round4/report.md:48,84-85`
-  (Table 3: "CUE: unification is commutative, conflicts fail [H]";
-  Section 5: "CUE commutativity are [H], standard but unread here")
-  [V: file read].
+  `.scratch/arch-design/research/20-prep/round4/report.md:48,84-85` (Table 3:
+  "CUE: unification is commutative, conflicts fail [H]"; Section 5: "CUE
+  commutativity are [H], standard but unread here") [V: file read].
 
 ### 2.2 Verdict
 
@@ -156,8 +154,7 @@ algebra where conflicting declarations yield `schema.class-conflict`.
 
 - **Round-4 Citation:**
   `.scratch/arch-design/research/20-prep/round4/D-schema-languages-and-linters.md:82-87,398-403,717-718,797-804`
-  [V: file read];
-  `.scratch/arch-design/research/20-prep/round4/report.md:53`
+  [V: file read]; `.scratch/arch-design/research/20-prep/round4/report.md:53`
   (Table 3: "Kubernetes silent pruning incident [S]") [V: file read].
 
 ### 3.2 Verdict
@@ -166,9 +163,8 @@ algebra where conflicting declarations yield `schema.class-conflict`.
 
 ### 3.3 Evidence
 
-1. **Official Kubernetes CRD Documentation:**
-   Kubernetes Docs, "Extend the Kubernetes API with CustomResourceDefinitions",
-   Section "Field pruning"
+1. **Official Kubernetes CRD Documentation:** Kubernetes Docs, "Extend the
+   Kubernetes API with CustomResourceDefinitions", Section "Field pruning"
    (`https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning`):
    > "if you specify a field that the API server does not recognize, the
    > unknown field is pruned (removed) before being persisted...
@@ -214,10 +210,9 @@ unknown fields as advisory diagnostics with closest-match hints (lines 87-88).
 
 - **Round-4 Citation:**
   `.scratch/arch-design/research/20-prep/round4/E-wiki-and-graph-systems.md:40-41,304-320,488-492,597-600,683-689`
-  [V: file read];
-  `.scratch/arch-design/research/20-prep/round4/report.md:49,82`
-  (Table 3: "Plone moved from class inheritance to behaviours (mixins) [H]")
-  [V: file read].
+  [V: file read]; `.scratch/arch-design/research/20-prep/round4/report.md:49,82`
+  (Table 3: "Plone moved from class inheritance to behaviours (mixins) [H]") [V:
+  file read].
 
 ### 4.2 Verdict
 
@@ -231,9 +226,8 @@ unknown fields as advisory diagnostics with closest-match hints (lines 87-88).
    (`plone.dexterity` and `plone.behavior`) due to fragile base classes and
    rigid inheritance hierarchies. [V: Plone 5.2 Dexterity Manual]
 
-2. **Behavior Field Clashes and Storage Mechanisms:**
-   Plone Documentation v5.2, "Schema-only behaviors using annotations or
-   attributes"
+2. **Behavior Field Clashes and Storage Mechanisms:** Plone Documentation v5.2,
+   "Schema-only behaviors using annotations or attributes"
    (`https://5.docs.plone.org/external/plone.app.dexterity/docs/behaviors/schema-only-behaviors.html`):
    - **Direct Attribute Storage (Marker behaviors without factory):**
      Stores fields directly on the content instance (`context.field_name`).
@@ -270,11 +264,10 @@ as a `schema.class-conflict` (lines 104-106).
 - **Round-4 Citation:**
   `.scratch/arch-design/research/20-prep/round4/F-agent-and-mcp-vault-tools.md:623-642`
   (Section 4.2: `"The delta rule blocks only newly introduced violations"`
-  citing Graphiti backward compatibility and Obsidian Local REST API)
-  [V: file read];
-  `.scratch/arch-design/research/20-prep/round4/report.md:54`
-  (Table 3: "Delta rule | Letta/Graphiti per scout F [S]; ruff/mypy
-  baselines [H]") [V: file read].
+  citing Graphiti backward compatibility and Obsidian Local REST API) [V: file
+  read]; `.scratch/arch-design/research/20-prep/round4/report.md:54` (Table 3:
+  "Delta rule | Letta/Graphiti per scout F [S]; ruff/mypy baselines [H]") [V:
+  file read].
 
 ### 5.2 Verdict
 
@@ -283,17 +276,15 @@ as a `schema.class-conflict` (lines 104-106).
 
 ### 5.3 Evidence
 
-1. **Graphiti / Zep (`getzep/graphiti`):**
-   Upstream documentation
+1. **Graphiti / Zep (`getzep/graphiti`):** Upstream documentation
    (`https://help.getzep.com/graphiti/core-concepts/custom-entity-and-edge-types.md`)
    demonstrates that Graphiti uses Pydantic models for custom entity and edge
    types. Validation occurs strictly on ingestion (`add_episode`) for newly
-   extracted entities.
-   Scout F cited Graphiti's schema evolution (where historical entities are not
-   invalidated when new schema rules are added) as evidence for a "delta
-   rule". However, this is simply standard open-world graph storage with
-   optional Pydantic fields (`Optional[T] = Field(None)`), **not** a document
-   delta validator comparing before/after states.
+   extracted entities. Scout F cited Graphiti's schema evolution (where
+   historical entities are not invalidated when new schema rules are added) as
+   evidence for a "delta rule". However, this is simply standard open-world
+   graph storage with optional Pydantic fields (`Optional[T] = Field(None)`),
+   **not** a document delta validator comparing before/after states.
 
 2. **Letta / MemGPT (`letta-ai/letta`):**
    Upstream documentation (`https://docs.letta.com`) shows that Letta manages

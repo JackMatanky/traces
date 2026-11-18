@@ -12,23 +12,26 @@ Files audited (read-only):
 - `tests/integration/task_tag_filters.rs` (297) — 3 tests
 - `tests/integration/template_render.rs` (303) — 5 tests
 
-**30 tests total.** Each claim below names `path::test_name`, the production functions it
-EXECUTES, and what it actually ASSERTS. `EXECUTES` and `ASSERTS` are kept separate on
-purpose: several tests execute a large pipeline but assert only a fixture property.
+**30 tests total.** Each claim below names `path::test_name`, the production
+functions it EXECUTES, and what it actually ASSERTS. `EXECUTES` and `ASSERTS`
+are kept separate on purpose: several tests execute a large pipeline but assert
+only a fixture property.
 
 Harness facts (verified):
 
-- `tests/integration.rs:5` — `#![cfg(feature = "test-utils")]`. There is **no `[[test]]`
-  entry in `Cargo.toml`**, so the target is auto-discovered with no `required-features`
-  guard (every `[[bench]]` *does* declare `required-features = ["test-utils"]`).
-  `[features]` is only `test-utils = []` — **not a default feature**. Consequence:
-  plain `cargo test` (no feature flags) compiles an *empty* `integration` binary and
-  exits 0. Only `mise run test` is safe, because `.mise/tasks/test/unit` defaults
+- `tests/integration.rs:5` — `#![cfg(feature = "test-utils")]`. There is
+  **no `[[test]]` entry in `Cargo.toml`**, so the target is auto-discovered with
+  no `required-features` guard (every `[[bench]]` *does* declare
+  `required-features = ["test-utils"]`). `[features]` is only `test-utils = []`
+  — **not a default feature**. Consequence: plain `cargo test` (no feature
+  flags) compiles an *empty* `integration` binary and exits 0. Only
+  `mise run test` is safe, because `.mise/tasks/test/unit` defaults
   `--feature all` → `cargo nextest run -p traces-pkm --all-features`.
-- `tests/integration.rs:6-11` blanket-allows `clippy::expect_used` for the whole binary.
+- `tests/integration.rs:6-11` blanket-allows `clippy::expect_used` for the whole
+  binary.
 - Re-exported surface used by the suite: `src/lib.rs:89-155` (`pub use`, gated
-  `#[cfg(any(test, feature = "test-utils"))]`) and `src/lib.rs:157-163` (test-utils
-  re-exports of `test_support`).
+  `#[cfg(any(test, feature = "test-utils"))]`) and `src/lib.rs:157-163`
+  (test-utils re-exports of `test_support`).
 
 ---
 
@@ -79,81 +82,107 @@ Harness facts (verified):
 
 ### 1.2 Detail — genuine coverage
 
-**#5 `index_persistence_roundtrip::preserves_query_rows_and_list_metadata_across_cold_reload`**
-- **EXECUTES:** `TestProject::build_and_persist` (`src/lib.rs:473`) → `TestProject::indexer`
-  (`src/lib.rs:451`, hides `IndexerService::from(&Config)`) → `IndexerService::build`
-  (`src/index/service.rs:73`, real `DirTree` scan + parse) → `persist` (`:293`) →
-  `QueryService::new("class").run` (`src/query/service.rs:67` + `:103`) →
-  **deletes both source `.md` files** → fresh `IndexerService` → `load` (`src/index/service.rs:316`)
-  → `run` again.
-- **ASSERTS:** row counts 11/8; `assert_rows_match` equality of
-  `(file.path, depth, line, parent)` + `(task_text, task_completed, status_symbol)` between the
-  in-memory and cold-reloaded sets; then dates/priority/`is_fully_complete`/status on
-  `Note::lists()` of the reloaded note.
-- **Why genuine:** deleting the Markdown before `load` is the only assertion in the repo
-  that the redb `NOTES`/`FILES` tables alone (ADR 0005, no `LISTS` table) reconstruct the
-  full list/task domain **without reparsing**. No unit twin does this.
-- **Residual gap it does *not* close:** `assert_rows_match` omits typed fields, so
-  typed frontmatter → redb → `QueryRow` filter/sort stays unit-only
-  (`src/index/service.rs::persist_then_load_recovers_typed_inline_field_values`, `:957`).
+**#5
+`index_persistence_roundtrip::preserves_query_rows_and_list_metadata_across_cold_reload`**
 
-**#6 `index_persistence_roundtrip::refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted`**
-- **EXECUTES:** `build_and_persist` → reads `.traces/index.redb`, `fill(0xFF)` over bytes
-  `9..` → `IndexerService::refresh_with_report` (`src/index/service.rs:122`) →
-  `IndexStore::open` (`src/index/store.rs:152`) `rebuild_needed` → wipe-and-recreate →
-  scan → rebuild → delta.
+- **EXECUTES:** `TestProject::build_and_persist` (`src/lib.rs:473`) →
+  `TestProject::indexer` (`src/lib.rs:451`, hides
+  `IndexerService::from(&Config)`) → `IndexerService::build`
+  (`src/index/service.rs:73`, real `DirTree` scan + parse) → `persist` (`:293`)
+  → `QueryService::new("class").run` (`src/query/service.rs:67` + `:103`) →
+  **deletes both source `.md` files** → fresh `IndexerService` → `load`
+  (`src/index/service.rs:316`) → `run` again.
+- **ASSERTS:** row counts 11/8; `assert_rows_match` equality of
+  `(file.path, depth, line, parent)` +
+  `(task_text, task_completed, status_symbol)` between the in-memory and
+  cold-reloaded sets; then dates/priority/`is_fully_complete`/status on
+  `Note::lists()` of the reloaded note.
+- **Why genuine:** deleting the Markdown before `load` is the only assertion in
+  the repo that the redb `NOTES`/`FILES` tables alone (ADR 0005, no `LISTS`
+  table) reconstruct the full list/task domain **without reparsing**. No unit
+  twin does this.
+- **Residual gap it does *not* close:** `assert_rows_match` omits typed fields,
+  so typed frontmatter → redb → `QueryRow` filter/sort stays unit-only
+  (`src/index/service.rs::persist_then_load_recovers_typed_inline_field_values`,
+  `:957`).
+
+**#6
+`index_persistence_roundtrip::refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted`**
+
+- **EXECUTES:** `build_and_persist` → reads `.traces/index.redb`, `fill(0xFF)`
+  over bytes `9..` → `IndexerService::refresh_with_report`
+  (`src/index/service.rs:122`) → `IndexStore::open` (`src/index/store.rs:152`)
+  `rebuild_needed` → wipe-and-recreate → scan → rebuild → delta.
 - **ASSERTS:** `report.upserted_count() == 2`, `report.deleted_count() == 0`.
-- **Why genuine:** no unit test corrupts the *container*. `rg "corrupt" src/index/service.rs`
-  → **no matches**; the only corruption tests in `src/` are row-level
-  (`src/index/store.rs:1806` raw-byte row, `:2516 skips_missing_and_undecodable_notes_but_keeps_valid_ones`,
+- **Why genuine:** no unit test corrupts the *container*.
+  `rg "corrupt" src/index/service.rs` → **no matches**; the only corruption
+  tests in `src/` are row-level (`src/index/store.rs:1806` raw-byte row,
+  `:2516 skips_missing_and_undecodable_notes_but_keeps_valid_ones`,
   `:2598 refresh_fails_open_when_a_previous_notes_row_is_corrupted`).
 - **Doc defect:** the test's own doc (`index_persistence_roundtrip.rs:304`) says
-  "Promoted from `src/index/service.rs`'s internal unit test" — **that test does not exist**.
-  The file header (`:1-7`) likewise cites `src/index/mod.rs::persist_then_load_recovers_the_same_records_and_notes`,
-  which also does not exist (`src/index/mod.rs` holds only module docs + a `fixtures` mod).
-  Both provenance claims are stale.
+  "Promoted from `src/index/service.rs`'s internal unit test" —
+  **that test does not exist**. The file header (`:1-7`) likewise cites
+  `src/index/mod.rs::persist_then_load_recovers_the_same_records_and_notes`,
+  which also does not exist (`src/index/mod.rs` holds only module docs + a
+  `fixtures` mod). Both provenance claims are stale.
 
 **#9 `index_query::sorts_tasks_by_priority_severity_rank_with_nulls_first`**
-- **EXECUTES:** `project.build_index` → `QueryBuilder::tasks(..).sort("list.priority", asc/desc)`
-  → `QueryService::run`.
-- **ASSERTS:** exact 5-tier order both directions with the un-prioritised task as null-first.
-- **Why genuine:** `rg "list.priority" src/` finds **no ordering test anywhere** —
-  `src/query/results.rs:1092` only asserts the *value* (`"highest"`) on a row, and
-  `src/query/sort.rs:80-89` documents severity ordering without a test for it.
-  `tests/e2e/dispatch.rs:373` uses `list.priority` as a table column only.
+
+- **EXECUTES:** `project.build_index` →
+  `QueryBuilder::tasks(..).sort("list.priority", asc/desc)` →
+  `QueryService::run`.
+- **ASSERTS:** exact 5-tier order both directions with the un-prioritised task
+  as null-first.
+- **Why genuine:** `rg "list.priority" src/` finds **no ordering test anywhere**
+  — `src/query/results.rs:1092` only asserts the *value* (`"highest"`) on a row,
+  and `src/query/sort.rs:80-89` documents severity ordering without a test for
+  it. `tests/e2e/dispatch.rs:373` uses `list.priority` as a table column only.
   This is the sole place the severity-rank comparator is proven.
 
-**#26 `template_render::renders_a_query_over_real_indexed_notes_and_writes_the_result`**
-- **EXECUTES:** `TemplateService::new(&config, PresetDialogProvider)` (`src/template/engine.rs:110-150`)
-  → `SchemaService::load_verbose` (`src/schema/service.rs:78`, the *production* schema path) +
-  `IndexerService::from(&config)` + `QueryService::new(..).with_class_expander` (`src/query/service.rs:82`)
-  → `render_to_file(WriteMode::Commit(CreateNew))` → inside render,
-  `QueryOps::cached_index` → **`IndexerService::refresh()`** (`src/template/engine/query.rs:233`)
-  → scan + build + **persist** → `QueryService::run` → file write.
+**#26
+`template_render::renders_a_query_over_real_indexed_notes_and_writes_the_result`**
+
+- **EXECUTES:** `TemplateService::new(&config, PresetDialogProvider)`
+  (`src/template/engine.rs:110-150`) → `SchemaService::load_verbose`
+  (`src/schema/service.rs:78`, the *production* schema path) +
+  `IndexerService::from(&config)` + `QueryService::new(..).with_class_expander`
+  (`src/query/service.rs:82`) → `render_to_file(WriteMode::Commit(CreateNew))` →
+  inside render, `QueryOps::cached_index` → **`IndexerService::refresh()`**
+  (`src/template/engine/query.rs:233`) → scan + build + **persist** →
+  `QueryService::run` → file write.
 - **ASSERTS:** written file content == `"2 notes"`.
-- **Why genuine:** the module doc's claim ("No single module's unit tests cover this seam")
-  is accurate. This is the **only** test in `tests/` that reaches `IndexerService::refresh`
-  through the production template path and the only one that writes via
-  `TemplateService::render_to_file` rather than a fixture helper.
+- **Why genuine:** the module doc's claim ("No single module's unit tests cover
+  this seam") is accurate. This is the **only** test in `tests/` that reaches
+  `IndexerService::refresh` through the production template path and the only
+  one that writes via `TemplateService::render_to_file` rather than a fixture
+  helper.
 
-**#27 `template_render::renders_a_file_sourced_select_field_in_template_rendering`**
-- **EXECUTES:** `write_schema_value` → `write_schema` with `values = { path = …, value = …, label = … }`
-  → `TemplateService::new` → `SchemaService::load_verbose` (production, incl.
-  `SchemaFieldBuildContext` values-file loading) → `schema.get('topic').field('category')[0].{label,value}`.
+**#27
+`template_render::renders_a_file_sourced_select_field_in_template_rendering`**
+
+- **EXECUTES:** `write_schema_value` → `write_schema` with
+  `values = { path = …, value = …, label = … }` → `TemplateService::new` →
+  `SchemaService::load_verbose` (production, incl. `SchemaFieldBuildContext`
+  values-file loading) →
+  `schema.get('topic').field('category')[0].{label,value}`.
 - **ASSERTS:** exact rendered bytes `"Category: Rust Programming (rust)"`.
-- **Why genuine:** only end-to-end proof that a **file-sourced** `select` values table
-  resolves into a rendered file. Unit twins stop at the schema layer
-  (`src/schema/service.rs::values_file_failures_drop_declaring_schema_not_registry`, `:427`).
+- **Why genuine:** only end-to-end proof that a **file-sourced** `select` values
+  table resolves into a rendered file. Unit twins stop at the schema layer
+  (`src/schema/service.rs::values_file_failures_drop_declaring_schema_not_registry`,
+  `:427`).
 
-**#30 `template_render::lists_pipeline_rejects_task_list_formatter_on_non_task_rows`**
+**#30
+`template_render::lists_pipeline_rejects_task_list_formatter_on_non_task_rows`**
+
 - **EXECUTES:** `render_to_file(DryRun)` with `{{ lists.from().task_list() }}` →
   `QueryOps::task_list` → `QueryService::run(lists)` → formatter guard.
-- **ASSERTS:** `err.source().source()` contains **`task_list requires task-level records`**.
+- **ASSERTS:** `err.source().source()` contains
+  **`task_list requires task-level records`**.
 - **Why genuine *and* stronger:** the unit twin
-  `src/template/engine/query.rs::errors::task_list_on_page_level_records_surfaces_as_a_render_error` (`:1576`)
-  uses `{{ query.from().task_list() }}` (the **`query`** namespace) and asserts only
-  `contains("query failed")`. This test covers the **`lists`** namespace and the precise
-  inner message. Keep it.
+  `src/template/engine/query.rs::errors::task_list_on_page_level_records_surfaces_as_a_render_error`
+  (`:1576`) uses `{{ query.from().task_list() }}` (the **`query`** namespace)
+  and asserts only `contains("query failed")`. This test covers the **`lists`**
+  namespace and the precise inner message. Keep it.
 
 ### 1.3 Detail — duplicates (representative, with twin citations)
 
@@ -190,11 +219,11 @@ pub fn new(directory: &Path) -> Result<Self, SchemaServiceError> {
 }
 ```
 
-It is **dead code in a production build** and exists only to *discard* the diagnostics
-that production actually reports via `warn_schema_construction_diagnostics`
-(`src/schema/service.rs:289`). Production reaches schema loading through
-`SchemaService::load_verbose` (`:78`), called by `TemplateService::new`
-(`src/template/engine.rs:131`) and the CLI.
+It is **dead code in a production build** and exists only to *discard* the
+diagnostics that production actually reports via
+`warn_schema_construction_diagnostics` (`src/schema/service.rs:289`). Production
+reaches schema loading through `SchemaService::load_verbose` (`:78`), called by
+`TemplateService::new` (`src/template/engine.rs:131`) and the CLI.
 
 Twins:
 
@@ -208,36 +237,40 @@ Twins:
 
 Additional defects in this file:
 
-- **Zero `assert*` calls.** Every test is `if cond { return Err(std::io::Error::other(…)) }`,
-  returning `Result<(), Box<dyn Error>>`. Failures surface as a bare `io::Error` string;
-  no `pretty_assertions`, no field-level diff. This diverges from the suite's convention
-  and from `tests/integration.rs`'s blanket `expect_used` allowance.
-- **Hard-codes `".traces/schemas"`** (`:25`, `:61`, `:89`, `:111`, `:132`) instead of the
-  exported `DEFAULT_SCHEMAS_DIR` (`src/lib.rs:205`) that `TestProject::write_schema` uses.
-  The test and the fixture helper can drift independently.
-- The header claim (`:4-6`) — "the only test proving that field inheritance works when called
-  only through `SchemaService::new` + `get` + `field`" — is **true but circular**: the
-  uniqueness is manufactured by the choice of a test-only constructor.
+- **Zero `assert*` calls.** Every test is
+  `if cond { return Err(std::io::Error::other(…)) }`, returning
+  `Result<(), Box<dyn Error>>`. Failures surface as a bare `io::Error` string;
+  no `pretty_assertions`, no field-level diff. This diverges from the suite's
+  convention and from `tests/integration.rs`'s blanket `expect_used` allowance.
+- **Hard-codes `".traces/schemas"`** (`:25`, `:61`, `:89`, `:111`, `:132`)
+  instead of the exported `DEFAULT_SCHEMAS_DIR` (`src/lib.rs:205`) that
+  `TestProject::write_schema` uses. The test and the fixture helper can drift
+  independently.
+- The header claim (`:4-6`) — "the only test proving that field inheritance
+  works when called only through `SchemaService::new` + `get` + `field`" — is
+  **true but circular**: the uniqueness is manufactured by the choice of a
+  test-only constructor.
 
-**Net:** deleting this file loses no production-path coverage; what it does preserve is
-that three `pub` methods (`get`/`children_of`/`descendants_of`/`matches`) remain callable
-from outside the crate. That is a *visibility* test, not an integration test — it belongs
+**Net:** deleting this file loses no production-path coverage; what it does
+preserve is that three `pub` methods
+(`get`/`children_of`/`descendants_of`/`matches`) remain callable from outside
+the crate. That is a *visibility* test, not an integration test — it belongs
 next to the other `pub`-surface checks, or should be rewritten against
 `TemplateService::new` (the production `load_verbose` caller).
 
 ### 1.5 The suite's real differentiator, and why it is mostly wasted
 
-The harness doc (`tests/integration.rs:1-4`) claims the suite "proves cross-module data
-flow through `traces_pkm`'s `test-utils`-gated public surface alone (no process
-spawning, no crate-internal imports)." That is accurate as a *constraint* — but as a
-*differentiator* it is thin, because the in-crate unit twins reach the same functions
-from the other side of the `pub(crate)` wall.
+The harness doc (`tests/integration.rs:1-4`) claims the suite "proves
+cross-module data flow through `traces_pkm`'s `test-utils`-gated public surface
+alone (no process spawning, no crate-internal imports)." That is accurate as a
+*constraint* — but as a *differentiator* it is thin, because the in-crate unit
+twins reach the same functions from the other side of the `pub(crate)` wall.
 
-The one genuinely different ingredient available to `tests/` is the **filesystem/DB
-boundary performed through `pub` APIs**: real `DirTree` scan, real `index.redb`,
-real file writes. Of the 30 tests, only **#5, #6, #26, #27** actually depend on that
-ingredient to say something no unit test says. The other 26 re-derive in-process
-logic through a longer call chain.
+The one genuinely different ingredient available to `tests/` is the
+**filesystem/DB boundary performed through `pub` APIs**: real `DirTree` scan,
+real `index.redb`, real file writes. Of the 30 tests, only **#5, #6, #26, #27**
+actually depend on that ingredient to say something no unit test says. The other
+26 re-derive in-process logic through a longer call chain.
 
 ---
 
@@ -260,62 +293,68 @@ logic through a longer call chain.
 | `sorts_pages_descending_by_text_field` (`:403`) | sort order |
 
 Mixed seams inside single tests:
-- `evaluates_query_modes_…` asserts **three** unrelated contracts in one body: (a) `lists`
-  mode returns all 5 items, (b) per-row `depth`/`line`/`parent` projection, (c) `tasks`
-  mode applies `TaskConfig::from_tags` — (c) belongs in `task_tag_filters.rs` and is
-  duplicated by it.
-- `accepts_canonical_list_paths_…` is a **grammar test**: the `expect_err` branches
-  (`:285-298`) never touch the index at all — they only exercise
-  `QueryBuilder::filter` → `FieldPath::parse`. It builds a whole trusted project and a
-  full index (`:250-264`) purely to throw an error before reading it.
+
+- `evaluates_query_modes_…` asserts **three** unrelated contracts in one body:
+  (a) `lists` mode returns all 5 items, (b) per-row `depth`/`line`/`parent`
+  projection, (c) `tasks` mode applies `TaskConfig::from_tags` — (c) belongs in
+  `task_tag_filters.rs` and is duplicated by it.
+- `accepts_canonical_list_paths_…` is a **grammar test**: the `expect_err`
+  branches (`:285-298`) never touch the index at all — they only exercise
+  `QueryBuilder::filter` → `FieldPath::parse`. It builds a whole trusted project
+  and a full index (`:250-264`) purely to throw an error before reading it.
 - The file header (`:1-3`) says "Proves `WorkspaceIndex::build` → `QueryBuilder`
   execution works across real files" — true of #7/#9/#15/#17 but not of #13.
 
 ### `index_persistence_roundtrip.rs` — 3 distinct seams in 4 tests
 
 - Tests 1-2: redb **row round-trip** (index store + note codec).
-- Test 3 `preserves_query_rows_and_list_metadata_across_cold_reload` mixes at least
-  five contracts: (i) redb round-trip, (ii) in-memory vs reload query equivalence,
-  (iii) **"no reparse"** proven by `fs::remove_file` (`:204-207`), (iv) task metadata on
-  `Note`, (v) ADR-0005 `LISTS`-table absence. It splits assertions across
-  `assert_rows_match` (structural + `task_text`/`task_completed`/`status_symbol`) and a
-  second block reading `Note::lists()` directly (`:225-254`) — i.e. it asserts the same
-  domain through **two different access paths** without saying why.
-- Test 4 `refresh_after_corruption_recovery_…` spans `store.rs` container recovery
-  **and** `refresh.rs`/`RefreshReport` delta accounting — two unrelated modules.
+- Test 3 `preserves_query_rows_and_list_metadata_across_cold_reload` mixes at
+  least five contracts: (i) redb round-trip, (ii) in-memory vs reload query
+  equivalence, (iii) **"no reparse"** proven by `fs::remove_file` (`:204-207`),
+  (iv) task metadata on `Note`, (v) ADR-0005 `LISTS`-table absence. It splits
+  assertions across `assert_rows_match` (structural +
+  `task_text`/`task_completed`/`status_symbol`) and a second block reading
+  `Note::lists()` directly (`:225-254`) — i.e. it asserts the same domain
+  through **two different access paths** without saying why.
+- Test 4 `refresh_after_corruption_recovery_…` spans `store.rs` container
+  recovery **and** `refresh.rs`/`RefreshReport` delta accounting — two unrelated
+  modules.
 
 ### `task_tag_filters.rs` — 3 tests, 2 of them near-identical
 
-- `config_with_tag_filters_…` (`:19`) and `config_without_tag_filters_…` (`:80`) are the
-  same test with `with_tasks(...)` present/absent; both assert `run(tasks).len()` +
-  `task_text` list. The "without" variant is exactly
-  `src/query/service.rs::query_lists::emits_plain_checkbox_and_tasks_in_document_order` (`:1168`).
-- `classifies_multi_note_vault_…` (`:122`) packs **parser classification + inline-field
-  parsing + `fully_complete` computation + QueryRow `status_symbol`** into one test,
-  split across three private helper fns (`assert_query_task_statuses` `:216`,
-  `assert_resolved_parent` `:248`, `assert_incomplete_parent` `:274`). The helpers are
-  where the real assertions live; the test body mostly dispatches to them.
-- The file header (`:4-6`) claims it proves classification "across real files, config
-  resolution, indexing, and query execution." **"Config resolution" is false**: no test
-  in this file parses a config file — every one uses
-  `project.config()` → `Config::test_default` + `.with_tasks(...)` (see §4).
+- `config_with_tag_filters_…` (`:19`) and `config_without_tag_filters_…` (`:80`)
+  are the same test with `with_tasks(...)` present/absent; both assert
+  `run(tasks).len()` + `task_text` list. The "without" variant is exactly
+  `src/query/service.rs::query_lists::emits_plain_checkbox_and_tasks_in_document_order`
+  (`:1168`).
+- `classifies_multi_note_vault_…` (`:122`) packs **parser classification +
+  inline-field parsing + `fully_complete` computation + QueryRow
+  `status_symbol`** into one test, split across three private helper fns
+  (`assert_query_task_statuses` `:216`, `assert_resolved_parent` `:248`,
+  `assert_incomplete_parent` `:274`). The helpers are where the real assertions
+  live; the test body mostly dispatches to them.
+- The file header (`:4-6`) claims it proves classification "across real files,
+  config resolution, indexing, and query execution."
+  **"Config resolution" is false**: no test in this file parses a config file —
+  every one uses `project.config()` → `Config::test_default` +
+  `.with_tasks(...)` (see §4).
 
 ### `config_lifecycle.rs` — two tests, one seam, one of them empty
 
-- Both tests assert exactly the same two things: a `.traces/config.toml` exists, and
-  `untrust() == 1`. Test 2 (`:42`) additionally re-asserts a fixture write performed by
-  `create_trusted_project` — it is testing the test helper.
+- Both tests assert exactly the same two things: a `.traces/config.toml` exists,
+  and `untrust() == 1`. Test 2 (`:42`) additionally re-asserts a fixture write
+  performed by `create_trusted_project` — it is testing the test helper.
 - The file's 11-line module doc (`:4-11`) is an argument for *not* widening
-  `ConfigService::load` to `pub`. That is a design note, not test scope; it belongs in an
-  ADR, not above two assertions.
+  `ConfigService::load` to `pub`. That is a design note, not test scope; it
+  belongs in an ADR, not above two assertions.
 
 ### `template_render.rs` — well-scoped (the only file with a coherent single boundary)
 
-All five tests cross the same seam: `TemplateService::render_to_file`. Test 3 (`:111`)
-nevertheless concatenates ~8 independent transform/formatter assertions
+All five tests cross the same seam: `TemplateService::render_to_file`. Test 3
+(`:111`) nevertheless concatenates ~8 independent transform/formatter assertions
 (`count`×5, `task_list`×3, `table`×4) that `src/template/engine/query.rs`
-`method_chaining` (`:873-1004`) and `terminal_rendering` (`:1006-1186`) already cover
-individually.
+`method_chaining` (`:873-1004`) and `terminal_rendering` (`:1006-1186`) already
+cover individually.
 
 ### `schema_field_resolution.rs` — single seam, but a dead-code one (see §1.4)
 
@@ -328,13 +367,15 @@ Every gap cites the production call path and the (unit-only / absent) coverage.
 ### G-B1 — The production query cold path is entirely untested from `tests/` (HIGH)
 
 Production: `src/cli/mod.rs:240` `service.load(&cwd)` → … → `refresh_query`
-(`src/cli/mod.rs:303`) → `IndexerService::refresh_store()` (`:312`, `pub(crate)`,
-`src/index/service.rs:226`) → `run_query_builder_from_store` (`src/cli/mod.rs:438`) →
+(`src/cli/mod.rs:303`) → `IndexerService::refresh_store()` (`:312`,
+`pub(crate)`, `src/index/service.rs:226`) → `run_query_builder_from_store`
+(`src/cli/mod.rs:438`) →
 `QueryService::new(config.schemas().class_field_name())` (`:446`) →
 `with_class_expander` (`:448`, `pub(crate)`, `src/query/service.rs:82`) →
 `run_from_store` (`:452`, `pub(crate)`, `src/query/service.rs:125`).
 
-`rg "sync_and_run|run_from_store|refresh_store|with_class_expander" tests/` → **zero hits.**
+`rg "sync_and_run|run_from_store|refresh_store|with_class_expander" tests/` →
+**zero hits.**
 
 | Function | Only callers |
 |---|---|
@@ -344,32 +385,38 @@ Production: `src/cli/mod.rs:240` `service.load(&cwd)` → … → `refresh_query
 | `sync_and_run` (`pub`, `#[cfg(any(test, feature = "test-utils"))]`, `src/query/service.rs:176-178`) | 1 unit test (`:1247`) + `benches/index_refresh.rs` + `benches/memory_footprint.rs` |
 
 `sync_and_run` exists *specifically* as the public stand-in for the CLI's
-`refresh_store` + `run_from_store` pair (`src/query/service.rs:183-184`) — and **no
-integration test calls it.** The stand-in for the most important untestable path is
-itself untested at the integration layer.
+`refresh_store` + `run_from_store` pair (`src/query/service.rs:183-184`) — and
+**no integration test calls it.** The stand-in for the most important untestable
+path is itself untested at the integration layer.
 
-The CLI process boundary is covered (`tests/e2e/*`), so this is a *layer* gap, not a
-total gap — but the `test-utils` surface was built for exactly this and is unused here.
+The CLI process boundary is covered (`tests/e2e/*`), so this is a *layer* gap,
+not a total gap — but the `test-utils` surface was built for exactly this and is
+unused here.
 
 ### G-B2 — `@Class` source expansion: schema → query `FileClassExpander` has zero `tests/` coverage (HIGH)
 
-Production: `src/cli/mod.rs:446-450` and `src/template/engine/query.rs:132-133` wire
-`SchemaService` into `QueryService::with_class_expander`, enabling
+Production: `src/cli/mod.rs:446-450` and `src/template/engine/query.rs:132-133`
+wire `SchemaService` into `QueryService::with_class_expander`, enabling
 `SourceSelector` class sources (`@Book`).
 
 - `rg "from\('@" tests/` → **zero hits** (only a prose mention at
   `tests/e2e/dispatch.rs:414`).
-- Every `SourceSelector` in `tests/integration/` is `SourceSelector::All` (**27 call
-  sites**, `rg -c` over the six files; zero `from_tags`/`from_folder`/`@class` selectors).
-- Coverage is unit-only: `src/template/engine/query.rs::class_sources::{selects_notes_of_a_single_class` (`:1824`),
-  `matches_any_of_several_classes` (`:1838`), `matches_a_subclass_transitively` (`:1856`),
-  `reads_the_file_class_from_the_configured_field` (`:1922`)}`; `src/file_class_expander.rs`.
+- Every `SourceSelector` in `tests/integration/` is `SourceSelector::All`
+  (**27 call sites**, `rg -c` over the six files; zero
+  `from_tags`/`from_folder`/`@class` selectors).
+- Coverage is unit-only:
+  `src/template/engine/query.rs::class_sources::{selects_notes_of_a_single_class`
+  (`:1824`), `matches_any_of_several_classes` (`:1838`),
+  `matches_a_subclass_transitively` (`:1856`),
+  `reads_the_file_class_from_the_configured_field`
+  (`:1922`)}`; `src/file_class_expander.rs`.
 - Also untested from `tests/`: `SchemaService::warn_unknown_classes`
-  (`src/schema/service.rs:185`) and `warn_schema_construction_diagnostics` (`:289`) —
-  i.e. **the diagnostics production emits when a schema dir is broken**.
-- `src/query/builder.rs:453 leaves_class_source_empty_without_an_expander` covers the
-  *degraded* case (no expander → empty), which is the opposite of production's
-  `has_classes == true` branch.
+  (`src/schema/service.rs:185`) and `warn_schema_construction_diagnostics`
+  (`:289`) — i.e.
+  **the diagnostics production emits when a schema dir is broken**.
+- `src/query/builder.rs:453 leaves_class_source_empty_without_an_expander`
+  covers the *degraded* case (no expander → empty), which is the opposite of
+  production's `has_classes == true` branch.
 
 ### G-B3 — Incremental refresh (add / edit / delete → refresh → changed query) has no integration test (MEDIUM-HIGH)
 
@@ -378,95 +425,118 @@ Production: `IndexerService::refresh` (`src/index/service.rs:105`, `pub`) /
 
 What `tests/` actually reaches:
 
-- `refresh_with_report` **once**, on a *corrupted* store (#6) — that is the wipe-and-recreate
-  rebuild path, not the incremental delta path.
-- `refresh()` **only as a hidden side effect** of `template_render`'s query namespace
-  (`src/template/engine/query.rs:233`), and in every `template_render` test the store
-  starts empty, so the delta is always "everything is new."
+- `refresh_with_report` **once**, on a *corrupted* store (#6) — that is the
+  wipe-and-recreate rebuild path, not the incremental delta path.
+- `refresh()` **only as a hidden side effect** of `template_render`'s query
+  namespace (`src/template/engine/query.rs:233`), and in every `template_render`
+  test the store starts empty, so the delta is always "everything is new."
 
-No integration test ever: builds → persists → **adds/edits/deletes a file** → refreshes →
-asserts the query result changed.
+No integration test ever: builds → persists → **adds/edits/deletes a file** →
+refreshes → asserts the query result changed.
 
 Unit-only: `src/index/service.rs::includes_newly_added_note` (`:1391`),
-`excludes_deleted_note` (`:1415`), `reparses_a_note_whose_content_and_size_changed` (`:1340`),
+`excludes_deleted_note` (`:1415`),
+`reparses_a_note_whose_content_and_size_changed` (`:1340`),
 `refresh_updates_changed_path_in_persisted_store` (`:1112`),
 `refresh_persists_so_a_fresh_load_reflects_the_change` (`:1588`),
-`incremental_refresh_persist_actually_removes_a_deleted_notes_row_from_disk` (`:1075`);
-plus `src/template/engine/query.rs::refresh::each_query_reflects_the_current_filesystem_state` (`:1636`).
+`incremental_refresh_persist_actually_removes_a_deleted_notes_row_from_disk`
+(`:1075`); plus
+`src/template/engine/query.rs::refresh::each_query_reflects_the_current_filesystem_state`
+(`:1636`).
 
 ### G-B4 — `ConfigService::load` is never reached from `tests/`, so no test proves config TOML → behavior (HIGH)
 
-Production: `src/cli/mod.rs:240` `service.load(&cwd)` (`pub(crate)`, `src/config/service.rs:190`).
+Production: `src/cli/mod.rs:240` `service.load(&cwd)` (`pub(crate)`,
+`src/config/service.rs:190`).
 
-- `rg "\.load\(" tests/` → only `IndexerService::load` (3 hits, `index_persistence_roundtrip.rs`).
-  The string `ConfigService::load` appears in `tests/` **only in prose**:
-  `config_lifecycle.rs:4` and `tests/e2e/tracked.rs:5` (a neighbouring doc comment,
-  `tests/e2e/golden_path.rs:58`, likewise discusses `ConfigService::trust` in prose only).
+- `rg "\.load\(" tests/` → only `IndexerService::load` (3 hits,
+  `index_persistence_roundtrip.rs`). The string `ConfigService::load` appears in
+  `tests/` **only in prose**: `config_lifecycle.rs:4` and
+  `tests/e2e/tracked.rs:5` (a neighbouring doc comment,
+  `tests/e2e/golden_path.rs:58`, likewise discusses `ConfigService::trust` in
+  prose only).
 - The only in-repo callers of `ConfigService::load` are `src/cli/mod.rs:240` and
-  `src/lib.rs::test_support::tests::service::returns_usable_service_in_temporary_directory` (`:873`),
-  which asserts nothing but `is_err` on an empty dir.
+  `src/lib.rs::test_support::tests::service::returns_usable_service_in_temporary_directory`
+  (`:873`), which asserts nothing but `is_err` on an empty dir.
 - **Consequence:** the `.traces/config.toml` written by `create_trusted_project`
-  (`src/lib.rs:600-603`, content `[templates]\ndirectory = "templates"\n`) is parsed only by
-  `LocalConfigFile::<Discovered>::try_new` at trust time — it is **never** run through
-  discovery + merge + trust gate + `Config` construction from `tests/`.
-- **Consequence:** every `Config` in this suite is fixture-computed. `TestProject::config()`
-  (`src/lib.rs:317`) returns `Config::test_default(&root)` (+ `.with_templates()` if
-  `templates/` exists). Therefore `[tasks] tag_filters`, `[schemas] class_field`,
-  `[schemas] directory`, `[templates] directory` read from TOML have **no `tests/` coverage**:
+  (`src/lib.rs:600-603`, content `[templates]\ndirectory = "templates"\n`) is
+  parsed only by `LocalConfigFile::<Discovered>::try_new` at trust time — it is
+  **never** run through discovery + merge + trust gate + `Config` construction
+  from `tests/`.
+- **Consequence:** every `Config` in this suite is fixture-computed.
+  `TestProject::config()` (`src/lib.rs:317`) returns
+  `Config::test_default(&root)` (+ `.with_templates()` if `templates/` exists).
+  Therefore `[tasks] tag_filters`, `[schemas] class_field`,
+  `[schemas] directory`, `[templates] directory` read from TOML have
+  **no `tests/` coverage**:
   - `[tasks] tag_filters` → classifier: unit-only
-    (`src/config/service.rs::load::fails_to_load_when_tag_filter_is_invalid`, `:730`) + e2e;
-    all three `task_tag_filters.rs` tests inject `TaskConfig::from_tags` programmatically.
-  - `[schemas] class_field` → `QueryService::new(config.schemas().class_field_name())`
-    (`src/cli/mod.rs:446`): **all 15 call sites in `tests/integration/` hard-code
-    `QueryService::new("class")`**. Unit-only:
-    `src/index/service.rs::mod class_field::indexes_file_class_under_the_configured_field` (`:1664`),
-    `rederives_class_under_configured_field_on_incremental_refresh` (`:1711`),
-    `src/template/engine/query.rs::refresh::uses_configured_class_field_and_task_statuses_for_template_queries` (`:1660`).
-  - Trust gate (untrusted root rejected): `pub(crate) load` unreachable; unit-only
-    `src/config/service.rs::build::rejects_untrusted_root` (`:830`) +
+    (`src/config/service.rs::load::fails_to_load_when_tag_filter_is_invalid`,
+    `:730`) + e2e; all three `task_tag_filters.rs` tests inject
+    `TaskConfig::from_tags` programmatically.
+  - `[schemas] class_field` →
+    `QueryService::new(config.schemas().class_field_name())`
+    (`src/cli/mod.rs:446`): **all 15 call sites in `tests/integration/`
+    hard-code `QueryService::new("class")`**. Unit-only:
+    `src/index/service.rs::mod class_field::indexes_file_class_under_the_configured_field`
+    (`:1664`), `rederives_class_under_configured_field_on_incremental_refresh`
+    (`:1711`),
+    `src/template/engine/query.rs::refresh::uses_configured_class_field_and_task_statuses_for_template_queries`
+    (`:1660`).
+  - Trust gate (untrusted root rejected): `pub(crate) load` unreachable;
+    unit-only `src/config/service.rs::build::rejects_untrusted_root` (`:830`) +
     `tests/e2e/dispatch.rs::untrusted_root_fails_with_the_config_build_diagnostic`.
-- `TestProject::config()` even silently *computes* `templates/` presence (`:319-323`) rather
-  than reading it from config — the unit test for that helper is
-  `src/lib.rs::test_support::tests::project::config_detects_templates_directory` (`:927`).
+- `TestProject::config()` even silently *computes* `templates/` presence
+  (`:319-323`) rather than reading it from config — the unit test for that
+  helper is
+  `src/lib.rs::test_support::tests::project::config_detects_templates_directory`
+  (`:927`).
 
 ### G-B5 — Typed values → redb → `QueryRow` filter/sort (MEDIUM)
 
 `index_persistence_roundtrip::preserves_query_rows_and_list_metadata_across_cold_reload`
-compares only `(path, depth, line, parent, task_text, task_completed, status_symbol)`
-(`assert_rows_match`, `:264-298`). It never filters or sorts by a typed field on the
-reloaded index. So "cold reload preserves values the query engine *reads*" is unproven;
-only "cold reload preserves values `Note::lists()` reads" is proven.
+compares only
+`(path, depth, line, parent, task_text, task_completed, status_symbol)`
+(`assert_rows_match`, `:264-298`). It never filters or sorts by a typed field on
+the reloaded index. So "cold reload preserves values the query engine *reads*"
+is unproven; only "cold reload preserves values `Note::lists()` reads" is
+proven.
 
-Unit-only: `src/index/service.rs::persist_then_load_recovers_typed_inline_field_values` (`:957`),
-`persist_then_load_recovers_frontmatter_link_fields` (`:896`), `…_inline_fields` (`:928`),
-`…_tags` (`:993`) — none of which run a query.
+Unit-only:
+`src/index/service.rs::persist_then_load_recovers_typed_inline_field_values`
+(`:957`), `persist_then_load_recovers_frontmatter_link_fields` (`:896`),
+`…_inline_fields` (`:928`), `…_tags` (`:993`) — none of which run a query.
 
 ### G-B6 — Row-level corruption / `read_notes_batch` fail-open (MEDIUM)
 
-The integration layer can only poison the **container** (byte 9..), which forces a full
-rebuild. It cannot reach `IndexStore::poison_note_row` (`src/index/store.rs:350`,
-`pub(super)`) to prove the "warn and skip a bad row" contract on a live path.
+The integration layer can only poison the **container** (byte 9..), which forces
+a full rebuild. It cannot reach `IndexStore::poison_note_row`
+(`src/index/store.rs:350`, `pub(super)`) to prove the "warn and skip a bad row"
+contract on a live path.
 
-Unit-only: `src/index/store.rs::refresh_fails_open_when_a_previous_notes_row_is_corrupted` (`:2598`),
-`skips_missing_and_undecodable_notes_but_keeps_valid_ones` (`:2516`),
-`propagates_a_failed_row_read_instead_of_omitting_the_row` (`:2495`). The fail-open site
-itself is the `tracing::warn!("skipping corrupted row")` branch at
-`src/index/store.rs:841-847`, reachable only through `pub(super)` row helpers.
+Unit-only:
+`src/index/store.rs::refresh_fails_open_when_a_previous_notes_row_is_corrupted`
+(`:2598`), `skips_missing_and_undecodable_notes_but_keeps_valid_ones` (`:2516`),
+`propagates_a_failed_row_read_instead_of_omitting_the_row` (`:2495`). The
+fail-open site itself is the `tracing::warn!("skipping corrupted row")` branch
+at `src/index/store.rs:841-847`, reachable only through `pub(super)` row
+helpers.
 
 ### G-B7 — The suite can silently be 0 tests (LOW-MEDIUM, operational)
 
 See harness facts above: `#![cfg(feature = "test-utils")]` + no `[[test]]`/
 `required-features` + `test-utils` not in `default`. Any invocation that omits
-`--all-features`/`--features test-utils` runs **0 integration tests and exits 0**.
-The benches guard themselves with `required-features = ["test-utils"]`
+`--all-features`/`--features test-utils` runs
+**0 integration tests and exits 0**. The benches guard themselves with
+`required-features = ["test-utils"]`
 (`Cargo.toml:43,47,52,57,62,67,72,77,82,87,92,97`); the tests do not.
 
 ### G-B8 — Free helpers re-exported for this suite are used by nothing in `tests/`
 
-`rg` over `tests/` for each of: `build_test_index`, `parse_note_str`, `parse_tag`,
-`resolve_safe_path`, free `write_note`/`write_template`/`write_schema`,
-`DEFAULT_TEMPLATES_DIR`, `DEFAULT_SCHEMAS_DIR`, `DEFAULT_SCHEMA_VALUES_DIR`,
-`TzGuard`, `TestProject::untrusted`, `TestProject::service` → **zero hits in `tests/`**.
+`rg` over `tests/` for each of: `build_test_index`, `parse_note_str`,
+`parse_tag`, `resolve_safe_path`, free
+`write_note`/`write_template`/`write_schema`, `DEFAULT_TEMPLATES_DIR`,
+`DEFAULT_SCHEMAS_DIR`, `DEFAULT_SCHEMA_VALUES_DIR`, `TzGuard`,
+`TestProject::untrusted`, `TestProject::service` → **zero hits in `tests/`**.
 
 Verified actual consumers:
 
@@ -474,21 +544,23 @@ Verified actual consumers:
   `benches/common/project.rs:23-25` only;
 - `parse_note` → `benches/common/notes.rs:24`;
 - `TzGuard` → `src/date.rs` unit tests only (`:1337` onward);
-- `TestProject::untrusted` / `::service` → `src/lib.rs` unit tests only (`:920`, `:875`);
+- `TestProject::untrusted` / `::service` → `src/lib.rs` unit tests only (`:920`,
+  `:875`);
 - everything else → `src/lib.rs` doctests + `src/` unit tests.
 
-So `src/lib.rs:165-180`'s module doc — "for external `tests/`/`benches/` consumers" —
-overstates the `tests/` half: of the 9 free helpers it advertises, **0 are used by any
-file under `tests/`**. Meanwhile the three constants that *would* remove the hard-coded
-`".traces/schemas"` literal in `schema_field_resolution.rs` go unused there
-(`TestProject::write_schema` itself uses `DEFAULT_SCHEMAS_DIR` at `src/lib.rs:425` —
-the test just doesn't).
+So `src/lib.rs:165-180`'s module doc — "for external `tests/`/`benches/`
+consumers" — overstates the `tests/` half: of the 9 free helpers it advertises,
+**0 are used by any file under `tests/`**. Meanwhile the three constants that
+*would* remove the hard-coded `".traces/schemas"` literal in
+`schema_field_resolution.rs` go unused there (`TestProject::write_schema` itself
+uses `DEFAULT_SCHEMAS_DIR` at `src/lib.rs:425` — the test just doesn't).
 
 ---
 
 ## 4. `test-utils` helper classification: arrangement vs behavior-hidden
 
-Source: `src/lib.rs:182-799` (`mod test_support`), re-exported at `src/lib.rs:157-163`.
+Source: `src/lib.rs:182-799` (`mod test_support`), re-exported at
+`src/lib.rs:157-163`.
 
 ### 4.1 Pure arrangement (safe)
 
@@ -524,36 +596,40 @@ Source: `src/lib.rs:182-799` (`mod test_support`), re-exported at `src/lib.rs:15
 
 ### 4.3 Classification summary
 
-- **Arrangement:** 16 helpers (`empty`, `root`, `service`, `write_file`, `write_note`,
-  `write_template`, `write_schema`, `write_schema_value`, free `write_*`, `resolve_safe_path`,
-  `parse_note`, `parse_note_str`, `build_test_index`, `fixture_service`, `untrusted`, `config`).
+- **Arrangement:** 16 helpers (`empty`, `root`, `service`, `write_file`,
+  `write_note`, `write_template`, `write_schema`, `write_schema_value`, free
+  `write_*`, `resolve_safe_path`, `parse_note`, `parse_note_str`,
+  `build_test_index`, `fixture_service`, `untrusted`, `config`).
 - **Behavior-hidden:** 6 (`create_trusted_project`, `trust`, `build_index`,
-  `build_and_persist`, `trusted`, `indexer`) + `config`, which is arrangement *that hides
-  production behavior* (config discovery), so it is counted in both columns deliberately.
+  `build_and_persist`, `trusted`, `indexer`) + `config`, which is arrangement
+  *that hides production behavior* (config discovery), so it is counted in both
+  columns deliberately.
 - **Assertion-passed-through correctly:** `untrust` (returns the count).
 
 ### 4.4 Two practices that make the classification worse than it needs to be
 
-1. **`.expect()` inside helpers + `#![allow(clippy::expect_used)]` on the harness**
-   (`tests/integration.rs:6-11`) means a fixture failure and a production failure are
-   indistinguishable in the report — both surface as a panic message.
+1. **`.expect()` inside helpers + `#![allow(clippy::expect_used)]` on the
+   harness** (`tests/integration.rs:6-11`) means a fixture failure and a
+   production failure are indistinguishable in the report — both surface as a
+   panic message.
 2. **`TestProject::config()` / `::indexer()` used as "the project's config"** in
    **13 of 30 tests** — `index_query` ×3 (`:187`, `:261`, `:318`),
-   `index_persistence_roundtrip` ×2 (`:64`, `:209`), `task_tag_filters` ×3 (`:35`, `:93`,
-   `:156`), `template_render` ×5 (`:29`, `:79`, `:157`, `:241`, `:280`). Every one of them
-   *appears* to prove "config → X" while proving "fixture-default-config → X."
+   `index_persistence_roundtrip` ×2 (`:64`, `:209`), `task_tag_filters` ×3
+   (`:35`, `:93`, `:156`), `template_render` ×5 (`:29`, `:79`, `:157`, `:241`,
+   `:280`). Every one of them *appears* to prove "config → X" while proving
+   "fixture-default-config → X."
 
 ---
 
 ## 5. Proposed responsibility map
 
-Principle: each `tests/integration/*` file owns exactly one **production boundary** that
-cannot be reached from `src/`, and each test in it must fail if that boundary breaks —
-not if a helper breaks.
+Principle: each `tests/integration/*` file owns exactly one
+**production boundary** that cannot be reached from `src/`, and each test in it
+must fail if that boundary breaks — not if a helper breaks.
 
 ### Proposed layout
 
-```
+```text
 tests/integration/
   index_store_roundtrip.rs      (index + note codec + redb)   ← keep 2, fold 2
   index_refresh.rs              (index + FS + redb + delta)   ← NEW (closes G-B3)
@@ -581,36 +657,44 @@ tests/integration/
 ### New tests the map implies (priority order)
 
 1. **Cold-path query through the public seam** — use the already-exported
-   `QueryService::sync_and_run` (`src/query/service.rs:178`), which exists precisely to
-   stand in for `refresh_store` + `run_from_store`, and is currently called only from a
-   unit test and two benches. (G-B1)
-2. **Config TOML → behavior** — one test that writes a real `.traces/config.toml` with
-   `[tasks] tag_filters` + `[schemas] class_field` and proves both flow into
-   classification and row field names. Blocked today because `ConfigService::load` is
-   `pub(crate)`; either widen it (the argument at `config_lifecycle.rs:4-11` is about the
-   *error type*, not the method) or drive it through `tests/e2e` and assert there. (G-B4)
-3. **`@Class` source through `TemplateService`** — a template using `tasks.from('@Book')`
-   with a real schema; this exercises `with_class_expander` + `load_verbose` +
-   `warn_unknown_classes` in one test. (G-B2)
-4. **Incremental refresh** — build → persist → add/edit/delete → refresh → changed rows. (G-B3)
-5. **Typed filter/sort after cold reload** — extend #5's `assert_rows_match` with one
-   `where`/`sort` on a typed field evaluated on the reloaded index. (G-B5)
-6. **Harness guard** — add `[[test]] name = "integration" path = "tests/integration.rs"
-   required-features = ["test-utils"]` (mirroring the 12 `[[bench]]` entries) so a
-   featureless `cargo test` fails loudly instead of reporting 0 tests. (G-B7)
+   `QueryService::sync_and_run` (`src/query/service.rs:178`), which exists
+   precisely to stand in for `refresh_store` + `run_from_store`, and is
+   currently called only from a unit test and two benches. (G-B1)
+2. **Config TOML → behavior** — one test that writes a real
+   `.traces/config.toml` with `[tasks] tag_filters` + `[schemas] class_field`
+   and proves both flow into classification and row field names. Blocked today
+   because `ConfigService::load` is `pub(crate)`; either widen it (the argument
+   at `config_lifecycle.rs:4-11` is about the *error type*, not the method) or
+   drive it through `tests/e2e` and assert there. (G-B4)
+3. **`@Class` source through `TemplateService`** — a template using
+   `tasks.from('@Book')` with a real schema; this exercises
+   `with_class_expander` + `load_verbose` + `warn_unknown_classes` in one test.
+   (G-B2)
+4. **Incremental refresh** — build → persist → add/edit/delete → refresh →
+   changed rows. (G-B3)
+5. **Typed filter/sort after cold reload** — extend #5's `assert_rows_match`
+   with one `where`/`sort` on a typed field evaluated on the reloaded index.
+   (G-B5)
+6. **Harness guard** — add
+   `[[test]] name = "integration" path = "tests/integration.rs" required-features = ["test-utils"]`
+   (mirroring the 12 `[[bench]]` entries) so a featureless `cargo test` fails
+   loudly instead of reporting 0 tests. (G-B7)
 
 ### What to stop doing
 
 - **Stop asserting fixture properties as production properties.**
   `config_lifecycle` test 1's `assert!(config_path.is_file())` and test 2's
-  `assert!(project.root().join(".traces/config.toml").is_file())` both assert that
-  `fs::write` succeeded.
-- **Stop writing module docs that argue design decisions** (`config_lifecycle.rs:4-11`)
-  or **cite nonexistent functions** (`index_persistence_roundtrip.rs:1-7`, `:304-307`).
-  Three of six files have stale provenance claims; a reader trusting them would look for
-  unit twins that do not exist.
+  `assert!(project.root().join(".traces/config.toml").is_file())` both assert
+  that `fs::write` succeeded.
+- **Stop writing module docs that argue design decisions**
+  (`config_lifecycle.rs:4-11`) or **cite nonexistent functions**
+  (`index_persistence_roundtrip.rs:1-7`, `:304-307`). Three of six files have
+  stale provenance claims; a reader trusting them would look for unit twins that
+  do not exist.
 - **Stop using `if … return Err(...)` in place of assertions**
   (`schema_field_resolution.rs`, all 5 tests).
-- **Stop hard-coding paths the fixtures already export** (`".traces/schemas"` ×5).
-- **Stop calling `QueryService::new("class")` literally** — derive it from the config
-  under test, or the `class_field` configuration seam stays unproven from `tests/` (G-B4).
+- **Stop hard-coding paths the fixtures already export** (`".traces/schemas"`
+  ×5).
+- **Stop calling `QueryService::new("class")` literally** — derive it from the
+  config under test, or the `class_field` configuration seam stays unproven from
+  `tests/` (G-B4).

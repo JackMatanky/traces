@@ -101,9 +101,10 @@ Checks:
 ## Inconsistencies to resolve at grilling
 
 1. Store path type vs row type: the 24-prep guide proposes a store path type
-   owning `Arc<FileEntry>` rows [P] (`research/24-prep/z-grilling-guide.md:264-266`),
-   but ticket 29 owns the row type. The split: ticket 32 owns the path form
-   and its key bytes; ticket 29 owns the row that hangs off it.
+   owning `Arc<FileEntry>` rows [P]
+   (`research/24-prep/z-grilling-guide.md:264-266`), but ticket 29 owns the row
+   type. The split: ticket 32 owns the path form and its key bytes; ticket 29
+   owns the row that hangs off it.
 2. Template inspection leak vs the invariant: endorsing absolute-path
    inspection weakens "all file access stays inside the root". Closing it
    breaks `path_exists('/usr/bin/pandoc')` checks [V] (survey H4). The

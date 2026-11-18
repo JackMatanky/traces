@@ -4,7 +4,9 @@ Research date: 2026-09-14
 
 ## Overview
 
-The Rust LSP ecosystem has **7 distinct approaches** to building a Language Server, ranging from full-featured async frameworks to raw JSON-RPC framing from scratch. Here's the full landscape.
+The Rust LSP ecosystem has **7 distinct approaches** to building a Language
+Server, ranging from full-featured async frameworks to raw JSON-RPC framing from
+scratch. Here's the full landscape.
 
 ---
 
@@ -28,7 +30,9 @@ The Rust LSP ecosystem has **7 distinct approaches** to building a Language Serv
 | **LSP spec version** | 3.16, proposed 3.18 via feature flag |
 | **LOC for basic server** | ~30 lines |
 
-**Key limitation**: `&self` on all handlers forces `Arc<RwLock<...>>` for mutable state. Notifications handled asynchronously introduces ordering bugs. No way to plug in custom tower middleware.
+**Key limitation**: `&self` on all handlers forces `Arc<RwLock<...>>` for
+mutable state. Notifications handled asynchronously introduces ordering bugs. No
+way to plug in custom tower middleware.
 
 ---
 
@@ -49,7 +53,9 @@ The Rust LSP ecosystem has **7 distinct approaches** to building a Language Serv
 | **Projects using it** | **Biome, Oxc, Harper, Polarity, Veryl, django-language-server, pytest-language-server, SystemD-LSP, Amber LSP, ast-grep** |
 | **LOC for basic server** | ~30 lines |
 
-**Verdict**: The de facto "easy" choice. Most production Rust LSPs use this. Same architectural limitations as the original (immutable state, no custom layers), but actively maintained and Biome-level projects ship on it.
+**Verdict**: The de facto "easy" choice. Most production Rust LSPs use this.
+Same architectural limitations as the original (immutable state, no custom
+layers), but actively maintained and Biome-level projects ship on it.
 
 ---
 
@@ -77,14 +83,20 @@ The Rust LSP ecosystem has **7 distinct approaches** to building a Language Serv
 | **LOC for basic server** | ~50-80 lines (more ceremony, more control) |
 
 **Key architecture**:
+
 - Requests: tower `Service` — can be `tower::Service::call()` concurrently
-- Notifications: synchronous handler — processed in order, can control main loop via `ControlFlow`
+- Notifications: synchronous handler — processed in order, can control main loop
+  via `ControlFlow`
 - Middleware stack is fully composable via tower `Layer`
-- Two API styles: builder API (more flexible) or omnitrait `LanguageServer`/`LanguageClient` (similar to tower-lsp)
+- Two API styles: builder API (more flexible) or omnitrait
+  `LanguageServer`/`LanguageClient` (similar to tower-lsp)
 
-**Why `&mut self` matters**: No `Arc<RwLock<...>>` needed. You mutate state directly in notification handlers (like `didChange`), and request handlers return futures that don't borrow self. This is the correct model for LSP.
+**Why `&mut self` matters**: No `Arc<RwLock<...>>` needed. You mutate state
+directly in notification handlers (like `didChange`), and request handlers
+return futures that don't borrow self. This is the correct model for LSP.
 
-**Adoption**: Used by oxalica's tooling (rust-overlay, etc.). Not as widely adopted as tower-lsp-server, but architecturally superior.
+**Adoption**: Used by oxalica's tooling (rust-overlay, etc.). Not as widely
+adopted as tower-lsp-server, but architecturally superior.
 
 ---
 
@@ -107,40 +119,54 @@ The Rust LSP ecosystem has **7 distinct approaches** to building a Language Serv
 | **LSP spec** | N/A (just types + framing) |
 | **LOC for basic server** | ~40 lines |
 
-**Who uses it**: rust-analyzer itself, and projects that want maximum control. The `Connection` struct gives you `sender`/`receiver` and you write `loop { match receiver.recv() { ... } }`.
+**Who uses it**: rust-analyzer itself, and projects that want maximum control.
+The `Connection` struct gives you `sender`/`receiver` and you write
+`loop { match receiver.recv() { ... } }`.
 
-**Key insight**: This is a "bring your own main loop" scaffold. You get JSON-RPC framing + LSP handshake, but everything else is manual. This is what rust-analyzer uses — it has a complex custom main loop with salsa integration, event loops, and internal task scheduling.
+**Key insight**: This is a "bring your own main loop" scaffold. You get JSON-RPC
+framing + LSP handshake, but everything else is manual. This is what
+rust-analyzer uses — it has a complex custom main loop with salsa integration,
+event loops, and internal task scheduling.
 
 ---
 
 ## 5. lsp-types / ls-types / lspt / lsp (Type-only crates)
 
-These provide **only type definitions** — no server scaffolding, no framing, no dispatch.
+These provide **only type definitions** — no server scaffolding, no framing, no
+dispatch.
 
 ### lsp-types (gluon-lang)
+
 - **Crate**: `lsp-types` v0.97.0 (most popular, 33M all-time downloads)
 - **LSP spec**: 3.16 with proposed 3.17
-- **Status**: Effectively unmaintained (last release Jun 2024), but still the most depended-upon
+- **Status**: Effectively unmaintained (last release Jun 2024), but still the
+  most depended-upon
 - **Used by**: tower-lsp, most frameworks
 
 ### ls-types (tower-lsp-community)
+
 - **Crate**: `ls-types` v0.0.6 (1M all-time downloads)
 - **LSP spec**: 3.18
-- **Status**: Active — maintained by tower-lsp-community, plans for codegen from LSP metamodel
+- **Status**: Active — maintained by tower-lsp-community, plans for codegen from
+  LSP metamodel
 - **Used by**: tower-lsp-server v0.22+
 
 ### gen-lsp-types
+
 - **Crate**: `gen-lsp-types` v0.11.0 (334K all-time downloads)
 - **Generated from**: Official LSP metamodel
 - **Always up-to-date** with latest LSP spec
 - **Status**: Active (Jul 2026)
 
 ### lspt
+
 - **Crate**: `lspt` v0.5.0
-- **Features**: Configurable URI (String vs url::Url), FxHashMap/indexmap, method macros
+- **Features**: Configurable URI (String vs url::Url), FxHashMap/indexmap,
+  method macros
 - **Status**: Active (Jul 2026)
 
 ### lsp (macmv)
+
 - **Crate**: `lsp` v0.1.1
 - **Generated from**: LSP meta model via lsp-generator
 - **Status**: New (2026)
@@ -150,6 +176,7 @@ These provide **only type definitions** — no server scaffolding, no framing, n
 ## 6. Other Frameworks
 
 ### lspower — `lspower`
+
 | Attribute | Detail |
 |-----------|--------|
 | **Crate** | `lspower` v1.5.0 |
@@ -159,6 +186,7 @@ These provide **only type definitions** — no server scaffolding, no framing, n
 | **SLoC** | 3.4K |
 
 ### language-server (latex-lsp)
+
 | Attribute | Detail |
 |-----------|--------|
 | **Repo** | [latex-lsp/language-server](https://github.com/latex-lsp/language-server) |
@@ -167,6 +195,7 @@ These provide **only type definitions** — no server scaffolding, no framing, n
 | **Used by** | latex-lsp project |
 
 ### lspf
+
 | Attribute | Detail |
 |-----------|--------|
 | **Crate** | `lspf` (Aug 2026) |
@@ -211,19 +240,24 @@ These provide **only type definitions** — no server scaffolding, no framing, n
 **Total**: ~125 lines of boilerplate for a working skeleton.
 
 **Libraries needed**:
+
 - `lsp-types` (or `lspt`, `gen-lsp-types`) for type definitions
 - `serde_json` for serialization
 - A Content-Length reader (custom or `lsp-server`)
 
-**Tutorials**: No dedicated tutorials exist. The best reference is `lsp-server`'s `examples/goto_def.rs` and rust-analyzer's `main_loop.rs`.
+**Tutorials**: No dedicated tutorials exist. The best reference is
+`lsp-server`'s `examples/goto_def.rs` and rust-analyzer's `main_loop.rs`.
 
 **When to go custom**:
+
 - Need synchronous notification processing with complex state machine
 - Need custom I/O (TCP, Unix sockets, not just stdio)
-- Need multiplexed internal event loops (e.g., rust-analyzer's salsa integration)
+- Need multiplexed internal event loops (e.g., rust-analyzer's salsa
+  integration)
 - Performance-critical with custom scheduling
 
 **When NOT to go custom**:
+
 - Standard LSP server with straightforward request handling
 - You want middleware, cancellation, progress without writing it yourself
 - Team unfamiliar with JSON-RPC/LSP protocol details
@@ -255,24 +289,28 @@ These provide **only type definitions** — no server scaffolding, no framing, n
 ## 10. Recommendations
 
 ### For most new projects: **tower-lsp-server**
+
 - Best balance of ease-of-use and production validation
 - Biome, Oxc, Harper prove it works at scale
 - Active maintenance, LSP 3.18 support
 - Trade-off: `&self` means `Arc<RwLock<...>>` for mutable state
 
 ### For maximum correctness: **async-lsp**
+
 - Correct `&mut self` model, synchronous notifications
 - Full tower middleware stack
 - Best architecture for complex servers
 - Trade-off: More ceremony, less ecosystem adoption
 
 ### For maximum control: **lsp-server** or **lsp-types only**
+
 - rust-analyzer's approach
 - You write the main loop
 - Best for complex state machines, custom I/O, performance-critical dispatch
 - Trade-off: More code, more responsibility
 
 ### Avoid: **tower-lsp** (original), **lspower**
+
 - Unmaintained
 - Use tower-lsp-server or async-lsp instead
 
@@ -283,6 +321,7 @@ These provide **only type definitions** — no server scaffolding, no framing, n
 The fundamental design tension in Rust LSP frameworks:
 
 **`&self` (tower-lsp, tower-lsp-server)**:
+
 - All handlers take `&self`
 - Concurrency is safe by construction
 - Mutable state requires `Arc<RwLock<T>>`
@@ -290,10 +329,13 @@ The fundamental design tension in Rust LSP frameworks:
 - Simpler API surface
 
 **`&mut self` (async-lsp)**:
+
 - Request handlers return futures that don't borrow self → concurrent
 - Notification handlers take `&mut self` → synchronous, ordered
 - No `Arc`/`RwLock` needed for state
 - More complex API surface
 - Correct per LSP specification
 
-The LSP spec says notifications must be processed in order (they change state that affects later requests). `async-lsp` is the only framework that gets this right by design.
+The LSP spec says notifications must be processed in order (they change state
+that affects later requests). `async-lsp` is the only framework that gets this
+right by design.

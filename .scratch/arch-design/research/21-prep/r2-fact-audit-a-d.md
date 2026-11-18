@@ -1,8 +1,18 @@
 # Round-2 fact audit: a-code-inventory, b-prior-decisions, c-digest-lessons, d-external-precedent
 
-Adversarial re-verification of round-1 evidence for [explicit execution context and ambient state](../../issues/21-ambient-environment-and-execution-context.md), to the round-2 standard of [the prep brief](./brief.md), sections 0 and 0.1. Every repo claim was re-derived from source this session; every external claim was checked on docs.rs or the cited primary page unless the verdict says otherwise. Counts were recounted at HEAD `6cfd8b52` (the brief cites `d6b63e0d`; no audited claim drifted between the two).
+Adversarial re-verification of round-1 evidence for
+[explicit execution context and ambient state](../../issues/21-ambient-environment-and-execution-context.md),
+to the round-2 standard of [the prep brief](./brief.md), sections 0 and 0.1.
+Every repo claim was re-derived from source this session; every external claim
+was checked on docs.rs or the cited primary page unless the verdict says
+otherwise. Counts were recounted at HEAD `6cfd8b52` (the brief cites `d6b63e0d`;
+no audited claim drifted between the two).
 
-Verdicts: CONFIRMED (reproduced from source), CONFIRMED-WITH-CAVEAT (true as stated, wording or a sub-part needs correction), WRONG (false as stated), UNSUPPORTED (could not reproduce from the cited source this session; may still be true). Provenance: (R) ratified by the user, (D) derived by an agent, (C) contradicted by code. "Brief" is [brief.md](./brief.md).
+Verdicts: CONFIRMED (reproduced from source), CONFIRMED-WITH-CAVEAT (true as
+stated, wording or a sub-part needs correction), WRONG (false as stated),
+UNSUPPORTED (could not reproduce from the cited source this session; may still
+be true). Provenance: (R) ratified by the user, (D) derived by an agent, (C)
+contradicted by code. "Brief" is [brief.md](./brief.md).
 
 ## 1. Claim table
 
@@ -120,31 +130,123 @@ Verdicts: CONFIRMED (reproduced from source), CONFIRMED-WITH-CAVEAT (true as sta
 
 ## 2. Errata, ordered by consequence for the grilling
 
-- **E1. The ticket-20 layering line is still treated as a functions-only ruling inside b.** The text exists ([schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):72), but its upstream ([IWE research](../12-iwe-core-and-hosts-architecture.md):278-279) says "explicit functions **or thin structs**", and brief 0.1 withdraws the functions-only reading. b:26-27 ("an app service holding `ExecutionContext` cannot be assumed compatible") and b:109-111 (item 18: an omnibus host object "violates the explicit-input use-case principle") still encode the withdrawn reading, and the grilling script's F1 default (brief:196-198) would import it through the back door. Re-read the ruling as "no service-locator mega-context at leaves"; whether the app layer is objects or functions belongs to [workspace host and composition](../../issues/33-workspace-host-and-composition.md).
-- **E2. "Judged sound" for `Cwd`/`CwdGuard` is a (D) premise doing (R) work.** The phrase is the open ticket's own framing ([ticket 21](../../issues/21-ambient-environment-and-execution-context.md):17-18); b item 9 and d's transfer paragraph (d:159-163) cite it as if an audit had happened. Round 1 contains no failure-mode analysis beyond a:121's [H] note that a non-cooperating relative-path reader can still race. H4 must be grilled on the defect class (process-global cwd vs explicit search start), with the verified 29-test migration cost reported separately, never as a selector.
-- **E3. d's jiff feature paragraph answers the wrong question for this repo.** The crate defaults d lists are real, but Traces sets `default-features = false` with `tzdb-bundle-always` (Cargo.toml:128). The shipped artifact bundles the tzdb, so IANA identifiers resolve without system zoneinfo; the stripped-container scenario behind T3b-B/brief Q2 is already mitigated for the binary. The live residual questions are tzdb staleness in the bundle and the failure policy for system-zone detection (`TZ`, `/etc/localtime`).
-- **E4. The interim zone-vs-cache hazard is unstated in b.** b:87-89 asserts a zone change should not invalidate the cache; that is only true after [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)'s cutover. Today the index persists zone-derived `day` and naive-derived instants (a12, a13) with no zone-aware invalidation, so a machine-zone change can produce mixed-zone rows silently. T6/F6 needs an explicit interim row: reindex on zone change, or accept mixed-zone data until the cutover lands.
-- **E5. The brief's "dialog Arc passed to 10 arms, 2 use it" is wrong (a18).** Actual: parameter on two dispatch functions, forwarded to 2 of 10 arms plus the two `-i` arms (`cli/mod.rs`:129-134,187,203). Low stakes, but the corrected sentence weakens any "dialog already threads everywhere" argument in H5.
-- **E6. jiff's own `try_system` doc contradicts its code on the fallback.** The doc sentence claims a UTC fallback; the code falls back to `Etc/Unknown` (d7). Since T3b turns on exactly what an unavailable zone yields, the grilling should cite the source behavior, and anyone re-checking should expect the doc to mislead.
-- **E7. Taskwarrior's `sow` Monday anchor is version/config-dependent.** The workweek RFC on the develop branch makes week start Sunday-or-Monday by configuration. Do not cite `sow` as a stable cross-tool Monday default; c/d's underlying point (week start is a product choice) is unaffected.
-- **E8. Unverified residue to downgrade in citations.** Patch versions d30; c rows c8 (call-site lines), c12 (OSEnv range), c13 (per-format call range), c18, c19. None is load-bearing alone, but none should be quoted as independently checked.
+- **E1. The ticket-20 layering line is still treated as a functions-only ruling
+  inside b.** The text exists
+  ([schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md):72),
+  but its upstream
+  ([IWE research](../12-iwe-core-and-hosts-architecture.md):278-279) says
+  "explicit functions **or thin structs**", and brief 0.1 withdraws the
+  functions-only reading. b:26-27 ("an app service holding `ExecutionContext`
+  cannot be assumed compatible") and b:109-111 (item 18: an omnibus host object
+  "violates the explicit-input use-case principle") still encode the withdrawn
+  reading, and the grilling script's F1 default (brief:196-198) would import it
+  through the back door. Re-read the ruling as "no service-locator mega-context
+  at leaves"; whether the app layer is objects or functions belongs to
+  [workspace host and composition](../../issues/33-workspace-host-and-composition.md).
+- **E2. "Judged sound" for `Cwd`/`CwdGuard` is a (D) premise doing (R) work.**
+  The phrase is the open ticket's own framing
+  ([ticket 21](../../issues/21-ambient-environment-and-execution-context.md):17-18);
+  b item 9 and d's transfer paragraph (d:159-163) cite it as if an audit had
+  happened. Round 1 contains no failure-mode analysis beyond a:121's [H] note
+  that a non-cooperating relative-path reader can still race. H4 must be grilled
+  on the defect class (process-global cwd vs explicit search start), with the
+  verified 29-test migration cost reported separately, never as a selector.
+- **E3. d's jiff feature paragraph answers the wrong question for this repo.**
+  The crate defaults d lists are real, but Traces sets
+  `default-features = false` with `tzdb-bundle-always` (Cargo.toml:128). The
+  shipped artifact bundles the tzdb, so IANA identifiers resolve without system
+  zoneinfo; the stripped-container scenario behind T3b-B/brief Q2 is already
+  mitigated for the binary. The live residual questions are tzdb staleness in
+  the bundle and the failure policy for system-zone detection (`TZ`,
+  `/etc/localtime`).
+- **E4. The interim zone-vs-cache hazard is unstated in b.** b:87-89 asserts a
+  zone change should not invalidate the cache; that is only true after
+  [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)'s
+  cutover. Today the index persists zone-derived `day` and naive-derived
+  instants (a12, a13) with no zone-aware invalidation, so a machine-zone change
+  can produce mixed-zone rows silently. T6/F6 needs an explicit interim row:
+  reindex on zone change, or accept mixed-zone data until the cutover lands.
+- **E5. The brief's "dialog Arc passed to 10 arms, 2 use it" is wrong (a18).**
+  Actual: parameter on two dispatch functions, forwarded to 2 of 10 arms plus
+  the two `-i` arms (`cli/mod.rs`:129-134,187,203). Low stakes, but the
+  corrected sentence weakens any "dialog already threads everywhere" argument in
+  H5.
+- **E6. jiff's own `try_system` doc contradicts its code on the fallback.** The
+  doc sentence claims a UTC fallback; the code falls back to `Etc/Unknown` (d7).
+  Since T3b turns on exactly what an unavailable zone yields, the grilling
+  should cite the source behavior, and anyone re-checking should expect the doc
+  to mislead.
+- **E7. Taskwarrior's `sow` Monday anchor is version/config-dependent.** The
+  workweek RFC on the develop branch makes week start Sunday-or-Monday by
+  configuration. Do not cite `sow` as a stable cross-tool Monday default; c/d's
+  underlying point (week start is a product choice) is unaffected.
+- **E8. Unverified residue to downgrade in citations.** Patch versions d30; c
+  rows c8 (call-site lines), c12 (OSEnv range), c13 (per-format call range),
+  c18, c19. None is load-bearing alone, but none should be quoted as
+  independently checked.
 
 ## 3. Reasoning flaws (with file:line)
 
-- **R1. Constraint-status laundering in b.** b:29-31 places ticket 19's destination ("the cache holds no machine state") under the heading "Constraints already decided" without noting that a-code-inventory proves the current cache is zone-bearing (a12-a14). A reader of b alone would believe the cutover landed. The brief handles this correctly (brief:12-18); b was never patched.
-- **R2. Churn as a design argument persists in three files.** a:84 ("explicit constructor + `scan` seam is the lower-bound change"), a:88-89 (removal "needs a concrete defect or test-value gain"), brief:132 ("worth the dispatch churn"), d:159-163 ("Keep audited `Cwd`/`CwdGuard` ... if its single-process assumptions still hold"). Reporting cost is required; letting it select is not. The brief's own 0.1 rule is violated by its remaining H4 phrasing.
-- **R3. Circularity in d's keep-as-is transfer.** d:159-163 conditions keeping the guard on "its single-process assumptions still hold", but whether the process must host multiple policies is precisely the open grilling fact (brief Q1). The sentence assumes the answer it should test.
-- **R4. T1 vs T5 inconsistency on scoped overrides.** brief:117 rejects "scoped override or task-local" for the evaluation carrier (Rayon, lazy `QuerySet`), while brief:119 lists "thread-local scope" as a live T5 option for tests. Both are defensible in their contexts (production evaluation vs test migration), but the script must not let T1's reject be quoted against T5's option; they govern different lifetimes.
-- **R5. c's pattern 6 overstates its evidence.** c:95-103 moves from three observed aggregates (Dataview evaluator context, zk `Container`→`ServerOpts`, Marksman `State`) to "a composition-root aggregate can be broad if it is not passed through every leaf". The examples show existence, not safety under Traces's lazy `QuerySet` and minijinja callbacks. Keep it tagged [H] and at existence-strength.
-- **R6. The Jiff TTL fact is cited to the wrong authority and its implication is inverted in one place.** The 5 minute TTL is real but lives in jiff's source (b8), not in research 04. More important, the TTL means a long-lived host's "system zone" can silently change mid-session, which strengthens sampling-per-evaluation (T2); the precedent file's framing is fine, but any "startup pin" argument should be marked dead by this same fact.
-- **R7. "Per row" phrasing in T2 (brief:116) can mislead.** Zone reads in query evaluation happen per evaluated filter expression and once per row at sort-key materialization (a24, a25); nothing samples per comparison. The rejected "per row" option should say "per row within an evaluation" to avoid re-deciding a non-existent behavior.
+- **R1. Constraint-status laundering in b.** b:29-31 places ticket 19's
+  destination ("the cache holds no machine state") under the heading
+  "Constraints already decided" without noting that a-code-inventory proves the
+  current cache is zone-bearing (a12-a14). A reader of b alone would believe the
+  cutover landed. The brief handles this correctly (brief:12-18); b was never
+  patched.
+- **R2. Churn as a design argument persists in three files.** a:84 ("explicit
+  constructor + `scan` seam is the lower-bound change"), a:88-89 (removal "needs
+  a concrete defect or test-value gain"), brief:132 ("worth the dispatch
+  churn"), d:159-163 ("Keep audited `Cwd`/`CwdGuard` ... if its single-process
+  assumptions still hold"). Reporting cost is required; letting it select is
+  not. The brief's own 0.1 rule is violated by its remaining H4 phrasing.
+- **R3. Circularity in d's keep-as-is transfer.** d:159-163 conditions keeping
+  the guard on "its single-process assumptions still hold", but whether the
+  process must host multiple policies is precisely the open grilling fact (brief
+  Q1). The sentence assumes the answer it should test.
+- **R4. T1 vs T5 inconsistency on scoped overrides.** brief:117 rejects "scoped
+  override or task-local" for the evaluation carrier (Rayon, lazy `QuerySet`),
+  while brief:119 lists "thread-local scope" as a live T5 option for tests. Both
+  are defensible in their contexts (production evaluation vs test migration),
+  but the script must not let T1's reject be quoted against T5's option; they
+  govern different lifetimes.
+- **R5. c's pattern 6 overstates its evidence.** c:95-103 moves from three
+  observed aggregates (Dataview evaluator context, zk `Container`→`ServerOpts`,
+  Marksman `State`) to "a composition-root aggregate can be broad if it is not
+  passed through every leaf". The examples show existence, not safety under
+  Traces's lazy `QuerySet` and minijinja callbacks. Keep it tagged [H] and at
+  existence-strength.
+- **R6. The Jiff TTL fact is cited to the wrong authority and its implication is
+  inverted in one place.** The 5 minute TTL is real but lives in jiff's source
+  (b8), not in research 04. More important, the TTL means a long-lived host's
+  "system zone" can silently change mid-session, which strengthens
+  sampling-per-evaluation (T2); the precedent file's framing is fine, but any
+  "startup pin" argument should be marked dead by this same fact.
+- **R7. "Per row" phrasing in T2 (brief:116) can mislead.** Zone reads in query
+  evaluation happen per evaluated filter expression and once per row at sort-key
+  materialization (a24, a25); nothing samples per comparison. The rejected "per
+  row" option should say "per row within an evaluation" to avoid re-deciding a
+  non-existent behavior.
 
 ## 4. The five errors that would most mislead the grilling if uncorrected
 
-1. **E1 (functions-only constraint).** It pre-decides D0 and topology B/E, and it is wired into F1's default wording rather than sitting in the withdrawn-leans section.
-2. **E2 ("judged sound" `CwdGuard`).** It converts an unexamined (D) premise into the H4 default; combined with R2's churn framing it makes "keep" win by default without a defect analysis.
-3. **E4 (interim zone-cache hazard).** T6/F6 would be answered with the post-cutover model while the code being grilled is pre-cutover; the mixed-zone-data question would never get asked.
-4. **E3 (jiff features in context).** T3b's failure-policy debate (stripped container, UTC fallback) would proceed against crate defaults Traces does not use, missing that the shipped binary bundles the tzdb.
-5. **E6 (jiff doc-vs-code contradiction on unknown).** The T3b question is exactly "what does an unavailable zone yield"; a participant who checks `try_system`'s doc would conclude an explicit UTC fallback already exists and mis-grade the options.
+1. **E1 (functions-only constraint).** It pre-decides D0 and topology B/E, and
+   it is wired into F1's default wording rather than sitting in the
+   withdrawn-leans section.
+2. **E2 ("judged sound" `CwdGuard`).** It converts an unexamined (D) premise
+   into the H4 default; combined with R2's churn framing it makes "keep" win by
+   default without a defect analysis.
+3. **E4 (interim zone-cache hazard).** T6/F6 would be answered with the
+   post-cutover model while the code being grilled is pre-cutover; the
+   mixed-zone-data question would never get asked.
+4. **E3 (jiff features in context).** T3b's failure-policy debate (stripped
+   container, UTC fallback) would proceed against crate defaults Traces does not
+   use, missing that the shipped binary bundles the tzdb.
+5. **E6 (jiff doc-vs-code contradiction on unknown).** The T3b question is
+   exactly "what does an unavailable zone yield"; a participant who checks
+   `try_system`'s doc would conclude an explicit UTC fallback already exists and
+   mis-grade the options.
 
-Not audited here: e/f/g design files, the brief's `render_captured`/`State` claim, the md-pkm-lsp sibling tickets (b items 27-29), the temporal divergence register, and `lib.rs` fixture helpers (a:123). Counts in section 1 reflect HEAD `6cfd8b52`.
+Not audited here: e/f/g design files, the brief's `render_captured`/`State`
+claim, the md-pkm-lsp sibling tickets (b items 27-29), the temporal divergence
+register, and `lib.rs` fixture helpers (a:123). Counts in section 1 reflect HEAD
+`6cfd8b52`.

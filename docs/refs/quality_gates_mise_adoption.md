@@ -59,27 +59,77 @@ mise install       # installs the recorded resolutions
 **messrust — cargo git form, pinned tag.** Verified reasoning, mostly already
 established in `quality_gates_messrust.md` §4, refreshed today:
 
-- crates.io is stale (0.1.0, 12+ releases behind at research time) → `"cargo:messrust"` rejected.
-- `github:quality-gates/messrust` ships **darwin-only** release assets — confirmed again today: [latest release](https://github.com/quality-gates/messrust/releases/tag/v0.1.15) carries only `messrust_0.1.15_darwin_{amd64,arm64}.tar.gz` + `checksums.txt`. The `github:` backend matches release assets, never source archives, so it cannot build for Linux ([github backend docs](https://mise.jdx.dev/dev-tools/backends/github.html)) → rejected as non-CI-viable.
-- The cargo git form — `"cargo:https://github.com/owner/repo"` with `version = "tag:…"` — is documented at [cargo backend docs](https://mise.jdx.dev/dev-tools/backends/cargo.html) and is already proven in this repo: `"cargo:https://github.com/snowmead/rust-docs-mcp" = { version = "branch:main", crate = "rust-docs-mcp" }` ([mise.toml:41](../../mise.toml)). messrust is a single-crate repo (no workspace), so no `crate =` selector is needed.
-- **Pin, don't float.** Upstream ships near-daily: the prior note pinned `tag:v0.1.12`; today's release is **v0.1.15** (published 2026-09-26). Exact tag pins are the only stable choice.
+- crates.io is stale (0.1.0, 12+ releases behind at research time) →
+  `"cargo:messrust"` rejected.
+- `github:quality-gates/messrust` ships **darwin-only** release assets —
+  confirmed again today:
+  [latest release](https://github.com/quality-gates/messrust/releases/tag/v0.1.15)
+  carries only `messrust_0.1.15_darwin_{amd64,arm64}.tar.gz` + `checksums.txt`.
+  The `github:` backend matches release assets, never source archives, so it
+  cannot build for Linux
+  ([github backend docs](https://mise.jdx.dev/dev-tools/backends/github.html)) →
+  rejected as non-CI-viable.
+- The cargo git form — `"cargo:https://github.com/owner/repo"` with
+  `version = "tag:…"` — is documented at
+  [cargo backend docs](https://mise.jdx.dev/dev-tools/backends/cargo.html) and
+  is already proven in this repo:
+  `"cargo:https://github.com/snowmead/rust-docs-mcp" = { version = "branch:main", crate = "rust-docs-mcp" }`
+  ([mise.toml:41](../../mise.toml)). messrust is a single-crate repo (no
+  workspace), so no `crate =` selector is needed.
+- **Pin, don't float.** Upstream ships near-daily: the prior note pinned
+  `tag:v0.1.12`; today's release is **v0.1.15** (published 2026-09-26). Exact
+  tag pins are the only stable choice.
 
 **mutarust — registry `cargo:` form, pinned version.**
 
-- The crate is on crates.io as `mutarust` (binary `mutarust`, `rust-version = 1.85`, edition 2024 — nightly-2026-10-01 satisfies it). **Latest today is 0.1.10** (crates.io API, 2026-09-26); the prior note's `0.1.9` pin is one release behind. Pin `"0.1.10"`.
-- Recent releases publish **no prebuilt assets** (only v0.1.4 did), so the cargo backend's binstall-first path (this repo installs `cargo-binstall`, [mise.toml:14](../../mise.toml)) finds nothing and falls back to `cargo install` (binstall's exit-94 fallback) — a source build either way. Same for messrust's git form, which **always** runs `cargo install --git` and never consults binstall.
+- The crate is on crates.io as `mutarust` (binary `mutarust`,
+  `rust-version = 1.85`, edition 2024 — nightly-2026-10-01 satisfies it).
+  **Latest today is 0.1.10** (crates.io API, 2026-09-26); the prior note's
+  `0.1.9` pin is one release behind. Pin `"0.1.10"`.
+- Recent releases publish **no prebuilt assets** (only v0.1.4 did), so the cargo
+  backend's binstall-first path (this repo installs `cargo-binstall`,
+  [mise.toml:14](../../mise.toml)) finds nothing and falls back to
+  `cargo install` (binstall's exit-94 fallback) — a source build either way.
+  Same for messrust's git form, which **always** runs `cargo install --git` and
+  never consults binstall.
 
 ### 2.3 Lockfile and CI implications
 
 Verified from [mise.lock docs](https://mise.jdx.dev/dev-tools/mise-lock.html)
 and this repo:
 
-- `lockfile = true` is already set ([mise.tom:47](../../mise.toml)); `mise.lock` is committed (354 lines today, `[[tools."cargo:cargo-mutants"]] version = "27.1.0"` at mise.lock:107).
-- `mise lock` resolves **without installing** and also picks up tools declared only in tasks/templates (it reads definitions without running them). `mise install --locked` is the strict CI form.
-- **The cargo backend is exempt from URL/checksum locking** — listed explicitly among backends skipped by URL locking — so both new entries lock as **version-only** top-level pins, exactly like the existing cargo entries (e.g. rust-docs-mcp records `version = "branch:main"` + `specifiers`, no checksum; mise.lock:132-138). Consequence: a retagged/moved git ref would *not* be caught by checksum verification — the tag string itself is the pin. Acceptable here (upstream releases are marked immutable), but worth knowing.
-- **Bumping:** `mise lock --bump <tool>` only re-resolves *fuzzy* selectors (`latest`, prefixes); **exactly pinned versions are left unchanged** (to rewrite a pin you edit `mise.toml` then `mise lock`, or use `mise upgrade --bump`). So for these two tools the bump ritual is: edit `tag:` / version in `mise.toml` → `mise lock` → review diff → `mise install` → run §8 checks.
-- **CI:** [.github/workflows/ci.yml:19-21](../../.github/workflows/ci.yml) sets `MISE_EXPERIMENTAL=1`, `MISE_YES=1`, `MISE_AUTO_INSTALL=0`, and each job installs exactly the tools it needs (`mise install --locked cargo-binstall github:nextest-rs/nextest` at ci.yml:69, the hygiene list at ci.yml:85, …). Two consequences: (a) no CI change is needed for this proposal — neither tool is run in CI; (b) if a hygiene/mutation job is *ever* added, its `mise install --locked` line must name the tool explicitly, because auto-install is off.
-- **Release-age default:** mise applies a 24 h `minimum_release_age` to fuzzy resolution; locked exact versions are exempt afterwards. Whether it also delays a freshly pinned cargo-git/crates version *before* the first lock is *unverified* (the docs tie it to backends with release timestamps). If `mise lock` refuses today's `tag:v0.1.15`, pin v0.1.14 or wait a day.
+- `lockfile = true` is already set ([mise.tom:47](../../mise.toml)); `mise.lock`
+  is committed (354 lines today,
+  `[[tools."cargo:cargo-mutants"]] version = "27.1.0"` at mise.lock:107).
+- `mise lock` resolves **without installing** and also picks up tools declared
+  only in tasks/templates (it reads definitions without running them).
+  `mise install --locked` is the strict CI form.
+- **The cargo backend is exempt from URL/checksum locking** — listed explicitly
+  among backends skipped by URL locking — so both new entries lock as
+  **version-only** top-level pins, exactly like the existing cargo entries (e.g.
+  rust-docs-mcp records `version = "branch:main"` + `specifiers`, no checksum;
+  mise.lock:132-138). Consequence: a retagged/moved git ref would *not* be
+  caught by checksum verification — the tag string itself is the pin. Acceptable
+  here (upstream releases are marked immutable), but worth knowing.
+- **Bumping:** `mise lock --bump <tool>` only re-resolves *fuzzy* selectors
+  (`latest`, prefixes); **exactly pinned versions are left unchanged** (to
+  rewrite a pin you edit `mise.toml` then `mise lock`, or use
+  `mise upgrade --bump`). So for these two tools the bump ritual is: edit `tag:`
+  / version in `mise.toml` → `mise lock` → review diff → `mise install` → run §8
+  checks.
+- **CI:** [.github/workflows/ci.yml:19-21](../../.github/workflows/ci.yml) sets
+  `MISE_EXPERIMENTAL=1`, `MISE_YES=1`, `MISE_AUTO_INSTALL=0`, and each job
+  installs exactly the tools it needs
+  (`mise install --locked cargo-binstall github:nextest-rs/nextest` at
+  ci.yml:69, the hygiene list at ci.yml:85, …). Two consequences: (a) no CI
+  change is needed for this proposal — neither tool is run in CI; (b) if a
+  hygiene/mutation job is *ever* added, its `mise install --locked` line must
+  name the tool explicitly, because auto-install is off.
+- **Release-age default:** mise applies a 24 h `minimum_release_age` to fuzzy
+  resolution; locked exact versions are exempt afterwards. Whether it also
+  delays a freshly pinned cargo-git/crates version *before* the first lock is
+  *unverified* (the docs tie it to backends with release timestamps). If
+  `mise lock` refuses today's `tag:v0.1.15`, pin v0.1.14 or wait a day.
 
 ### 2.4 Version policy (proposal)
 
@@ -93,15 +143,27 @@ and this repo:
 
 ### 3.1 Decision criteria observed in this repo
 
-- **TOML task in `mise.toml`** when the body is short and the surface is a plain passthrough: `check` (mise.toml:83), `fmt` (:132), `audit*` (:146-170), `release`/`doc` (:228, :244). They use `usage = 'arg "[args]" var=#true …'` + an `eval` one-liner.
-- **File task under `.mise/tasks/`** when the body maps several flags to tool arguments and carries helper functions: `lint` (`.mise/tasks/lint`, functions + `load_fix_registry`), `test` (`.mise/tasks/test/_default`, `-m`/`--feature`/`--docs` logic), `mutants` (`.mise/tasks/mutants/_default`, five `build_*_flags` functions).
-- File tasks carry metadata in `#MISE` headers and their spec in `#USAGE` comment lines (`.mise/tasks/mutants/_default:1-42`); `task.disable_spec_from_run_scripts = true` ([mise.toml:48](../../mise.toml)) only disables the *deprecated Tera* `flag()/arg()` functions inside `run` scripts — it does not affect `usage = …` on TOML tasks or `#USAGE` on file tasks (vendored `06_arguments.md:555-568`).
+- **TOML task in `mise.toml`** when the body is short and the surface is a plain
+  passthrough: `check` (mise.toml:83), `fmt` (:132), `audit*` (:146-170),
+  `release`/`doc` (:228, :244). They use `usage = 'arg "[args]" var=#true …'` +
+  an `eval` one-liner.
+- **File task under `.mise/tasks/`** when the body maps several flags to tool
+  arguments and carries helper functions: `lint` (`.mise/tasks/lint`,
+  functions + `load_fix_registry`), `test` (`.mise/tasks/test/_default`,
+  `-m`/`--feature`/`--docs` logic), `mutants` (`.mise/tasks/mutants/_default`,
+  five `build_*_flags` functions).
+- File tasks carry metadata in `#MISE` headers and their spec in `#USAGE`
+  comment lines (`.mise/tasks/mutants/_default:1-42`);
+  `task.disable_spec_from_run_scripts = true` ([mise.toml:48](../../mise.toml))
+  only disables the *deprecated Tera* `flag()/arg()` functions inside `run`
+  scripts — it does not affect `usage = …` on TOML tasks or `#USAGE` on file
+  tasks (vendored `06_arguments.md:555-568`).
 
 ### 3.2 Can a file task extend a template? Yes — with constraints
 
 Verified (online [templates docs](https://mise.jdx.dev/tasks/templates.html)
-+ this repo):
 
+- this repo):
 - File tasks extend via a header line: `#MISE extends="name"` — documented
   explicitly, and proven in-repo twice: `.mise/tasks/mutants/_default:4`
   (`extends="mutants"`) and the bench task (`#MISE extends="bench"`,
@@ -153,14 +215,15 @@ Decisions embedded here:
   anyway (`--only`/`--strict`/`--reportfile` change per triage session, per
   messrust §7.3); no flag→argument mapping logic, no helper functions → a file
   task would be ceremony.
-- Positional invocation `messrust <paths> <format> <ruleset>` with the
-  committed `messrust.xml` policy file at repo root
-  (per-tool config convention: `clippy.toml`, `deny.toml`, `tarpaulin.toml`).
-  `src` = comma-free single path; `text` = human format on stdout; `--ignore-tests`
-  makes it a production-code gate (upstream docs/usage.md:78).
+- Positional invocation `messrust <paths> <format> <ruleset>` with the committed
+  `messrust.xml` policy file at repo root (per-tool config convention:
+  `clippy.toml`, `deny.toml`, `tarpaulin.toml`). `src` = comma-free single path;
+  `text` = human format on stdout; `--ignore-tests` makes it a production-code
+  gate (upstream docs/usage.md:78).
 - **Advisory posture:** no `--strict`, no `--reportfile` by default — stdout +
   non-zero exit (2 = findings) is the contract; adopters add flags via
-  passthrough (`mise run mess -- --reportfile messrust.json --ignore-violations-on-exit`).
+  passthrough
+  (`mise run mess -- --reportfile messrust.json --ignore-violations-on-exit`).
 - Rejected alternative: `extends = "mutants"` — wrong timeout (1 h for a
   parse-only tool) and semantically a *hygiene* gate, not a mutation run.
 
@@ -307,10 +370,10 @@ Decisions embedded here:
 | `mutants` (file, until stage 3) | `mutants` | unchanged | coexistence |
 | `bench` (file) | `bench` | 20 m timeout, declares never-skip pair locally | untouched precedent for the single-slot rule |
 
-Optional tidy-up at retirement (stage 3): rename
-`[task_templates.mutants]` → `[task_templates.mutation]` and update the one
-`#MISE extends=` line in the mutarust task. Low value; do it only if the old
-name would confuse (`mise tasks info mutarust` prints the inherited fields either way).
+Optional tidy-up at retirement (stage 3): rename `[task_templates.mutants]` →
+`[task_templates.mutation]` and update the one `#MISE extends=` line in the
+mutarust task. Low value; do it only if the old name would confuse
+(`mise tasks info mutarust` prints the inherited fields either way).
 
 ## 4. Q3 — Caching decisions
 
@@ -319,7 +382,10 @@ name would confuse (`mise tasks info mutarust` prints the inherited fields eithe
 From [mise.toml](../../mise.toml) and the vendored task docs:
 
 - Project default: `[task_config.cache] enabled = true` (mise.toml:58-61) — but
-  a task is only *freshness-skippable* if it declares output paths; **`outputs = []` is the explicit "no files" declaration that blocks the skip**, and `cache = { enabled = false }` blocks artifact-cache replay (repo comment, mise.toml:284-291; online templates docs, "Empty lists and file tasks").
+  a task is only *freshness-skippable* if it declares output paths;
+  **`outputs = []` is the explicit "no files" declaration that blocks the skip**,
+  and `cache = { enabled = false }` blocks artifact-cache replay (repo comment,
+  mise.toml:284-291; online templates docs, "Empty lists and file tasks").
 - `global_inputs = ["mise.toml", "Cargo.lock", "clippy.toml"]` (mise.toml:56)
   are added to every task's inputs; `input_groups` `rust` =
   `["Cargo.toml", "src/**/*.rs", "tests/**/*.rs"]` (mise.toml:63-67).
@@ -640,7 +706,8 @@ proposal, not a record of observed behavior.
 ## 9. Primary sources
 
 - This repo: `mise.toml` (tools/settings/task_config/templates lines cited
-  inline), `mise.lock`, `.mise/tasks/{lint,test/_default,mutants/_default,mutants/report}`,
+  inline), `mise.lock`,
+  `.mise/tasks/{lint,test/_default,mutants/_default,mutants/report}`,
   `.cargo/mutants.toml`, `.gitignore`, `Cargo.toml` (`[profile.mutants]`),
   `hk.pkl`, `.github/workflows/ci.yml`, `docs/refs/mutation_testing.md`,
   `docs/refs/quality_gates_messrust.md` (§4, §7),
@@ -657,10 +724,10 @@ proposal, not a record of observed behavior.
   [mise run](https://mise.jdx.dev/cli/run.html),
   [mise tasks](https://mise.jdx.dev/cli/tasks.html).
 - usage spec: [scripts](https://usage.jdx.dev/cli/scripts),
-  [flagset](https://usage.jdx.dev/spec/reference/flagset) (flagsets/`use`/`include`
-  exist in usage's KDL spec; whether mise's `#USAGE` comment form accepts them
-  is unverified — noted only as a possible dedup of the shared `-f`/`-m`
-  declarations during coexistence).
+  [flagset](https://usage.jdx.dev/spec/reference/flagset)
+  (flagsets/`use`/`include` exist in usage's KDL spec; whether mise's `#USAGE`
+  comment form accepts them is unverified — noted only as a possible dedup of
+  the shared `-f`/`-m` declarations during coexistence).
 - Registries: crates.io API for `mutarust` (max 0.1.10, 2026-09-26) and
   `messrust`; GitHub releases API for
   [messrust v0.1.15](https://github.com/quality-gates/messrust/releases/tag/v0.1.15)
@@ -691,6 +758,7 @@ the vendored mutarust docs (`cli.md`, `config.md`, `json-outputs.md`).
 | Execution | assembles args → `cargo mutants "${mutants_args[@]}"`, `set -euo pipefail`, shellcheck-guarded `eval` of `usage_args` |
 
 **`report` (41 lines, `hide=true`)** — a *post-run* contract:
+
 - `-i` (default `mutants.out/missed.txt`) → `-o` (default `mutants-report.md`).
 - Writes a Markdown file with an **"Instructions for Next Agent Session"**
   block (read list → write kill tests → verify with `cargo mutants --file`),
@@ -887,24 +955,27 @@ likewise superseded for --profile only.
 P3 (cap-lints): rule: `skippedCount(off) − skippedCount(on) > 5% of
   totalMutantsCount → inflation`. Observed: stats(ON) (RUSTFLAGS=
   --cap-lints=allow) == stats(OFF) (identical), both rc=0:
+
 ```json
 {"totalMutantsCount":1,"killedCount":0,"notCoveredCount":0,"escapedCount":1,"errorCount":0,"skippedCount":0,"msi":0.0,"coveredCodeMsi":0.0}
 ```
-  skippedCount delta=0 of 1 → no material inflation observed on M. The
-  threshold is degenerate at n=1 (5% of 1 = 0.05), so any single skipped
-  mutant would have tripped it. Caveat: M is a single-mutant scope, so the
-  A/B has almost no statistical power — "no material inflation observed on
-  M" only. Env inheritance into cargo was confirmed: the cl-on run did a
-  full rebuild under RUSTFLAGS=--cap-lints=allow. Still off by default: the
-  RUSTFLAGS switch also invalidates build caches, and the ON run was ~33 s
-  slower than OFF (225.27 s vs 191.98 s "Finished in"), consistent with a
-  cold rebuild. The old engine always cap-lints, so "off" is a deliberate
-  divergence.
-`default target` (`./src...`): accepted — bare `--dry-run` = 3820 == `./src...` set-identical (123 files); user positional now narrows scope (post-Task-7 default-target guard).
-Duplicate `--config` passthrough: rejected at task level (rc=2, task-owns
-  message) — task config always wins; losing-config scenario unreachable.
-Passthrough probe (`-- --list-mutators`): worked (verified in Tasks 7/8: rc=0, 33 names).
-Any other surprises:
+
+skippedCount delta=0 of 1 → no material inflation observed on M. The threshold
+is degenerate at n=1 (5% of 1 = 0.05), so any single skipped mutant would have
+tripped it. Caveat: M is a single-mutant scope, so the A/B has almost no
+statistical power — "no material inflation observed on M" only. Env inheritance
+into cargo was confirmed: the cl-on run did a full rebuild under
+RUSTFLAGS=--cap-lints=allow. Still off by default: the RUSTFLAGS switch also
+invalidates build caches, and the ON run was ~33 s slower than OFF (225.27 s vs
+191.98 s "Finished in"), consistent with a cold rebuild. The old engine always
+cap-lints, so "off" is a deliberate divergence. `default target` (`./src...`):
+accepted — bare `--dry-run` = 3820 == `./src...` set-identical (123 files); user
+positional now narrows scope (post-Task-7 default-target guard). Duplicate
+`--config` passthrough: rejected at task level (rc=2, task-owns message) — task
+config always wins; losing-config scenario unreachable. Passthrough probe
+(`-- --list-mutators`): worked (verified in Tasks 7/8: rc=0, 33 names). Any
+other surprises:
+
 - The plan's literal P2 target `./src/dirs...` does not resolve for a file
   module: rc=3 `mutarust: cannot read source target ./src/dirs: No such file
   or directory`. The task's `-m` mapping emits `./src/dirs.rs`, which works;
@@ -917,9 +988,9 @@ Any other surprises:
   461.26 s Step-1 run (real from `time -p`); the mutation phase dominates.
 
 Note (not a surprise): `report.json` clobbering behaved exactly as
-  pre-documented (Task 8 reminder + plan grounding facts) — the P2 dry-run verification
-  rewrote the Step-1 stats (escaped 1 → 0), a live confirmation. Every stats
-  read above was taken immediately after its scored run.
+pre-documented (Task 8 reminder + plan grounding facts) — the P2 dry-run
+verification rewrote the Step-1 stats (escaped 1 → 0), a live confirmation.
+Every stats read above was taken immediately after its scored run.
 
 ### 11.1 Scoped baseline run (2026-09-28)
 

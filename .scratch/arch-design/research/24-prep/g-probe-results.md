@@ -328,14 +328,14 @@ holds the `status` value, as a stand-in for the class field.
 ## Store comparison on the same pipelines
 
 The same 50,000 notes went into seven stores and an in-memory snapshot. The
-candidates and the layout for each store are in `i1-store-candidates-and-designs.md`.
-Every store loaded the same facet bytes from one dump of the real parser output.
-Every store returned the same rows: 112, 2,500 and 6,667. Each run was a new
-process. The time includes the open of the store, the query and a sort. The first
-run was discarded. The figure is the median of seven runs. The machine was busy
-(load average 15 to 28), so compare the stores within one set only. Versions:
-redb 4.3.0, rusqlite 0.41.1 (bundled SQLite), turso 0.9.0-pre.2, heed 0.23.1,
-fjall 3.1.13, duckdb 1.20000.1.
+candidates and the layout for each store are in
+`i1-store-candidates-and-designs.md`. Every store loaded the same facet bytes
+from one dump of the real parser output. Every store returned the same rows:
+112, 2,500 and 6,667. Each run was a new process. The time includes the open of
+the store, the query and a sort. The first run was discarded. The figure is the
+median of seven runs. The machine was busy (load average 15 to 28), so compare
+the stores within one set only. Versions: redb 4.3.0, rusqlite 0.41.1 (bundled
+SQLite), turso 0.9.0-pre.2, heed 0.23.1, fjall 3.1.13, duckdb 1.20000.1.
 
 Pipelines: p1 is a folder range (500 notes) with a filter on `status` and
 `created`. p2 is a tag with an excluded folder, a filter on `rating` and the

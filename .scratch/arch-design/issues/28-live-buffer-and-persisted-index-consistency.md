@@ -671,8 +671,8 @@ Rule:
   Reject obsolete results before publication. Check diagnostics the same way.
 - A position request captures its document session and received version.
   Select a generation containing that exact parsed version before pinning it.
-- Selection can wait for relevant work or return `Stale`. The host chooses
-  the wait budget. A newer version never silently replaces the requested version.
+- Selection can wait for relevant work or return `Stale`. The host chooses the
+  wait budget. A newer version never silently replaces the requested version.
 - Once execution starts, the request never changes its generation pin.
 - `Stale` is a core outcome. The host maps it to its protocol code.
   `ContentModified` is an LSP term and does not belong in core.
@@ -743,7 +743,8 @@ Rule:
   equal byte size, text or parse notices.
 - A validated deletion supersedes older saved snapshots. Its scan starts after
   the relevant save observation. Never restore that old snapshot at close.
-- A later save creates a new proof obligation. An older deletion cannot clear it.
+- A later save creates a new proof obligation. An older deletion cannot clear
+  it.
 - The 2 s constant is the racy margin of ticket 25
   (`mtime >= scan_start - 2 s`). It is borderline on FAT. Clock skew on network
   volumes defeats it [H].
@@ -874,8 +875,9 @@ Rule:
 - The host emits one notice for each (document, divergence kind). It keeps
   that notice until the state changes or the buffer closes.
   The document identity is the client URI. Ticket 34 owns the text.
-- Closed-buffer divergence ends at Group 4's atomic proof transition, not at
-  an arbitrary next scan. An unknown unsaved replacement drops under its close rule.
+- Closed-buffer divergence ends at Group 4's atomic proof transition, not at an
+  arbitrary next scan. An unknown unsaved replacement drops under its close
+  rule.
 - A second writer is possible. The IWE MCP crate can write the vault through
   another process [V]. The overlay never enters the store. The store stays
   consistent through the lock rules of tickets 24 and 25.
@@ -1112,7 +1114,8 @@ reversal.
    belongs to that other path.
 9. `ContentModified` became the core outcome `Stale`. The host maps it.
 10. The first-round S4 outcome became a ghost for dirty or unknown text after
-    validated deletion. Known clean text drops with the absent base installation.
+    validated deletion. Known clean text drops with the absent base
+    installation.
 11. The rule "publish only by compare-and-swap" became: one owner serializes
     every generation change. Compare-and-swap is one allowed implementation.
 12. The first design lacks an admission rule and a URI conversion. The overlay

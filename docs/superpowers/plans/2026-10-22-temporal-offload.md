@@ -1,32 +1,75 @@
 # Temporal Offload Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move every calendar rule, unit/spelling lookup, constructor, and pattern-translation decision out of the template engine into `src/temporal/`, so the temporal crate is the single owner of date/time semantics and the engine is left with argument coercion, `ErrorKind` selection, and minijinja wiring only.
+**Goal:** Move every calendar rule, unit/spelling lookup, constructor, and
+pattern-translation decision out of the template engine into `src/temporal/`, so
+the temporal crate is the single owner of date/time semantics and the engine is
+left with argument coercion, `ErrorKind` selection, and minijinja wiring only.
 
-**Architecture:** The engine (`src/template/engine/date.rs`) currently hand-rolls a leap-year rule, unit-spelling messages, namespace period-edge tables, `now`/`today` construction, `start_of`/`end_of` dispatch, the moment-token translator, and four bespoke error messages. Each task below offloads one concern behind an existing or new `pub(crate)` seam in `src/temporal/`, deletes the duplicated engine copy, and pins behavior with tests before/while moving. The plan also lands the negative-year rendering fix (`temporal/fmt.rs`) and closes the audit's documentation findings.
+**Architecture:** The engine (`src/template/engine/date.rs`) currently
+hand-rolls a leap-year rule, unit-spelling messages, namespace period-edge
+tables, `now`/`today` construction, `start_of`/`end_of` dispatch, the
+moment-token translator, and four bespoke error messages. Each task below
+offloads one concern behind an existing or new `pub(crate)` seam in
+`src/temporal/`, deletes the duplicated engine copy, and pins behavior with
+tests before/while moving. The plan also lands the negative-year rendering fix
+(`temporal/fmt.rs`) and closes the audit's documentation findings.
 
-**Tech Stack:** Rust 2024, jiff 0.2.38 (civil/zoned time), minijinja 3 (engine), serde, rstest + proptest + pretty_assertions (tests), cargo-nextest, `mise` gates (`verify`, `check:visibility`, `doc`), `hk` hooks.
+**Tech Stack:** Rust 2024, jiff 0.2.38 (civil/zoned time), minijinja 3 (engine),
+serde, rstest + proptest + pretty_assertions (tests), cargo-nextest, `mise`
+gates (`verify`, `check:visibility`, `doc`), `hk` hooks.
 
 ---
 
 ## Conventions (apply to every task)
 
-- **Order is load-bearing.** Execute tasks 1→19 exactly. Later tasks cite line numbers produced by earlier ones; `Task 6` deletes ~130 lines from `engine/date.rs` and `Task 10` rewrites `datetime.rs` regions, so **re-verify every line anchor by symbol name (grep) before editing**.
-- **Line numbers** for tasks 1-17 were captured on 2026-10-23 against a clean tree (only `.scratch/arch-design/**` is dirty; do **not** touch those three paths); Part 2 (tasks 18-19) anchors were captured on 2026-10-28 against merged `main`.
-- **TDD:** write the failing test first, watch it fail, implement, watch it pass. Where a refactor is behavior-equivalent by construction, the plan says so and marks the pin (a new test or the existing tests that move with the code, green before and after) instead of a fake red (the note under the test says which it is).
-- **Gates:** end every task with `mise run verify` (runs `fmt`, then `check` + `lint --no-fix` + `test` in parallel; `check` includes `check:visibility`, which diffs both API baselines and the pub-token snapshot).
-- **Baseline regen** (visibility-changing tasks only; the regen form of the snapshot check at `mise.toml:143`, produces a sorted snapshot; expect exactly the listed line delta):
+- **Order is load-bearing.** Execute tasks 1→19 exactly. Later tasks cite line
+  numbers produced by earlier ones; `Task 6` deletes ~130 lines from
+  `engine/date.rs` and `Task 10` rewrites `datetime.rs` regions, so
+  **re-verify every line anchor by symbol name (grep) before editing**.
+- **Line numbers** for tasks 1-17 were captured on 2026-10-23 against a clean
+  tree (only `.scratch/arch-design/**` is dirty; do **not** touch those three
+  paths); Part 2 (tasks 18-19) anchors were captured on 2026-10-28 against
+  merged `main`.
+- **TDD:** write the failing test first, watch it fail, implement, watch it
+  pass. Where a refactor is behavior-equivalent by construction, the plan says
+  so and marks the pin (a new test or the existing tests that move with the
+  code, green before and after) instead of a fake red (the note under the test
+  says which it is).
+- **Gates:** end every task with `mise run verify` (runs `fmt`, then `check` +
+  `lint --no-fix` + `test` in parallel; `check` includes `check:visibility`,
+  which diffs both API baselines and the pub-token snapshot).
+- **Baseline regen** (visibility-changing tasks only; the regen form of the
+  snapshot check at `mise.toml:143`, produces a sorted snapshot; expect exactly
+  the listed line delta):
 
   ```bash
   git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
   ```
 
-  `tests/baselines/public-api-default.txt` regen (`cargo public-api --color=never > tests/baselines/public-api-default.txt`) happens **only in Task 14 (O4)** if its gate selects Branch A. `tests/baselines/public-api-test-utils.txt` regen (`cargo public-api --features test-utils --color=never > tests/baselines/public-api-test-utils.txt`) happens under that same gate. No other task may change the public API.
-- **Test commands:** fast loop `mise run test:unit <name-substring>` (all-features nextest, name filter; a filter matching zero tests in every phase is an error). Full suite = `mise run verify`. Single module: `mise run test:unit -m temporal`.
-- **Commits:** one per task, conventional style matching `git log` (`refactor(temporal): …`, `refactor(template): …`, `docs(temporal): …`). Stage only the files the task touched, never the three dirty `.scratch/arch-design` paths.
-- **Docs touched by tasks** live under `.scratch/temporal-core/` (spec, review, divergence register, issue ACs) and `src/temporal/GLOSSARY.md`.
-- **Prose:** a task's `Context:` paragraph is a research summary, not an instruction; it sits outside Simplified Technical English (STE). The `- [ ]` steps are the instructions, written in STE.
+  `tests/baselines/public-api-default.txt` regen
+  (`cargo public-api --color=never > tests/baselines/public-api-default.txt`)
+  happens **only in Task 14 (O4)** if its gate selects Branch A.
+  `tests/baselines/public-api-test-utils.txt` regen
+  (`cargo public-api --features test-utils --color=never > tests/baselines/public-api-test-utils.txt`)
+  happens under that same gate. No other task may change the public API.
+- **Test commands:** fast loop `mise run test:unit <name-substring>`
+  (all-features nextest, name filter; a filter matching zero tests in every
+  phase is an error). Full suite = `mise run verify`. Single module:
+  `mise run test:unit -m temporal`.
+- **Commits:** one per task, conventional style matching `git log`
+  (`refactor(temporal): …`, `refactor(template): …`, `docs(temporal): …`). Stage
+  only the files the task touched, never the three dirty `.scratch/arch-design`
+  paths.
+- **Docs touched by tasks** live under `.scratch/temporal-core/` (spec, review,
+  divergence register, issue ACs) and `src/temporal/GLOSSARY.md`.
+- **Prose:** a task's `Context:` paragraph is a research summary, not an
+  instruction; it sits outside Simplified Technical English (STE). The `- [ ]`
+  steps are the instructions, written in STE.
 
 ## Task order and baseline deltas
 
@@ -52,41 +95,106 @@
 | 18 | J1 | Confine `jiff` code to `src/temporal/`: engine swaps to temporal seams (`from_unix_seconds`, `now_instant`, `unix_seconds`, weekday `i64`, `parse_local_year`), wrapper deleted | +2 |
 | 19 | J2 | Strip `jiff` names from date-engine rustdoc prose (non-test) | none |
 
-**Accepted behavior changes** (each is pinned by a test in its task): case-insensitive `date.*` keys (superset, Task 2) · template zone/range messages adopt temporal `Display` wording (Task 13) · `[%Y]` renders literal `%Y`, unclosed `[…%` errors, the unclosed-bracket error precedes the token walk, and `UnclosedBracket`'s Display drops `moment-dialect` (Task 8) · runs longer than any real token now error instead of silently composing (Task 7) · zone resolution runs before pattern translation, so a range failure wins over an invalid pattern (Task 11) · a zone failure renders its `DateError` once instead of stacking two lookups (Task 12) · negative years render round-trippably from `Display`/`Serialize` (Task 10) · miette gains a `Caused by:` line for range errors (Task 13) · an unrenderable pattern's message gains `: <Jiff's reason>`, Jiff's error leaves the source chain, and the unreachable range edge behind sites 4-5 reports `DateError::OutOfRange` through `into_date_error` instead of `CalendarError::OutOfRange` (Task 14; see amendment 1) · query `date_add`/`date_diff` unit rejections quote the full unit hint instead of the static phrase (Task 17) · datetime parsing accepts sign+4-digit years such as `-0009-01-01T00:00:00Z` (Task 10; `Display`/`Serialize` stay four-digit zero-padded; see amendment 3).
+**Accepted behavior changes** (each is pinned by a test in its task):
+case-insensitive `date.*` keys (superset, Task 2) · template zone/range messages
+adopt temporal `Display` wording (Task 13) · `[%Y]` renders literal `%Y`,
+unclosed `[…%` errors, the unclosed-bracket error precedes the token walk, and
+`UnclosedBracket`'s Display drops `moment-dialect` (Task 8) · runs longer than
+any real token now error instead of silently composing (Task 7) · zone
+resolution runs before pattern translation, so a range failure wins over an
+invalid pattern (Task 11) · a zone failure renders its `DateError` once instead
+of stacking two lookups (Task 12) · negative years render round-trippably from
+`Display`/`Serialize` (Task 10) · miette gains a `Caused by:` line for range
+errors (Task 13) · an unrenderable pattern's message gains `: <Jiff's reason>`,
+Jiff's error leaves the source chain, and the unreachable range edge behind
+sites 4-5 reports `DateError::OutOfRange` through `into_date_error` instead of
+`CalendarError::OutOfRange` (Task 14; see amendment 1) · query
+`date_add`/`date_diff` unit rejections quote the full unit hint instead of the
+static phrase (Task 17) · datetime parsing accepts sign+4-digit years such as
+`-0009-01-01T00:00:00Z` (Task 10; `Display`/`Serialize` stay four-digit
+zero-padded; see amendment 3).
 
 ## Post-implementation amendments (2026-10-28)
 
-Recorded after the branch-final plan-conformance audit (two independent auditors over the full branch diff; 24 strays classified, all ratified). Rationale detail lives in `.scratch/temporal-core/divergence-register.md`.
+Recorded after the branch-final plan-conformance audit (two independent auditors
+over the full branch diff; 24 strays classified, all ratified). Rationale detail
+lives in `.scratch/temporal-core/divergence-register.md`.
 
-1. **Public API reservation (line 25) amended.** The post-Task-14 quality commit `58cb776a` also changed the public API: `DateError::OutOfRange { input }` joined the two `InvalidFormat` lines in both public-api baselines. A recognized value that leaves the representable range could not be rendered truthfully by any existing variant, and the engine-side reword alternative is forbidden by Task 13's origin rule. The same commit added the `DATETIME_*_PATTERN` consts and the shared `render_pattern` helper, and rewrote Task 10 Step 3's `render_canonical_pattern` re-export line (all `pub(crate)`; `render_canonical_pattern` itself remains). The Task 14 clause in the accepted-behavior list above now reads `OutOfRange` instead of the originally planned `InvalidValue`.
-2. **Task 10 Files scope extended.** `expand_signed_year` (about 30 lines in `datetime.rs`) widens datetime parsing to accept sign+4-digit years. Forced: jiff requires six digits after a sign, so the plan's own Step 1 red tests and the Display-reparse proptest cannot arrange without it.
-3. **Task 10 fixtures use constructors.** The negative-year test fixtures build values with `civil::Date::new` instead of parsing the plan's example strings, which jiff cannot parse for the same six-digit reason; `render_year` takes `i16` because that is what jiff's `year()` returns.
-4. **Task 7 test placement amended.** `every_moment_token_is_a_single_byte_repeat` lives in `src/temporal/token.rs` rather than on the template seam; it pins the single-byte-repeat invariant that `match_moment_run` correctness depends on.
-5. **Task 6 error type modernized.** `TemporalTokenError` derives `thiserror::Error` with `Box<str>` fields instead of the hand-written `Display`/`String` sketch; message text is byte-identical and the shape matches Task 3's `UnitError`.
+1. **Public API reservation (line 25) amended.** The post-Task-14 quality commit
+   `58cb776a` also changed the public API: `DateError::OutOfRange { input }`
+   joined the two `InvalidFormat` lines in both public-api baselines. A
+   recognized value that leaves the representable range could not be rendered
+   truthfully by any existing variant, and the engine-side reword alternative is
+   forbidden by Task 13's origin rule. The same commit added the
+   `DATETIME_*_PATTERN` consts and the shared `render_pattern` helper, and
+   rewrote Task 10 Step 3's `render_canonical_pattern` re-export line (all
+   `pub(crate)`; `render_canonical_pattern` itself remains). The Task 14 clause
+   in the accepted-behavior list above now reads `OutOfRange` instead of the
+   originally planned `InvalidValue`.
+2. **Task 10 Files scope extended.** `expand_signed_year` (about 30 lines in
+   `datetime.rs`) widens datetime parsing to accept sign+4-digit years. Forced:
+   jiff requires six digits after a sign, so the plan's own Step 1 red tests and
+   the Display-reparse proptest cannot arrange without it.
+3. **Task 10 fixtures use constructors.** The negative-year test fixtures build
+   values with `civil::Date::new` instead of parsing the plan's example strings,
+   which jiff cannot parse for the same six-digit reason; `render_year` takes
+   `i16` because that is what jiff's `year()` returns.
+4. **Task 7 test placement amended.**
+   `every_moment_token_is_a_single_byte_repeat` lives in `src/temporal/token.rs`
+   rather than on the template seam; it pins the single-byte-repeat invariant
+   that `match_moment_run` correctness depends on.
+5. **Task 6 error type modernized.** `TemporalTokenError` derives
+   `thiserror::Error` with `Box<str>` fields instead of the hand-written
+   `Display`/`String` sketch; message text is byte-identical and the shape
+   matches Task 3's `UnitError`.
 
 ## File map
 
-- Modify: `src/template/engine/date.rs` (tasks 1-9, 11-16, 18-19), `src/template/engine.rs` (9, 15), `src/temporal/{date,datetime,point,unit,error,mod,duration}.rs`, `src/temporal/GLOSSARY.md` (16), `src/delimiter.rs` (8), `src/lexer.rs` (17), `src/query/grammar/filter.rs` (5, 17), `src/query/error.rs` (17), `src/lib.rs` (3)
-- Create: `src/temporal/token.rs` (6, modified in 7, 8), `src/temporal/fmt.rs` (10), `src/template/engine/duration.rs` (15)
-- Docs: `.scratch/temporal-core/{spec.md,review.md,divergence-register.md}`, `.scratch/temporal-core/issues/05-query-temporal-functions.md`, `.scratch/temporal-core/issues/06-template-format-dialects.md` (16)
-- Baselines: `tests/baselines/pub-tokens.txt` (+1, +2, +3, −1, +3, +1, +2, +1, +2, +2 for tasks 1, 3, 4, 5, 6, 8, 10, 14, 15, 18; tasks 9, 11, 12, 13 regen with zero net change), `tests/baselines/public-api-default.txt` (14 only), `tests/baselines/public-api-test-utils.txt` (14 only)
+- Modify: `src/template/engine/date.rs` (tasks 1-9, 11-16, 18-19),
+  `src/template/engine.rs` (9, 15),
+  `src/temporal/{date,datetime,point,unit,error,mod,duration}.rs`,
+  `src/temporal/GLOSSARY.md` (16), `src/delimiter.rs` (8), `src/lexer.rs` (17),
+  `src/query/grammar/filter.rs` (5, 17), `src/query/error.rs` (17), `src/lib.rs`
+  (3)
+- Create: `src/temporal/token.rs` (6, modified in 7, 8), `src/temporal/fmt.rs`
+  (10), `src/template/engine/duration.rs` (15)
+- Docs: `.scratch/temporal-core/{spec.md,review.md,divergence-register.md}`,
+  `.scratch/temporal-core/issues/05-query-temporal-functions.md`,
+  `.scratch/temporal-core/issues/06-template-format-dialects.md` (16)
+- Baselines: `tests/baselines/pub-tokens.txt` (+1, +2, +3, −1, +3, +1, +2, +1,
+  +2, +2 for tasks 1, 3, 4, 5, 6, 8, 10, 14, 15, 18; tasks 9, 11, 12, 13 regen
+  with zero net change), `tests/baselines/public-api-default.txt` (14 only),
+  `tests/baselines/public-api-test-utils.txt` (14 only)
 
 ---
 
 ### Task 1 (O1): Offload the leap-year rule to `DateValue::in_leap_year`
 
 **Files:**
-- Modify: `src/temporal/date.rs:120-129` (insert new method after `advance_span`, before the `impl` close at :129)
-- Test: `src/temporal/date.rs:537-539` (insert new test mod between `mod constructor`'s close and `mod parse {`)
-- Modify: `src/template/engine/date.rs:46-49` (import `DateValue`), `:1043-1056` (`is_leap_year`), `:2398-2406` (pin test)
-- Modify: `.scratch/temporal-core/issues/05-query-temporal-functions.md:17` (AC no longer names `leap_year()`)
+
+- Modify: `src/temporal/date.rs:120-129` (insert new method after
+  `advance_span`, before the `impl` close at :129)
+- Test: `src/temporal/date.rs:537-539` (insert new test mod between
+  `mod constructor`'s close and `mod parse {`)
+- Modify: `src/template/engine/date.rs:46-49` (import `DateValue`), `:1043-1056`
+  (`is_leap_year`), `:2398-2406` (pin test)
+- Modify: `.scratch/temporal-core/issues/05-query-temporal-functions.md:17` (AC
+  no longer names `leap_year()`)
 - Baseline: `tests/baselines/pub-tokens.txt` (+1)
 
-**Context:** The engine computes `year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)` itself, a second live copy of a calendar rule, explicitly forbidden by the tracker AC (`issues/05:17` names `leap_year()` as a violation) and by `review.md:1971` (T-new-1). jiff 0.2.38 already provides `civil::Date::in_leap_year(self) -> bool` (`date.rs:701`), and `DateValue` is the declared single owner of date rules. The engine's doc line (:1039-1042) already claims `i32` while the code uses `i16::try_from`; offloading makes the doc true for free.
+**Context:** The engine computes
+`year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)` itself, a second live
+copy of a calendar rule, explicitly forbidden by the tracker AC (`issues/05:17`
+names `leap_year()` as a violation) and by `review.md:1971` (T-new-1). jiff
+0.2.38 already provides `civil::Date::in_leap_year(self) -> bool`
+(`date.rs:701`), and `DateValue` is the declared single owner of date rules. The
+engine's doc line (:1039-1042) already claims `i32` while the code uses
+`i16::try_from`; offloading makes the doc true for free.
 
 - [ ] **Step 1: Write the failing temporal tests**
 
-  In `src/temporal/date.rs`, insert immediately before `mod parse {` (line 539; the anchor `    }\n\n    mod parse {` occurs exactly once):
+  In `src/temporal/date.rs`, insert immediately before `mod parse {` (line 539;
+  the anchor `}\n\n    mod parse {` occurs exactly once):
 
   ```rust
       mod in_leap_year {
@@ -133,8 +241,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 2: Run the tests to check that they fail**
 
-  Run: `mise run test:unit in_leap_year`
-  Expected: FAIL with compile error `no function or associated item named 'in_leap_year' found for struct 'DateValue'`.
+  Run: `mise run test:unit in_leap_year` Expected: FAIL with compile error
+  `no function or associated item named 'in_leap_year' found for struct 'DateValue'`.
 
 - [ ] **Step 3: Implement `DateValue::in_leap_year`**
 
@@ -177,16 +285,22 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  Notes: `from_ymd` already enforces the `-9999..=9999` gate and produces the `InvalidValue`/`"a field is out of range"` error. `civil_date()` is the existing `pub(crate)` accessor. The leap rule itself is jiff's method. Visibility is `pub(crate)`: the public API must not grow (public-api baseline stays untouched).
+  Notes: `from_ymd` already enforces the `-9999..=9999` gate and produces the
+  `InvalidValue`/`"a field is out of range"` error. `civil_date()` is the
+  existing `pub(crate)` accessor. The leap rule itself is jiff's method.
+  Visibility is `pub(crate)`: the public API must not grow (public-api baseline
+  stays untouched).
 
 - [ ] **Step 4: Run the temporal tests to check that they pass**
 
-  Run: `mise run test:unit in_leap_year`
-  Expected: PASS, 12 rstest cases (nine in `computes_the_proleptic_gregorian_rule`, three in `rejects_years_outside_the_representable_range`).
+  Run: `mise run test:unit in_leap_year` Expected: PASS, 12 rstest cases (nine
+  in `computes_the_proleptic_gregorian_rule`, three in
+  `rejects_years_outside_the_representable_range`).
 
 - [ ] **Step 5: Rewrite the engine's `is_leap_year` and add the import**
 
-  In `src/template/engine/date.rs`, add `DateValue` to the temporal import (line 46-49):
+  In `src/template/engine/date.rs`, add `DateValue` to the temporal import (line
+  46-49):
 
   ```rust
       temporal::{
@@ -239,20 +353,26 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   ```
 
   Behavior equivalence (asserted, not assumed):
-  - `|year| > 9999`: old `civil::Date::new` error, new `from_ymd` error, both remapped to `leap_year_input_error`.
-  - `10_000..=32_767`: old `i16` ok + `Date::new` fails, new `i32` ok + `from_ymd` fails, same remap.
-  - `> 32_767`: old `i16::try_from` fails, new `i32::try_from` fails, same remap.
+  - `|year| > 9999`: old `civil::Date::new` error, new `from_ymd` error, both
+    remapped to `leap_year_input_error`.
+  - `10_000..=32_767`: old `i16` ok + `Date::new` fails, new `i32` ok +
+    `from_ymd` fails, same remap.
+  - `> 32_767`: old `i16::try_from` fails, new `i32::try_from` fails, same
+    remap.
   - Date-string arm unchanged in effect (both end in `from_ymd`/`Date::new`).
   - The two leap formulas agree on the whole `i32` range (proleptic Gregorian).
 
 - [ ] **Step 6: Run the existing engine tests**
 
-  Run: `mise run test:unit leap_year`
-  Expected: PASS; every case in `mod is_leap_year` (`2024/2023/1900/2000`, both date-string cases, the non-int/non-string rejection) stays green, plus the two new temporal tests.
+  Run: `mise run test:unit leap_year` Expected: PASS; every case in
+  `mod is_leap_year` (`2024/2023/1900/2000`, both date-string cases, the
+  non-int/non-string rejection) stays green, plus the two new temporal tests.
 
 - [ ] **Step 7: Add the engine boundary pin**
 
-  In `mod is_leap_year` (insert after `rejects_a_non_integer_non_string_argument`, before the mod's closing `}` at :2406):
+  In `mod is_leap_year` (insert after
+  `rejects_a_non_integer_non_string_argument`, before the mod's closing `}`
+  at :2406):
 
   ```rust
           #[test]
@@ -265,11 +385,15 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
           }
   ```
 
-  This test is **green before and after** (old `i16::try_from(40_000)` and new `from_ymd(40_000, 1, 1)` both remap to `leap_year_input_error`). It pins the boundary the rewrite must preserve.
+  This test is **green before and after** (old `i16::try_from(40_000)` and new
+  `from_ymd(40_000, 1, 1)` both remap to `leap_year_input_error`). It pins the
+  boundary the rewrite must preserve.
 
 - [ ] **Step 8: Update the tracker AC**
 
-  In `.scratch/temporal-core/issues/05-query-temporal-functions.md:17`, remove the `leap_year()` item from the enumerated violations. Old substring (must match exactly):
+  In `.scratch/temporal-core/issues/05-query-temporal-functions.md:17`, remove
+  the `leap_year()` item from the enumerated violations. Old substring (must
+  match exactly):
 
   ```text
   `weekday()` (`:602`), `leap_year()` (`:691-692`), plus
@@ -281,7 +405,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   `weekday()` (`:602`), plus
   ```
 
-  GLOSSARY: **no edit**. Neither glossary mentions leap years. The generic "date rules have a single owner" clause already holds once the offload lands. Record this decision. Do not invent a glossary entry.
+  GLOSSARY: **no edit**. Neither glossary mentions leap years. The generic "date
+  rules have a single owner" clause already holds once the offload lands. Record
+  this decision. Do not invent a glossary entry.
 
 - [ ] **Step 9: Regenerate the pub-token baseline (+1 line)**
 
@@ -292,12 +418,15 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   git diff --stat tests/baselines/pub-tokens.txt
   ```
 
-  Expected: exactly one added line for `src/temporal/date.rs: pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {`; no deletions.
+  Expected: exactly one added line for
+  `src/temporal/date.rs: pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {`;
+  no deletions.
 
 - [ ] **Step 10: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green: `fmt`, `check` (incl. `check:visibility`: public-api diff empty, pub-token diff empty after regen), `lint --no-fix`, `test`.
+  Run: `mise run verify` Expected: green: `fmt`, `check` (incl.
+  `check:visibility`: public-api diff empty, pub-token diff empty after regen),
+  `lint --no-fix`, `test`.
 
 - [ ] **Step 11: Commit**
 
@@ -311,15 +440,28 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 2 (O3): Route the date namespace through `resolve_period_edge`
 
 **Files:**
-- Modify: `src/template/engine/date.rs:46-49` (import `resolve_period_edge`), `:293-356` (`get_value`)
+
+- Modify: `src/template/engine/date.rs:46-49` (import `resolve_period_edge`),
+  `:293-356` (`get_value`)
 - Test: `src/template/engine/date.rs:1158-1174` (`mod get_value`)
 - Baseline: none (no visibility change)
 
-**Context:** Twelve `get_value` arms (`start_of_week`/`sow`/…/`eoy`) hand-map names that `temporal::calendar::resolve_period_edge` (calendar.rs:101-116) already resolves, ASCII-case-insensitively, from one `PERIOD_EDGE_LOOKUP` table. Three-way maintenance (namespace const, match arms, lookup) collapses to one. The key is folded to lowercase once in a 16-byte buffer (mirroring `resolve_period_edge` itself), which makes the whole `date` namespace case-insensitive: a deliberate superset matching the query layer (`filter.rs:514` already resolves case-insensitively). Longest real key is `start_of_month` (15 bytes) so the 16-byte fold never truncates a real name; longer unknown keys fall through raw and resolve to `None` as before.
+**Context:** Twelve `get_value` arms (`start_of_week`/`sow`/…/`eoy`) hand-map
+names that `temporal::calendar::resolve_period_edge` (calendar.rs:101-116)
+already resolves, ASCII-case-insensitively, from one `PERIOD_EDGE_LOOKUP` table.
+Three-way maintenance (namespace const, match arms, lookup) collapses to one.
+The key is folded to lowercase once in a 16-byte buffer (mirroring
+`resolve_period_edge` itself), which makes the whole `date` namespace
+case-insensitive: a deliberate superset matching the query layer
+(`filter.rs:514` already resolves case-insensitively). Longest real key is
+`start_of_month` (15 bytes) so the 16-byte fold never truncates a real name;
+longer unknown keys fall through raw and resolve to `None` as before.
 
 - [ ] **Step 1: Write the failing tests**
 
-  In `mod get_value` (insert after `get_value_returns_none_for_a_non_string_key`, before the mod's closing `}` at :1174):
+  In `mod get_value` (insert after
+  `get_value_returns_none_for_a_non_string_key`, before the mod's closing `}`
+  at :1174):
 
   ```rust
           #[test]
@@ -346,8 +488,10 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 2: Run the tests to check that they fail**
 
-  Run: `mise run test:unit get_value`
-  Expected: FAIL: `get_value_accepts_uppercase_method_names` panics with `"NOW" (uppercase of "now") does not resolve` (the other new test fails on `Start_Of_Week`).
+  Run: `mise run test:unit get_value` Expected: FAIL:
+  `get_value_accepts_uppercase_method_names` panics with
+  `"NOW" (uppercase of "now") does not resolve` (the other new test fails on
+  `Start_Of_Week`).
 
 - [ ] **Step 3: Import `resolve_period_edge` and rewrite `get_value`**
 
@@ -507,12 +651,18 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       }
   ```
 
-  Behavior notes: the twelve explicit arms become one fall-through arm. Unknown keys still return `None` (`resolve_period_edge` returns `None`). Keys over 16 bytes skip the fold and still resolve to `None`. `CalendarPeriod` remains used (the `Anchor` enum at :153-154 and `render_period_edge` at :693), so no import is dropped. `NAMESPACE_METHODS` is unchanged (already lowercase, so the existing bidirectional test at :1412-1423 keeps passing).
+  Behavior notes: the twelve explicit arms become one fall-through arm. Unknown
+  keys still return `None` (`resolve_period_edge` returns `None`). Keys over 16
+  bytes skip the fold and still resolve to `None`. `CalendarPeriod` remains used
+  (the `Anchor` enum at :153-154 and `render_period_edge` at :693), so no import
+  is dropped. `NAMESPACE_METHODS` is unchanged (already lowercase, so the
+  existing bidirectional test at :1412-1423 keeps passing).
 
 - [ ] **Step 4: Run the tests to check that they pass**
 
-  Run: `mise run test:unit get_value`
-  Expected: PASS: the two original `get_value` tests plus both new tests (5 with the enumerate round-trip that also matches the filter).
+  Run: `mise run test:unit get_value` Expected: PASS: the two original
+  `get_value` tests plus both new tests (5 with the enumerate round-trip that
+  also matches the filter).
 
 - [ ] **Step 5: Run the full gate**
 
@@ -531,15 +681,54 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 3 (O2): Type the unknown-unit rejection as `UnitError`
 
 **Files:**
-- Modify: `src/temporal/error.rs:168` (insert `UnitError` between `impl CalendarError` and the tests mod), `src/temporal/unit.rs:20` (import) and `:97` (add `parse_spelling` after `from_spelling`), `src/template/engine/date.rs:406-409` (doc link), `:414-415` (`unit_kwarg` body), `:966` (doc link), `:1113-1130` (delete `unknown_unit_error`), `:44-45` (drop the hint import; apply this edit last, it shifts every later line by one), `src/temporal/mod.rs:54`, `src/lib.rs:170-173`
-- Test: `src/temporal/unit.rs:499` (new `mod spelling_errors` between `mod lookup` and `mod accessors`), `src/template/engine/date.rs:2244` (message-shape pin inside `date_add_rejects_unknown_unit`)
-- Baseline: regen `tests/baselines/pub-tokens.txt`, expected delta `+2` added lines plus the one `mod.rs` line rewrite (the table's "+2, 1 line rewrite"); `public-api-default.txt` and `public-api-test-utils.txt` stay byte-identical
 
-**Context:** Rejecting a bad `unit="..."` kwarg is split over three places: `TimeUnit::from_spelling` (unit.rs:87-97) returns a bare `Option`; `unit_kwarg` (engine/date.rs:411-416) converts `None` through the date.rs-local `unknown_unit_error` (:1116-1129); and the message text comes from `UNIT_SPELLINGS_HINT` (unit.rs:357-363), re-exported through `temporal/mod.rs:54` and `lib.rs:172` solely so that one helper can reach it. O2 gives the rejection a type: `TimeUnit::parse_spelling(unit) -> Result<Self, UnitError>`; the thiserror format string reproduces the old `format!` byte for byte (`Box<str>` debug-prints exactly like the old `&str`); and `unit_kwarg` maps it with `invalid_operation(error.to_string(), error)` (engine/error.rs:48-56), which keeps the message verbatim and chains the cause. minijinja's `Display` prints only `"{kind}: {detail}"` (minijinja error.rs:183), never the source chain, so the user-visible string stays `invalid operation: unknown unit "..." (expected ...)`. The existing kind-only tests (`rejects_an_unknown_unit_instead_of_panicking` :2084, `date_add_rejects_unknown_unit` :2236) stay green; Step 5 adds a shape pin so Step 6 cannot silently rewrap the message. `filter.rs:322/669/685` keeps calling `from_spelling` (query adoption of `parse_spelling` lands in Task 17; the evaluator sites stay on `from_spelling` by design); `DurationError::UnknownUnit` (error.rs:119), the duration parser's hint-less sibling message, is untouched. Visibility: `UnitError` is declared `pub` inside the private `mod error` (mod.rs:36) and is not re-exported, so both public-api baselines stay byte-identical (`unnameable-types` and `unreachable-pub` are allow-by-default; `clippy::redundant_pub_crate` is nursery and not enabled here). GLOSSARY: **no edit**; the `UNIT_SPELLINGS_HINT`/`TEMPORAL_UNITS` sync contract at `src/GLOSSARY.md:49` stays true and is now machine-enforced by `unit_spellings_hint_matches_the_registry`.
+- Modify: `src/temporal/error.rs:168` (insert `UnitError` between
+  `impl CalendarError` and the tests mod), `src/temporal/unit.rs:20` (import)
+  and `:97` (add `parse_spelling` after `from_spelling`),
+  `src/template/engine/date.rs:406-409` (doc link), `:414-415` (`unit_kwarg`
+  body), `:966` (doc link), `:1113-1130` (delete `unknown_unit_error`), `:44-45`
+  (drop the hint import; apply this edit last, it shifts every later line by
+  one), `src/temporal/mod.rs:54`, `src/lib.rs:170-173`
+- Test: `src/temporal/unit.rs:499` (new `mod spelling_errors` between
+  `mod lookup` and `mod accessors`), `src/template/engine/date.rs:2244`
+  (message-shape pin inside `date_add_rejects_unknown_unit`)
+- Baseline: regen `tests/baselines/pub-tokens.txt`, expected delta `+2` added
+  lines plus the one `mod.rs` line rewrite (the table's "+2, 1 line rewrite");
+  `public-api-default.txt` and `public-api-test-utils.txt` stay byte-identical
+
+**Context:** Rejecting a bad `unit="..."` kwarg is split over three places:
+`TimeUnit::from_spelling` (unit.rs:87-97) returns a bare `Option`; `unit_kwarg`
+(engine/date.rs:411-416) converts `None` through the date.rs-local
+`unknown_unit_error` (:1116-1129); and the message text comes from
+`UNIT_SPELLINGS_HINT` (unit.rs:357-363), re-exported through
+`temporal/mod.rs:54` and `lib.rs:172` solely so that one helper can reach it. O2
+gives the rejection a type:
+`TimeUnit::parse_spelling(unit) -> Result<Self, UnitError>`; the thiserror
+format string reproduces the old `format!` byte for byte (`Box<str>`
+debug-prints exactly like the old `&str`); and `unit_kwarg` maps it with
+`invalid_operation(error.to_string(), error)` (engine/error.rs:48-56), which
+keeps the message verbatim and chains the cause. minijinja's `Display` prints
+only `"{kind}: {detail}"` (minijinja error.rs:183), never the source chain, so
+the user-visible string stays
+`invalid operation: unknown unit "..." (expected ...)`. The existing kind-only
+tests (`rejects_an_unknown_unit_instead_of_panicking` :2084,
+`date_add_rejects_unknown_unit` :2236) stay green; Step 5 adds a shape pin so
+Step 6 cannot silently rewrap the message. `filter.rs:322/669/685` keeps calling
+`from_spelling` (query adoption of `parse_spelling` lands in Task 17; the
+evaluator sites stay on `from_spelling` by design); `DurationError::UnknownUnit`
+(error.rs:119), the duration parser's hint-less sibling message, is untouched.
+Visibility: `UnitError` is declared `pub` inside the private `mod error`
+(mod.rs:36) and is not re-exported, so both public-api baselines stay
+byte-identical (`unnameable-types` and `unreachable-pub` are allow-by-default;
+`clippy::redundant_pub_crate` is nursery and not enabled here). GLOSSARY:
+**no edit**; the `UNIT_SPELLINGS_HINT`/`TEMPORAL_UNITS` sync contract at
+`src/GLOSSARY.md:49` stays true and is now machine-enforced by
+`unit_spellings_hint_matches_the_registry`.
 
 - [ ] **Step 1: Write the failing tests**
 
-  In `src/temporal/unit.rs`, insert a new test mod between the end of `mod lookup` (line 499) and `mod accessors` (line 501):
+  In `src/temporal/unit.rs`, insert a new test mod between the end of
+  `mod lookup` (line 499) and `mod accessors` (line 501):
 
   ```rust
       mod spelling_errors {
@@ -618,12 +807,16 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 2: Run the tests to check that they fail**
 
-  Run: `mise run test:unit spelling_errors`
-  Expected: FAIL: compile error, no test runs: `no function or associated item named 'parse_spelling' found for enum 'TimeUnit'`. Neither `parse_spelling` nor `UnitError` exists yet. The engine still compiles because it still calls `from_spelling`.
+  Run: `mise run test:unit spelling_errors` Expected: FAIL: compile error, no
+  test runs:
+  `no function or associated item named 'parse_spelling' found for enum 'TimeUnit'`.
+  Neither `parse_spelling` nor `UnitError` exists yet. The engine still compiles
+  because it still calls `from_spelling`.
 
 - [ ] **Step 3: Add `UnitError` and `TimeUnit::parse_spelling`**
 
-  In `src/temporal/error.rs`, replace the tail of `impl CalendarError` plus the test-mod opener:
+  In `src/temporal/error.rs`, replace the tail of `impl CalendarError` plus the
+  test-mod opener:
 
   ```rust
               },
@@ -657,7 +850,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   #[cfg(test)]
   ```
 
-  (`UnitError` is `pub` inside the private `mod error` like `DateError` is. It carries no `#[non_exhaustive]`, matching the internal `CalendarError`. Variant fields carry no `pub`, so the pub-token cost is the enum line alone.)
+  (`UnitError` is `pub` inside the private `mod error` like `DateError` is. It
+  carries no `#[non_exhaustive]`, matching the internal `CalendarError`. Variant
+  fields carry no `pub`, so the pub-token cost is the enum line alone.)
 
   In `src/temporal/unit.rs`, change the error import (line 20):
 
@@ -671,7 +866,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   use super::error::{CalendarError, UnitError};
   ```
 
-  and insert `parse_spelling` directly after `from_spelling` (anchor: the `UNIT_LOOKUP.get(lower).copied()` tail, before the `UnitSpec` doc):
+  and insert `parse_spelling` directly after `from_spelling` (anchor: the
+  `UNIT_LOOKUP.get(lower).copied()` tail, before the `UnitSpec` doc):
 
   ```rust
       /// Resolves a unit spelling or reports why it was rejected.
@@ -693,12 +889,16 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 4: Run the tests to check that they pass**
 
-  Run: `mise run test:unit spelling_errors`
-  Expected: PASS: both new tests. `unit_spellings_hint_matches_the_registry` proves each hint pair parses to its own registry row under the registry's own plural. `unknown_spelling_error_names_the_unit_and_the_hint` pins the byte-exact `UnitError` message.
+  Run: `mise run test:unit spelling_errors` Expected: PASS: both new tests.
+  `unit_spellings_hint_matches_the_registry` proves each hint pair parses to its
+  own registry row under the registry's own plural.
+  `unknown_spelling_error_names_the_unit_and_the_hint` pins the byte-exact
+  `UnitError` message.
 
 - [ ] **Step 5: Add the engine message-shape pin**
 
-  In `date_add_rejects_unknown_unit` (engine/date.rs:2236-2245), extend the existing assertion:
+  In `date_add_rejects_unknown_unit` (engine/date.rs:2236-2245), extend the
+  existing assertion:
 
   ```rust
               assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -718,14 +918,17 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
           }
   ```
 
-  This test is **green before and after** the rewrite (minijinja's `Display` renders `"{kind}: {detail}"`, so `contains` sees the same detail on both sides). It pins the text Step 6 must preserve.
+  This test is **green before and after** the rewrite (minijinja's `Display`
+  renders `"{kind}: {detail}"`, so `contains` sees the same detail on both
+  sides). It pins the text Step 6 must preserve.
 
   Run: `mise run test:unit date_add_rejects_unknown_unit`
   Expected: PASS against the unmodified engine.
 
 - [ ] **Step 6: Rewire the engine and shrink the hint's re-exports**
 
-  Apply these edits in order. Each old text block is unique. The import drop goes last because it shifts every later line.
+  Apply these edits in order. Each old text block is unique. The import drop
+  goes last because it shifts every later line.
 
   1. engine/date.rs `unit_kwarg` doc (lines 406-409), link to the fallible API:
 
@@ -771,7 +974,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
      /// [`TimeUnit::parse_spelling`]'s accepted names (see [`unit_kwarg`]). Returns
      ```
 
-  4. engine/date.rs, delete `unknown_unit_error` entirely (the closing `}` of the previous function through the blank line before `#[cfg(test)]`):
+  4. engine/date.rs, delete `unknown_unit_error` entirely (the closing `}` of
+     the previous function through the blank line before `#[cfg(test)]`):
 
      ```rust
      }
@@ -829,7 +1033,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
      pub(crate) use unit::{DateUnit, TimeUnit};
      ```
 
-  7. `src/lib.rs:170-173`, drop the hint line (keep the multi-line braces; `fmt` approved this shape):
+  7. `src/lib.rs:170-173`, drop the hint line (keep the multi-line braces; `fmt`
+     approved this shape):
 
      ```rust
      pub(crate) use temporal::{
@@ -846,12 +1051,17 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
      };
      ```
 
-  Behavior notes: the three `UNIT_SPELLINGS_HINT` imports go away together, so no `unused_imports` warning remains.
-  `Error`/`ErrorKind` stay used elsewhere in date.rs (lines 136, 282, 341, 559, 598, 648, 1061, 1075).
-  `from_spelling` itself stays (unit.rs tests, `filter.rs:322/669/685`, and the new `parse_spelling` body).
+  Behavior notes: the three `UNIT_SPELLINGS_HINT` imports go away together, so
+  no `unused_imports` warning remains. `Error`/`ErrorKind` stay used elsewhere
+  in date.rs (lines 136, 282, 341, 559, 598, 648, 1061, 1075). `from_spelling`
+  itself stays (unit.rs tests, `filter.rs:322/669/685`, and the new
+  `parse_spelling` body).
 
-  Run: `mise run test:unit unknown_unit` and `mise run test:unit spelling_errors`
-  Expected: PASS: `rejects_an_unknown_unit_instead_of_panicking`, `date_add_rejects_unknown_unit` (now with the shape pin), and both `spelling_errors` tests.
+  Run: `mise run test:unit unknown_unit` and
+  `mise run test:unit spelling_errors` Expected: PASS:
+  `rejects_an_unknown_unit_instead_of_panicking`,
+  `date_add_rejects_unknown_unit` (now with the shape pin), and both
+  `spelling_errors` tests.
 
 - [ ] **Step 7: Regenerate the pub-token baseline (+2 lines, 1 rewrite)**
 
@@ -862,12 +1072,20 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   git diff tests/baselines/pub-tokens.txt
   ```
 
-  Expected: exactly two added lines, `src/temporal/error.rs: pub enum UnitError {` and `src/temporal/unit.rs: pub(crate) fn parse_spelling(unit: &str) -> Result<Self, UnitError> {`. The one rewritten line `src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit};` replaces its three-item form. No other lines change (`src/lib.rs` keeps its `pub(crate) use temporal::{` line, only a non-matching body line was removed).
+  Expected: exactly two added lines,
+  `src/temporal/error.rs: pub enum UnitError {` and
+  `src/temporal/unit.rs: pub(crate) fn parse_spelling(unit: &str) -> Result<Self, UnitError> {`.
+  The one rewritten line
+  `src/temporal/mod.rs: pub(crate) use unit::{DateUnit, TimeUnit};` replaces its
+  three-item form. No other lines change (`src/lib.rs` keeps its
+  `pub(crate) use temporal::{` line, only a non-matching body line was removed).
 
 - [ ] **Step 8: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (`fmt`, `check` incl. `check:visibility`: both public-api diffs empty because `UnitError` is unreachable from outside the crate, pub-token diff empty after the regen, `lint --no-fix`, `test`).
+  Run: `mise run verify` Expected: green (`fmt`, `check` incl.
+  `check:visibility`: both public-api diffs empty because `UnitError` is
+  unreachable from outside the crate, pub-token diff empty after the regen,
+  `lint --no-fix`, `test`).
 
 - [ ] **Step 9: Commit**
 
@@ -881,19 +1099,56 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 4 (O5): Own the wall clock in temporal with `now()` and `today()`
 
 **Files:**
-- Modify: `src/temporal/datetime.rs` (insert `now()` after `from_timestamp` :111-114; tests: insert `mod clock` before `mod constructor` :628)
-- Modify: `src/temporal/date.rs` (insert `today()` after Task 1's `in_leap_year`, before the `impl DateValue` close; tests: insert `mod today` before `mod parse {`, the same anchor Task 1 chained onto)
-- Modify: `src/temporal/point.rs:779` (`local_zone_for_calendar` gains `pub(super)`)
-- Modify: `src/template/engine/date.rs` (`base` :160-173, `transform` :176-205, comment at `is_past` :1007 / `is_future` :1023)
+
+- Modify: `src/temporal/datetime.rs` (insert `now()` after
+  `from_timestamp` :111-114; tests: insert `mod clock` before
+  `mod constructor` :628)
+- Modify: `src/temporal/date.rs` (insert `today()` after Task 1's
+  `in_leap_year`, before the `impl DateValue` close; tests: insert `mod today`
+  before `mod parse {`, the same anchor Task 1 chained onto)
+- Modify: `src/temporal/point.rs:779` (`local_zone_for_calendar` gains
+  `pub(super)`)
+- Modify: `src/template/engine/date.rs` (`base` :160-173, `transform` :176-205,
+  comment at `is_past` :1007 / `is_future` :1023)
 - Baseline: `tests/baselines/pub-tokens.txt` (+3)
 
-**Context:** The engine reads the clock. `Anchor::base` (`engine/date.rs:160-173`) builds `DatePoint::from(DateTimeValue::from_timestamp(jiff::Timestamp::now()))` eagerly, then derives the calendar day through `now.date()`, which resolves the process zone inside `DatePoint::date` (`point.rs:200`, `local_zone_for_calendar()?`). `Anchor::transform` (:176-205) keeps `Now | Today` out of the zone by short-circuiting in an outer match; its inner `Now | Today` arm is unreachable, an exhaustiveness artifact of matching the narrowed `anchor`. O5 gives the clock to temporal behind the same seam `DatePoint::date` already uses: `DateTimeValue::now()` is an infallible instant read, and `DateValue::today()` resolves the local calendar day through `local_zone_for_calendar()`, so the error is value-identical to the old path (`now.date()?` already propagated `CalendarError::Zone` from that constructor, rendered unchanged at `render` :246). `base` collapses to a two-arm match; `transform` collapses to a single match whose `let zone = || ...` closure resolves the zone per arm, preserving the invariant that `Now`/`Today` never touch the zone (fetching the zone at the top of `transform` would make `date.now()` fail when zone lookup fails: forbidden). `is_past`/`is_future` (:1007/:1023) compare instants: no zone and no point construction, so they deliberately keep raw `jiff::Timestamp::now()` and gain a comment saying why. Re-verified by grep: those are the engine's only `Timestamp::now()` sites besides a test (:2326); `render` does not read the clock itself. Engine tests `mod now` (:1176) and `mod today_tomorrow_yesterday` (:1263) are **green before and after**. Visibility: +3 pub tokens, all `pub(crate)`/`pub(super)`, so both public-api baselines stay byte-identical. GLOSSARY: **no edit**; the glossary defines the types against the process-local clock but names no constructor, so `now()`/`today()` add no vocabulary. Note: `transform` still calls `start_of`/`end_of` here; Task 5 converts those two arms to `snap`.
+**Context:** The engine reads the clock. `Anchor::base`
+(`engine/date.rs:160-173`) builds
+`DatePoint::from(DateTimeValue::from_timestamp(jiff::Timestamp::now()))`
+eagerly, then derives the calendar day through `now.date()`, which resolves the
+process zone inside `DatePoint::date` (`point.rs:200`,
+`local_zone_for_calendar()?`). `Anchor::transform` (:176-205) keeps
+`Now | Today` out of the zone by short-circuiting in an outer match; its inner
+`Now | Today` arm is unreachable, an exhaustiveness artifact of matching the
+narrowed `anchor`. O5 gives the clock to temporal behind the same seam
+`DatePoint::date` already uses: `DateTimeValue::now()` is an infallible instant
+read, and `DateValue::today()` resolves the local calendar day through
+`local_zone_for_calendar()`, so the error is value-identical to the old path
+(`now.date()?` already propagated `CalendarError::Zone` from that constructor,
+rendered unchanged at `render` :246). `base` collapses to a two-arm match;
+`transform` collapses to a single match whose `let zone = || ...` closure
+resolves the zone per arm, preserving the invariant that `Now`/`Today` never
+touch the zone (fetching the zone at the top of `transform` would make
+`date.now()` fail when zone lookup fails: forbidden). `is_past`/`is_future`
+(:1007/:1023) compare instants: no zone and no point construction, so they
+deliberately keep raw `jiff::Timestamp::now()` and gain a comment saying why.
+Re-verified by grep: those are the engine's only `Timestamp::now()` sites
+besides a test (:2326); `render` does not read the clock itself. Engine tests
+`mod now` (:1176) and `mod today_tomorrow_yesterday` (:1263) are
+**green before and after**. Visibility: +3 pub tokens, all
+`pub(crate)`/`pub(super)`, so both public-api baselines stay byte-identical.
+GLOSSARY: **no edit**; the glossary defines the types against the process-local
+clock but names no constructor, so `now()`/`today()` add no vocabulary. Note:
+`transform` still calls `start_of`/`end_of` here; Task 5 converts those two arms
+to `snap`.
 
 - [ ] **Step 1: Write the failing temporal tests**
 
   Two insertions.
 
-  1. In `src/temporal/datetime.rs`, insert `mod clock` immediately before `mod constructor {` (line 628; the sequence `    mod constructor {\n        use std::time::Duration;` occurs exactly once):
+  1. In `src/temporal/datetime.rs`, insert `mod clock` immediately before
+     `mod constructor {` (line 628; the sequence
+     `mod constructor {\n        use std::time::Duration;` occurs exactly once):
 
   ```rust
       mod clock {
@@ -927,7 +1182,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
   ```
 
-  2. In `src/temporal/date.rs`, insert immediately before `mod parse {`. This is the same anchor Task 1 chained onto: `    }\n\n    mod parse {`, still exactly once after Task 1:
+  2. In `src/temporal/date.rs`, insert immediately before `mod parse {`. This is
+     the same anchor Task 1 chained onto: `}\n\n    mod parse {`, still exactly
+     once after Task 1:
 
   ```rust
       mod today {
@@ -954,12 +1211,17 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
   ```
 
-  Notes: `ZoneGuard` is already imported at the `mod tests` root (`date.rs:394`) and reaches child mods through `use super::*`, the same path `ymd` takes. `Etc/GMT+5` is a fixed offset with no DST transitions, so both clock reads see the same wall date except at the accepted midnight race.
+  Notes: `ZoneGuard` is already imported at the `mod tests` root (`date.rs:394`)
+  and reaches child mods through `use super::*`, the same path `ymd` takes.
+  `Etc/GMT+5` is a fixed offset with no DST transitions, so both clock reads see
+  the same wall date except at the accepted midnight race.
 
 - [ ] **Step 2: Run the tests to check that they fail**
 
-  Run: `mise run test:unit now_falls_between`
-  Expected: FAIL with compile error `no function or associated item named 'now' found for struct 'DateTimeValue'`. The `'today'` error is the same for `DateValue`. One run covers both files because the crate compiles as one unit.
+  Run: `mise run test:unit now_falls_between` Expected: FAIL with compile error
+  `no function or associated item named 'now' found for struct 'DateTimeValue'`.
+  The `'today'` error is the same for `DateValue`. One run covers both files
+  because the crate compiles as one unit.
 
 - [ ] **Step 3: Implement `DateTimeValue::now()`**
 
@@ -989,13 +1251,16 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       }
   ```
 
-  Note: `Timestamp` is already imported (`datetime.rs:13`); `#[inline]` matches the sibling constructors.
+  Note: `Timestamp` is already imported (`datetime.rs:13`); `#[inline]` matches
+  the sibling constructors.
 
 - [ ] **Step 4: Implement `DateValue::today()` and widen `local_zone_for_calendar`**
 
   Two edits.
 
-  1. In `src/temporal/point.rs`, widen the helper's visibility (line 779; `fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {` occurs exactly once):
+  1. In `src/temporal/point.rs`, widen the helper's visibility (line 779;
+     `fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {` occurs
+     exactly once):
 
   ```rust
   fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
@@ -1007,7 +1272,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   pub(super) fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
   ```
 
-  2. In `src/temporal/date.rs`, replace Task 1's `in_leap_year` tail (the `impl DateValue` close follows it):
+  2. In `src/temporal/date.rs`, replace Task 1's `in_leap_year` tail (the
+     `impl DateValue` close follows it):
 
   ```rust
           pub(crate) fn in_leap_year(year: i32) -> Result<bool, DateError> {
@@ -1037,17 +1303,27 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       }
   ```
 
-  Notes: `DateTimeValue` and `CalendarError` are already imported (`date.rs:14-16`); `super::point::local_zone_for_calendar` resolves because `pub(super)` items are visible throughout `temporal`, including descendant modules such as `temporal::date`. The body converts through `local_datetime_in` + `From<civil::Date>` (`date.rs:156`), the same conversion `DatePoint::date` does today. Visibility is `pub(super)`: the helper gains no wider reach than `temporal` itself.
+  Notes: `DateTimeValue` and `CalendarError` are already imported
+  (`date.rs:14-16`); `super::point::local_zone_for_calendar` resolves because
+  `pub(super)` items are visible throughout `temporal`, including descendant
+  modules such as `temporal::date`. The body converts through
+  `local_datetime_in` + `From<civil::Date>` (`date.rs:156`), the same conversion
+  `DatePoint::date` does today. Visibility is `pub(super)`: the helper gains no
+  wider reach than `temporal` itself.
 
 - [ ] **Step 5: Run the temporal tests to check that they pass**
 
-  Run: `mise run test:unit tests::clock`
-  Expected: PASS, 2 tests (`now_falls_between_two_bracketing_clock_reads`, `now_is_after_a_fixed_timestamp_from_2025`).
+  Run: `mise run test:unit tests::clock` Expected: PASS, 2 tests
+  (`now_falls_between_two_bracketing_clock_reads`,
+  `now_is_after_a_fixed_timestamp_from_2025`).
 
-  Run: `mise run test:unit tests::today`
-  Expected: PASS, 1 test (`today_is_the_local_calendar_date_of_the_instant`). The filter may also execute engine `today_tomorrow_yesterday` tests; they still run against the unrewritten engine and stay green.
+  Run: `mise run test:unit tests::today` Expected: PASS, 1 test
+  (`today_is_the_local_calendar_date_of_the_instant`). The filter may also
+  execute engine `today_tomorrow_yesterday` tests; they still run against the
+  unrewritten engine and stay green.
 
-- [ ] **Step 6: Rewrite the engine's `base`, `transform`, and annotate `is_past`/`is_future`**
+- [ ] **Step 6: Rewrite the engine's `base`, `transform`, and annotate
+  `is_past`/`is_future`**
 
   Three edits in `src/template/engine/date.rs`.
 
@@ -1086,7 +1362,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       }
   ```
 
-  2. Replace `transform` (the doc comment `/// Moves the date point as this anchor requires.` stays):
+  2. Replace `transform` (the doc comment
+     `/// Moves the date point as this anchor requires.` stays):
 
   ```rust
       fn transform(
@@ -1150,7 +1427,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       }
   ```
 
-  3. Annotate the two instant comparisons (their bodies otherwise stay byte-identical):
+  3. Annotate the two instant comparisons (their bodies otherwise stay
+     byte-identical):
 
   ```rust
   fn is_past(value: &str) -> TemplateEngineResult<bool> {
@@ -1171,44 +1449,53 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  and the same comment line before `Ok(instant > jiff::Timestamp::now())` in `is_future`.
+  and the same comment line before `Ok(instant > jiff::Timestamp::now())` in
+  `is_future`.
 
-  Notes: `DateValue` is already in the engine's `temporal::{...}` import (Task 1). `zone` stays lazy: the closure runs once per non-`Now`/`Today` arm and never for those two, so `date.now()` still cannot fail on zone lookup. Each arm sees `&zone()?`, `TimeZone` by reference exactly as before. `render_date_error` and `render_calendar_error` remain referenced (the closure plus `render` :246), so no import goes dead.
+  Notes: `DateValue` is already in the engine's `temporal::{...}` import (Task
+  1). `zone` stays lazy: the closure runs once per non-`Now`/`Today` arm and
+  never for those two, so `date.now()` still cannot fail on zone lookup. Each
+  arm sees `&zone()?`, `TimeZone` by reference exactly as before.
+  `render_date_error` and `render_calendar_error` remain referenced (the closure
+  plus `render` :246), so no import goes dead.
 
 - [ ] **Step 7: Run the engine tests to check that they pass**
 
-  Run: `mise run test:unit now`
-  Expected: PASS (engine `mod now` renders shape only; the new datetime `now` tests pass too).
+  Run: `mise run test:unit now` Expected: PASS (engine `mod now` renders shape
+  only; the new datetime `now` tests pass too).
 
-  Run: `mise run test:unit today_tomorrow_yesterday`
-  Expected: PASS. This test is **green before and after**: it drives `base` plus `transform` with real zone resolution. It asserts the single-evaluation day arithmetic, so the rewrite changes no observable behavior.
+  Run: `mise run test:unit today_tomorrow_yesterday` Expected: PASS. This test
+  is **green before and after**: it drives `base` plus `transform` with real
+  zone resolution. It asserts the single-evaluation day arithmetic, so the
+  rewrite changes no observable behavior.
 
 - [ ] **Step 8: Regenerate the pub-token baseline**
 
   Run:
 
-  ```
+  ```text
   git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
   ```
 
   Expected: the diff adds exactly three lines:
 
-  ```
+  ```text
   src/temporal/date.rs: pub(crate) fn today() -> Result<Self, CalendarError> {
   src/temporal/datetime.rs: pub(crate) fn now() -> Self {
   src/temporal/point.rs: pub(super) fn local_zone_for_calendar() -> Result<TimeZone, CalendarError> {
   ```
 
-  and nothing else changes. Both `cargo public-api` baselines stay byte-identical: no `pub` item was added.
+  and nothing else changes. Both `cargo public-api` baselines stay
+  byte-identical: no `pub` item was added.
 
 - [ ] **Step 9: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: PASS (fmt, check including `check:visibility` against both baseline kinds, lint without fixes, full test suite).
+  Run: `mise run verify` Expected: PASS (fmt, check including `check:visibility`
+  against both baseline kinds, lint without fixes, full test suite).
 
 - [ ] **Step 10: Commit**
 
-  ```
+  ```text
   git add src/temporal/datetime.rs src/temporal/date.rs src/temporal/point.rs src/template/engine/date.rs tests/baselines/pub-tokens.txt
   git commit -m "refactor(temporal): offload clock reads to now() and today()"
   ```
@@ -1218,16 +1505,42 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 5 (O6): Collapse the period-edge methods into `DatePoint::snap`
 
 **Files:**
-- Modify: `src/temporal/point.rs:340-372` (replace `start_of` + `end_of` with one `snap`), tests at :2324/:2353/:2382/:2440/:2469/:2498 (multiline calls) and :3185/:3188/:3210/:3213 (proptest chain calls)
-- Modify: `src/template/engine/date.rs` (transform arms :194/:197, `render_period_edge` match :698-702)
+
+- Modify: `src/temporal/point.rs:340-372` (replace `start_of` + `end_of` with
+  one `snap`), tests at :2324/:2353/:2382/:2440/:2469/:2498 (multiline calls)
+  and :3185/:3188/:3210/:3213 (proptest chain calls)
+- Modify: `src/template/engine/date.rs` (transform arms :194/:197,
+  `render_period_edge` match :698-702)
 - Modify: `src/query/grammar/filter.rs:640-653` (two closure bodies)
 - Baseline: `tests/baselines/pub-tokens.txt` (net −1)
 
-**Context:** `start_of` (:347) and `end_of` (:364) are line-for-line identical except for the `PeriodEdge` constant passed to `calendar_period.snap_date`. Three call sites re-derive that dispatch: the engine's `Anchor::transform` picks the method per anchor variant, `render_period_edge` re-matches the edge in a two-arm `match`, and query's `filter.rs` keeps one closure per filter variant. O6 makes `DatePoint::snap(calendar_period, period_edge, zone)` the single point-level primitive, so callers pass the edge through instead of re-selecting it; the name matches the `snap_date`/`snap_weekday` verb family `calendar.rs` already owns. The `snap` body is exactly `start_of`'s body with `period_edge` as the parameter, so behavior is identical at every site (including fetch order: each caller still resolves the zone before snapping). Query impact is mechanical and coupling-neutral: `filter.rs` already imports `PeriodEdge` (:35), depends on `DatePoint` already, and gains no new import or type across the boundary; `date_boundary`'s `CalendarError::Zone` wildcard stays unchanged. Filter and namespace NAMES (`start_of_week`/`sow`, engine `NAMESPACE_METHODS` :51-70, module doc :14, query test cases :1979-2112) are untouched: they name the surface, not the method. The test mods `mod start_of`/`mod end_of` keep their names deliberately (they name the behavior under test) while every call inside migrates; all point, engine, and filter tests are **green before and after**. Visibility: net −1 pub token (two `pub(crate)` methods deleted, one added). GLOSSARY: **no edit**; no glossary line mentions `start_of`/`end_of`, and `snap` extends the existing `snap_date` vocabulary rather than adding a term.
+**Context:** `start_of` (:347) and `end_of` (:364) are line-for-line identical
+except for the `PeriodEdge` constant passed to `calendar_period.snap_date`.
+Three call sites re-derive that dispatch: the engine's `Anchor::transform` picks
+the method per anchor variant, `render_period_edge` re-matches the edge in a
+two-arm `match`, and query's `filter.rs` keeps one closure per filter variant.
+O6 makes `DatePoint::snap(calendar_period, period_edge, zone)` the single
+point-level primitive, so callers pass the edge through instead of re-selecting
+it; the name matches the `snap_date`/`snap_weekday` verb family `calendar.rs`
+already owns. The `snap` body is exactly `start_of`'s body with `period_edge` as
+the parameter, so behavior is identical at every site (including fetch order:
+each caller still resolves the zone before snapping). Query impact is mechanical
+and coupling-neutral: `filter.rs` already imports `PeriodEdge` (:35), depends on
+`DatePoint` already, and gains no new import or type across the boundary;
+`date_boundary`'s `CalendarError::Zone` wildcard stays unchanged. Filter and
+namespace NAMES (`start_of_week`/`sow`, engine `NAMESPACE_METHODS` :51-70,
+module doc :14, query test cases :1979-2112) are untouched: they name the
+surface, not the method. The test mods `mod start_of`/`mod end_of` keep their
+names deliberately (they name the behavior under test) while every call inside
+migrates; all point, engine, and filter tests are **green before and after**.
+Visibility: net −1 pub token (two `pub(crate)` methods deleted, one added).
+GLOSSARY: **no edit**; no glossary line mentions `start_of`/`end_of`, and `snap`
+extends the existing `snap_date` vocabulary rather than adding a term.
 
 - [ ] **Step 1: Replace `start_of` and `end_of` with `snap`**
 
-  In `src/temporal/point.rs`, replace both methods (their doc comments included):
+  In `src/temporal/point.rs`, replace both methods (their doc comments
+  included):
 
   ```rust
       /// Returns the first day of the period, preserving written precision and
@@ -1287,13 +1600,18 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       }
   ```
 
-  Note: `PeriodEdge` is already imported at the top of `point.rs` (the old bodies referenced it); `snap_date`'s `(edge, date)` argument order is unchanged.
+  Note: `PeriodEdge` is already imported at the top of `point.rs` (the old
+  bodies referenced it); `snap_date`'s `(edge, date)` argument order is
+  unchanged.
 
 - [ ] **Step 2: Migrate the point.rs test call sites**
 
   Four replace-all instructions in `src/temporal/point.rs`.
 
-  1. The multiline start form occurs 3 times (test fns `returns_the_first_day_of_the_period`, `preserves_month_precision`, `keeps_the_time_of_day_on_a_date_time_point` in `mod start_of`). Replace all:
+  1. The multiline start form occurs 3 times (test fns
+     `returns_the_first_day_of_the_period`, `preserves_month_precision`,
+     `keeps_the_time_of_day_on_a_date_time_point` in `mod start_of`). Replace
+     all:
 
   ```rust
               let start = base.start_of(
@@ -1312,7 +1630,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
               );
   ```
 
-  2. The multiline end form occurs 3 times (`mod end_of`, same three fn names). Replace all:
+  2. The multiline end form occurs 3 times (`mod end_of`, same three fn names).
+     Replace all:
 
   ```rust
               let end = base.end_of(
@@ -1331,7 +1650,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
               );
   ```
 
-  3. The proptest start chain occurs 3 times (lines ~3185, ~3188, ~3210). Replace all:
+  3. The proptest start chain occurs 3 times (lines ~3185, ~3188, ~3210).
+     Replace all:
 
   ```rust
                       .start_of(period, &local_zone().expect("system time zone available"))
@@ -1355,13 +1675,17 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
                       .snap(period, PeriodEdge::End, &local_zone().expect("system time zone available"))
   ```
 
-  Notes: the new proptest lines exceed 100 columns; `mise run verify` runs `fmt` first, which reflows those calls vertically, and that reflow is expected. Keep the test mod names `mod start_of` and `mod end_of`: they describe the boundary behavior under test, and nothing outside the file filters on them.
+  Notes: the new proptest lines exceed 100 columns; `mise run verify` runs `fmt`
+  first, which reflows those calls vertically, and that reflow is expected. Keep
+  the test mod names `mod start_of` and `mod end_of`: they describe the boundary
+  behavior under test, and nothing outside the file filters on them.
 
 - [ ] **Step 3: Migrate the engine call sites**
 
   Two edits in `src/template/engine/date.rs`.
 
-  1. In `Anchor::transform` (the text as rewritten by Task 4), replace the two arms:
+  1. In `Anchor::transform` (the text as rewritten by Task 4), replace the two
+     arms:
 
   ```rust
               Self::StartOf(calendar_period) => date_point
@@ -1401,7 +1725,10 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
           .map_err(render_calendar_error)?;
   ```
 
-  Note: `PeriodEdge` is already in the engine's `temporal::{...}` import, and the function's `period_edge` parameter now flows straight through. The doc comment above `render_period_edge` (:680-686) describes filter names and error kinds only, so it stays as written.
+  Note: `PeriodEdge` is already in the engine's `temporal::{...}` import, and
+  the function's `period_edge` parameter now flows straight through. The doc
+  comment above `render_period_edge` (:680-686) describes filter names and error
+  kinds only, so it stays as written.
 
 - [ ] **Step 4: Migrate the query call sites**
 
@@ -1439,36 +1766,43 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
               }
   ```
 
-  Note: no import change (`PeriodEdge` at :39-41); `date_boundary` and its `CalendarError::Zone` wildcard are deliberately untouched.
+  Note: no import change (`PeriodEdge` at :39-41); `date_boundary` and its
+  `CalendarError::Zone` wildcard are deliberately untouched.
 
 - [ ] **Step 5: Run the migrated tests**
 
-  Run: `mise run test:unit start_of`
-  Expected: PASS (point `mod start_of` cases, engine `mod start_and_end_of_month`, and query `start_of_*` cases all route through `snap` now).
+  Run: `mise run test:unit start_of` Expected: PASS (point `mod start_of` cases,
+  engine `mod start_and_end_of_month`, and query `start_of_*` cases all route
+  through `snap` now).
 
   Run: `mise run test:unit end_of`
   Expected: PASS.
 
-  Both filters are **green before and after**: the migration changes which method is called, never what it computes.
+  Both filters are **green before and after**: the migration changes which
+  method is called, never what it computes.
 
 - [ ] **Step 6: Regenerate the pub-token baseline**
 
   Run:
 
-  ```
+  ```text
   git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
   ```
 
-  Expected: net −1 line. Two lines disappear (`src/temporal/point.rs: pub(crate) fn start_of(`, `src/temporal/point.rs: pub(crate) fn end_of(`), one appears (`src/temporal/point.rs: pub(crate) fn snap(`), and nothing else changes. Both `cargo public-api` baselines stay byte-identical.
+  Expected: net −1 line. Two lines disappear
+  (`src/temporal/point.rs: pub(crate) fn start_of(`,
+  `src/temporal/point.rs: pub(crate) fn end_of(`), one appears
+  (`src/temporal/point.rs: pub(crate) fn snap(`), and nothing else changes. Both
+  `cargo public-api` baselines stay byte-identical.
 
 - [ ] **Step 7: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: PASS (fmt applies the proptest reflow, then check including `check:visibility`, lint, full test suite).
+  Run: `mise run verify` Expected: PASS (fmt applies the proptest reflow, then
+  check including `check:visibility`, lint, full test suite).
 
 - [ ] **Step 8: Commit**
 
-  ```
+  ```text
   git add src/temporal/point.rs src/template/engine/date.rs src/query/grammar/filter.rs tests/baselines/pub-tokens.txt
   git commit -m "refactor(temporal): collapse period edges into DatePoint::snap"
   ```
@@ -1478,18 +1812,71 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 6 (P1): Move the moment-dialect translator to `temporal::token`
 
 **Files:**
-- Create: `src/temporal/token.rs` (~150 lines: module doc, `MOMENT_TOKENS`, `ordinal_suffix`, `moment_to_strftime`, `pattern_to_strftime`)
-- Modify: `src/temporal/error.rs` (declare `TemporalTokenError` between `UnitError` and the tests mod, plus `use std::fmt;`)
-- Modify: `src/template/engine/date.rs` (delete `MOMENT_TOKENS` :498-520, `ordinal_suffix` :522-534, `moment_to_strftime` :536-623; replace `pattern_to_strftime` :482-496 with a thin wrapper; ~130 lines removed)
-- Modify: `src/temporal/mod.rs` (+2 lines: `mod token;`, `pub(crate) use token::pattern_to_strftime;`)
-- Modify: `.scratch/temporal-core/spec.md:105`, `.scratch/temporal-core/review.md:113`, `.scratch/temporal-core/review.md:449` (design-doc sync)
+
+- Create: `src/temporal/token.rs` (~150 lines: module doc, `MOMENT_TOKENS`,
+  `ordinal_suffix`, `moment_to_strftime`, `pattern_to_strftime`)
+- Modify: `src/temporal/error.rs` (declare `TemporalTokenError` between
+  `UnitError` and the tests mod, plus `use std::fmt;`)
+- Modify: `src/template/engine/date.rs` (delete `MOMENT_TOKENS` :498-520,
+  `ordinal_suffix` :522-534, `moment_to_strftime` :536-623; replace
+  `pattern_to_strftime` :482-496 with a thin wrapper; ~130 lines removed)
+- Modify: `src/temporal/mod.rs` (+2 lines: `mod token;`,
+  `pub(crate) use token::pattern_to_strftime;`)
+- Modify: `.scratch/temporal-core/spec.md:105`,
+  `.scratch/temporal-core/review.md:113`, `.scratch/temporal-core/review.md:449`
+  (design-doc sync)
 - Baseline: `tests/baselines/pub-tokens.txt` (+3)
 
-**Context:** `engine/date.rs:482-623` holds a self-contained moment-dialect tokenizer: `pattern_to_strftime` (the `%`-contains dialect dispatch), `MOMENT_TOKENS` (a 21-entry table), `ordinal_suffix` (the `Do` ordinal, calendar knowledge), and `moment_to_strftime` (the ~90-line tokenizer). It is a pure `(&str, jiff::civil::DateTime) -> String` translation whose only minijinja contact is constructing `minijinja::Error` directly at its two failure sites (`engine/date.rs:558-565` unclosed bracket, `:598-606` unsupported token): a layering violation, since a template-library error is built inside what is otherwise date-domain logic. Task 6 moves the tokenizer into a new `temporal::token` module and declares a temporal-native `TemporalTokenError` in `error.rs` (error types live in error.rs); the engine keeps a same-named thin wrapper that maps `TemporalTokenError` to the existing `minijinja::Error` message, so every engine call site (`:256`, `:476`, `:936`, `:1669`) and every test compiles unchanged and stays **green before and after**: the wrapper preserves the exact interface (`TemplateEngineResult<String>`), error kind (`InvalidOperation`), and message text that `rejects_unsupported_moment_token_with_token_and_dialect_name` (:1635) and `rejects_unclosed_bracket_literal_in_moment_dialect` (:1649) pin through the template seam. The `%`-contains dispatch moves with the tokenizer: it is the translator's own front door, and the engine wrapper delegates it wholesale. `Error`/`ErrorKind` imports stay in the engine (63 uses remain outside :482-623, in `render_date_error`/`render_calendar_error` and the other filters), so no import line changes there. Design-doc sync: the audit's Section C recorded this translator as "template-seam only" in three artifacts; moving it falsifies that, so `spec.md:105` (the formatting-seam decision), `review.md:113` (D-b "template seam only"), and `review.md:449` (D8's translator-error note) are amended in the same change; the remaining stale "template seam"/`format_with` mentions in `issues/06` and `spec.md:104`'s chrono-era `DelayedFormat` wording are left to the final doc-consistency pass (task D) since Task 6 does not touch `format_strtime`. Visibility: +3 pub tokens (`pattern_to_strftime` in `token.rs`, `TemporalTokenError` in `error.rs`, one re-export in `mod.rs`); both `cargo public-api` baselines stay byte-identical: the `token.rs` item and the re-export are `pub(crate)`, and `TemporalTokenError` is `pub` inside the private `mod error`, unreachable from outside just like `UnitError`. GLOSSARY: **no edit**; `TemporalTokenError`/`pattern_to_strftime` are internal implementation names, not domain vocabulary. The full moment-token matrix required by `spec.md:127` (Seam 3, "moment-token rendering (incl. the token-naming error)") and issue-06's AC ("the supported moment token set ... pinned by tests") is deferred to X4 (Task 7), which restructures this tokenizer's matching and is the natural home for it; `spec.md:136` is an out-of-scope line, not a test promise.
+**Context:** `engine/date.rs:482-623` holds a self-contained moment-dialect
+tokenizer: `pattern_to_strftime` (the `%`-contains dialect dispatch),
+`MOMENT_TOKENS` (a 21-entry table), `ordinal_suffix` (the `Do` ordinal, calendar
+knowledge), and `moment_to_strftime` (the ~90-line tokenizer). It is a pure
+`(&str, jiff::civil::DateTime) -> String` translation whose only minijinja
+contact is constructing `minijinja::Error` directly at its two failure sites
+(`engine/date.rs:558-565` unclosed bracket, `:598-606` unsupported token): a
+layering violation, since a template-library error is built inside what is
+otherwise date-domain logic. Task 6 moves the tokenizer into a new
+`temporal::token` module and declares a temporal-native `TemporalTokenError` in
+`error.rs` (error types live in error.rs); the engine keeps a same-named thin
+wrapper that maps `TemporalTokenError` to the existing `minijinja::Error`
+message, so every engine call site (`:256`, `:476`, `:936`, `:1669`) and every
+test compiles unchanged and stays **green before and after**: the wrapper
+preserves the exact interface (`TemplateEngineResult<String>`), error kind
+(`InvalidOperation`), and message text that
+`rejects_unsupported_moment_token_with_token_and_dialect_name` (:1635) and
+`rejects_unclosed_bracket_literal_in_moment_dialect` (:1649) pin through the
+template seam. The `%`-contains dispatch moves with the tokenizer: it is the
+translator's own front door, and the engine wrapper delegates it wholesale.
+`Error`/`ErrorKind` imports stay in the engine (63 uses remain outside :482-623,
+in `render_date_error`/`render_calendar_error` and the other filters), so no
+import line changes there. Design-doc sync: the audit's Section C recorded this
+translator as "template-seam only" in three artifacts; moving it falsifies that,
+so `spec.md:105` (the formatting-seam decision), `review.md:113` (D-b "template
+seam only"), and `review.md:449` (D8's translator-error note) are amended in the
+same change; the remaining stale "template seam"/`format_with` mentions in
+`issues/06` and `spec.md:104`'s chrono-era `DelayedFormat` wording are left to
+the final doc-consistency pass (task D) since Task 6 does not touch
+`format_strtime`. Visibility: +3 pub tokens (`pattern_to_strftime` in
+`token.rs`, `TemporalTokenError` in `error.rs`, one re-export in `mod.rs`); both
+`cargo public-api` baselines stay byte-identical: the `token.rs` item and the
+re-export are `pub(crate)`, and `TemporalTokenError` is `pub` inside the private
+`mod error`, unreachable from outside just like `UnitError`. GLOSSARY:
+**no edit**; `TemporalTokenError`/`pattern_to_strftime` are internal
+implementation names, not domain vocabulary. The full moment-token matrix
+required by `spec.md:127` (Seam 3, "moment-token rendering (incl. the
+token-naming error)") and issue-06's AC ("the supported moment token set ...
+pinned by tests") is deferred to X4 (Task 7), which restructures this
+tokenizer's matching and is the natural home for it; `spec.md:136` is an
+out-of-scope line, not a test promise.
 
 - [ ] **Step 1: Create `src/temporal/token.rs`**
 
-  Create the file with a module doc, the token table, and the two moved functions. `MOMENT_TOKENS`, `ordinal_suffix`, and the `moment_to_strftime` body move **verbatim** from `engine/date.rs:498-623`. The only edits inside `moment_to_strftime` are its two `Err(...)` sites (the `minijinja::Error` constructions become `TemporalTokenError` values) and its return type. Full content:
+  Create the file with a module doc, the token table, and the two moved
+  functions. `MOMENT_TOKENS`, `ordinal_suffix`, and the `moment_to_strftime`
+  body move **verbatim** from `engine/date.rs:498-623`. The only edits inside
+  `moment_to_strftime` are its two `Err(...)` sites (the `minijinja::Error`
+  constructions become `TemporalTokenError` values) and its return type. Full
+  content:
 
   ```rust
   //! Translates moment-dialect date patterns to strftime patterns.
@@ -1646,7 +2033,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  Then declare the error type in `src/temporal/error.rs`. Add `use std::fmt;` after the module doc, and insert the enum between the `UnitError` enum (Task 3's addition) and the tests mod:
+  Then declare the error type in `src/temporal/error.rs`. Add `use std::fmt;`
+  after the module doc, and insert the enum between the `UnitError` enum (Task
+  3's addition) and the tests mod:
 
   ```rust
   /// An error translating a moment-dialect pattern to strftime.
@@ -1687,11 +2076,19 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   impl std::error::Error for TemporalTokenError {}
   ```
 
-  Notes: the two `Display` arms reproduce the engine's current messages **byte-for-byte**. The `\` continuations reflow the same joined strings the `format!` calls at engine `:561-564`/`:600-605` produce. The template-seam tests that assert on message substrings keep passing. `TemporalTokenError` carries `pattern: String` (and `token: String`) so `Display` can render the full context the messages include. Both fields are `Send + Sync`, satisfying `invalid_operation`'s source bound. The `use std::fmt::Write as _;` stays function-local inside `moment_to_strftime` as it is today.
+  Notes: the two `Display` arms reproduce the engine's current messages
+  **byte-for-byte**. The `\` continuations reflow the same joined strings the
+  `format!` calls at engine `:561-564`/`:600-605` produce. The template-seam
+  tests that assert on message substrings keep passing. `TemporalTokenError`
+  carries `pattern: String` (and `token: String`) so `Display` can render the
+  full context the messages include. Both fields are `Send + Sync`, satisfying
+  `invalid_operation`'s source bound. The `use std::fmt::Write as _;` stays
+  function-local inside `moment_to_strftime` as it is today.
 
 - [ ] **Step 2: Register the module in `src/temporal/mod.rs`**
 
-  Two additions. First, add `mod token;` to the module declarations, alphabetically between `point` and `unit` (rustfmt also sorts these):
+  Two additions. First, add `mod token;` to the module declarations,
+  alphabetically between `point` and `unit` (rustfmt also sorts these):
 
   ```rust
   mod point;
@@ -1699,7 +2096,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   mod unit;
   ```
 
-  Second, add the re-export to the `pub(crate) use` block, alphabetically between the `point` and `unit` re-exports:
+  Second, add the re-export to the `pub(crate) use` block, alphabetically
+  between the `point` and `unit` re-exports:
 
   ```rust
   pub(crate) use point::{DateDiff, DatePoint};
@@ -1707,11 +2105,18 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   pub(crate) use unit::{DateUnit, TimeUnit};
   ```
 
-  Note: `mod token;` is private (the sibling module). `pub(crate) use token::pattern_to_strftime;` exposes the re-exported name at `crate::temporal::pattern_to_strftime` with `pub(crate)` visibility. That is the name the engine wrapper calls. `TemporalTokenError` is deliberately **not** re-exported: the engine maps it with type inference (`|source| invalid_operation(source.to_string(), source)`) and never names the type.
+  Note: `mod token;` is private (the sibling module).
+  `pub(crate) use token::pattern_to_strftime;` exposes the re-exported name at
+  `crate::temporal::pattern_to_strftime` with `pub(crate)` visibility. That is
+  the name the engine wrapper calls. `TemporalTokenError` is deliberately
+  **not** re-exported: the engine maps it with type inference
+  (`|source| invalid_operation(source.to_string(), source)`) and never names the
+  type.
 
 - [ ] **Step 3: Replace the engine's `pattern_to_strftime` with the thin wrapper**
 
-  In `src/template/engine/date.rs`, replace the function and its doc comment (`:482-496`):
+  In `src/template/engine/date.rs`, replace the function and its doc comment
+  (`:482-496`):
 
   ```rust
   /// Translates `pattern` to a strftime pattern.
@@ -1749,74 +2154,99 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  Then delete the three moved items that followed it: `MOMENT_TOKENS` (`:498-520`), `ordinal_suffix` (`:522-534`), and `moment_to_strftime` (`:536-623`). Delete them as one contiguous block: the const, the fn, and their doc comments. The wrapper calls `crate::temporal::pattern_to_strftime` by full path (no `use` import added, to avoid colliding with the local fn name). `invalid_operation` and `TemplateEngineResult` are already imported at `:42`. The four call sites (`:256`, `:476`, `:936`, `:1669`) are unchanged, since they still call the local `pattern_to_strftime`.
+  Then delete the three moved items that followed it: `MOMENT_TOKENS`
+  (`:498-520`), `ordinal_suffix` (`:522-534`), and `moment_to_strftime`
+  (`:536-623`). Delete them as one contiguous block: the const, the fn, and
+  their doc comments. The wrapper calls `crate::temporal::pattern_to_strftime`
+  by full path (no `use` import added, to avoid colliding with the local fn
+  name). `invalid_operation` and `TemplateEngineResult` are already imported at
+  `:42`. The four call sites (`:256`, `:476`, `:936`, `:1669`) are unchanged,
+  since they still call the local `pattern_to_strftime`.
 
 - [ ] **Step 4: Sync the design docs**
 
   Three surgical amendments so the recorded decisions stay true after the move.
 
-  1. `.scratch/temporal-core/spec.md:105`: replace the "template-seam only" translator line:
+  1. `.scratch/temporal-core/spec.md:105`: replace the "template-seam only"
+     translator line:
 
-  ```
+  ```text
   - Moment→strftime translator is template-seam only, scope 1: bracket literals, `YYYY MM DD HH mm ss` family, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`; everything else errors naming the token and dialect. The only strftime-grammar surface left is the engine's private `format_with` (template seam).
   ```
 
   with:
 
-  ```
+  ```text
   - Moment→strftime translator lives in `temporal::token` (`src/temporal/token.rs`), scope 1: bracket literals, `YYYY MM DD HH mm ss` family, `Do`/`S`, `dddd`/`ddd`/`MMM`/`MMMM`; everything else errors naming the token and dialect via `TemporalTokenError`. The engine keeps a thin `pattern_to_strftime` wrapper that delegates the `%`-contains dispatch to the translator and maps `TemporalTokenError` to a template render error. **(Amended by temporal-offload Task 6:** the translator moved from the template seam to `temporal::token`; the "template-seam only" claim is retired.**)**
   ```
 
-  2. `.scratch/temporal-core/review.md:113`: the D-b decision line, located by its unique tail `is now true by deletion.)*`, gets this note appended on the line after it:
+  2. `.scratch/temporal-core/review.md:113`: the D-b decision line, located by
+     its unique tail `is now true by deletion.)*`, gets this note appended on
+     the line after it:
 
-  ```
+  ```text
   - *(2026-10-24, temporal-offload Task 6: the translator moved to `temporal::token`; the engine retains only a `pattern_to_strftime` wrapper that delegates dialect dispatch and maps `TemporalTokenError`. The "template seam only" location claim above is retired; the error-message and scope decisions stand.)*
   ```
 
-  3. `.scratch/temporal-core/review.md:449`: the D8 `**Observed:**` paragraph, append a sync note at its end (after "06's edge is 04 only."):
+  3. `.scratch/temporal-core/review.md:449`: the D8 `**Observed:**` paragraph,
+     append a sync note at its end (after "06's edge is 04 only."):
 
-  ```
+  ```text
    (2026-10-24, temporal-offload Task 6: the translator now lives in `temporal::token` and returns `TemporalTokenError`; the engine wrapper still maps it to a template-render error, so the "not a `DateError`" decision holds.)
   ```
 
-  Note: `spec.md:104`'s stale `format_with`/`DelayedFormat` wording and the remaining "template seam" mentions in `issues/06-template-format-dialects.md` are **not** touched here. Task 6 does not change `format_strtime` (the strftime renderer named there). Those references are swept by the final doc-consistency task (D).
+  Note: `spec.md:104`'s stale `format_with`/`DelayedFormat` wording and the
+  remaining "template seam" mentions in `issues/06-template-format-dialects.md`
+  are **not** touched here. Task 6 does not change `format_strtime` (the
+  strftime renderer named there). Those references are swept by the final
+  doc-consistency task (D).
 
 - [ ] **Step 5: Run the translator tests**
 
-  Run: `mise run test:unit moment`
-  Expected: PASS. The `formats_moment_tokens` rstest table, `rejects_unsupported_moment_token_with_token_and_dialect_name`, `rejects_unclosed_bracket_literal_in_moment_dialect`, and `format_bindings_never_emit_percent_plus` all now route through `crate::temporal::pattern_to_strftime`. Their assertions on error kind and message substrings hold because the wrapper and `Display` reproduce the previous contract exactly.
+  Run: `mise run test:unit moment` Expected: PASS. The `formats_moment_tokens`
+  rstest table, `rejects_unsupported_moment_token_with_token_and_dialect_name`,
+  `rejects_unclosed_bracket_literal_in_moment_dialect`, and
+  `format_bindings_never_emit_percent_plus` all now route through
+  `crate::temporal::pattern_to_strftime`. Their assertions on error kind and
+  message substrings hold because the wrapper and `Display` reproduce the
+  previous contract exactly.
 
   Run: `mise run test:unit date_format`
   Expected: PASS (the filters that call `pattern_to_strftime` render unchanged).
 
-  Both are **green before and after**: this is code motion behind a behavior-preserving wrapper, so no test changes.
+  Both are **green before and after**: this is code motion behind a
+  behavior-preserving wrapper, so no test changes.
 
 - [ ] **Step 6: Regenerate the pub-token baseline**
 
   Run:
 
-  ```
+  ```text
   git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
   ```
 
   Expected: the diff adds exactly three lines:
 
-  ```
+  ```text
   src/temporal/mod.rs: pub(crate) use token::pattern_to_strftime;
   src/temporal/error.rs: pub enum TemporalTokenError {
   src/temporal/token.rs: pub(crate) fn pattern_to_strftime(
   ```
 
-  and nothing else changes (`mod token;` is not a `pub` line, so it does not appear). Both `cargo public-api` baselines stay byte-identical: the `token.rs` item and the re-export are `pub(crate)`, and the `error.rs` enum is `pub` inside the private `mod error`, unreachable from outside the crate just like `UnitError`.
+  and nothing else changes (`mod token;` is not a `pub` line, so it does not
+  appear). Both `cargo public-api` baselines stay byte-identical: the `token.rs`
+  item and the re-export are `pub(crate)`, and the `error.rs` enum is `pub`
+  inside the private `mod error`, unreachable from outside the crate just like
+  `UnitError`.
 
 - [ ] **Step 7: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: PASS (fmt, check including `check:visibility`, lint, full test suite).
+  Run: `mise run verify` Expected: PASS (fmt, check including
+  `check:visibility`, lint, full test suite).
 
 - [ ] **Step 8: Commit**
 
-  ```
+  ```text
   git add src/temporal/token.rs src/temporal/error.rs src/temporal/mod.rs src/template/engine/date.rs tests/baselines/pub-tokens.txt .scratch/temporal-core/spec.md .scratch/temporal-core/review.md
   git commit -m "refactor(temporal): move moment-dialect translator to temporal::token"
   ```
@@ -1826,15 +2256,46 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 7 (X4): Match moment tokens by the full letter-run
 
 **Files:**
-- Modify: `src/temporal/token.rs` (add `match_moment_run`; rewrite the alphabetic branch of `moment_to_strftime`)
-- Tests only: `src/template/engine/date.rs`
-- No baseline, doc, or GLOSSARY changes: `match_moment_run` is private, so the pub-token snapshot stays identical.
 
-**Context:** `moment_to_strftime` still matches tokens with a greedy prefix scan: at an alphabetic position it takes the remaining tail of the pattern and consumes the first `MOMENT_TOKENS` entry that prefixes it. A longer run of one letter therefore decomposes into adjacent shorter tokens instead of failing. Walking the current loop confirms ten silent compositions: `DDD` → `"%d%-d"` (renders `"2929"` for July 29), `DDDD` → `"%d%d"`, `MMMMM` → `"%B%-m"`, `HHH` → `"%H%-H"`, `hhh` → `"%I%-I"`, `mmm` → `"%M%-M"`, `sss` → `"%S%-S"`, `SSSS` → `"%3f%1f"`, `Y×6` → `"%Y%y"`, `Y×8` → `"%Y%Y"`; other lengths decompose too (`hhhh`, `mmmm`, `ssss`, `DDDDDD`, `MMMMMM`). None of these reach the unsupported-token error, which violates the recorded "never silently mistranslate" rule (`issues/06-template-format-dialects.md`). The fix keeps the `Do` special-case first (load-bearing: checked against `Dooo`, `DDo`, `MMDo`, `do`), then consumes the maximal run of the repeated byte and looks the whole run up with a new private `match_moment_run(ch, run_len)` helper that does exact equality against the table; an unknown run returns `TemporalTokenError::UnsupportedToken` naming the full run. The rule is total: every table entry except `Do` is a single-character repeat, so the token-bearing letters are exactly `{Y, M, d, D, H, h, m, s, S}` and any run either equals an entry or errors. Error contract: the `Display` token list stays untouched (the `Q` test stays byte-identical), `dd`/`d`/`yyy`/`do` report the same token name before and after, and only partial-consumption leftovers change name (`YYY` now names `YYY` where it named `Y`; `ddddd` now names `ddddd` where it named `d`); both deltas are pinned red-first below. Tests stay on the template seam next to `formats_moment_tokens`, as Seam 3 requires (`spec.md:127`); the matrix satisfies issue-06's AC "the supported moment token set ... pinned by tests". Task 8 (X5) rewrites the adjacent `%`-dispatch code in this same function; the task order keeps them serial.
+- Modify: `src/temporal/token.rs` (add `match_moment_run`; rewrite the
+  alphabetic branch of `moment_to_strftime`)
+- Tests only: `src/template/engine/date.rs`
+- No baseline, doc, or GLOSSARY changes: `match_moment_run` is private, so the
+  pub-token snapshot stays identical.
+
+**Context:** `moment_to_strftime` still matches tokens with a greedy prefix
+scan: at an alphabetic position it takes the remaining tail of the pattern and
+consumes the first `MOMENT_TOKENS` entry that prefixes it. A longer run of one
+letter therefore decomposes into adjacent shorter tokens instead of failing.
+Walking the current loop confirms ten silent compositions: `DDD` → `"%d%-d"`
+(renders `"2929"` for July 29), `DDDD` → `"%d%d"`, `MMMMM` → `"%B%-m"`, `HHH` →
+`"%H%-H"`, `hhh` → `"%I%-I"`, `mmm` → `"%M%-M"`, `sss` → `"%S%-S"`, `SSSS` →
+`"%3f%1f"`, `Y×6` → `"%Y%y"`, `Y×8` → `"%Y%Y"`; other lengths decompose too
+(`hhhh`, `mmmm`, `ssss`, `DDDDDD`, `MMMMMM`). None of these reach the
+unsupported-token error, which violates the recorded "never silently
+mistranslate" rule (`issues/06-template-format-dialects.md`). The fix keeps the
+`Do` special-case first (load-bearing: checked against `Dooo`, `DDo`, `MMDo`,
+`do`), then consumes the maximal run of the repeated byte and looks the whole
+run up with a new private `match_moment_run(ch, run_len)` helper that does exact
+equality against the table; an unknown run returns
+`TemporalTokenError::UnsupportedToken` naming the full run. The rule is total:
+every table entry except `Do` is a single-character repeat, so the token-bearing
+letters are exactly `{Y, M, d, D, H, h, m, s, S}` and any run either equals an
+entry or errors. Error contract: the `Display` token list stays untouched (the
+`Q` test stays byte-identical), `dd`/`d`/`yyy`/`do` report the same token name
+before and after, and only partial-consumption leftovers change name (`YYY` now
+names `YYY` where it named `Y`; `ddddd` now names `ddddd` where it named `d`);
+both deltas are pinned red-first below. Tests stay on the template seam next to
+`formats_moment_tokens`, as Seam 3 requires (`spec.md:127`); the matrix
+satisfies issue-06's AC "the supported moment token set ... pinned by tests".
+Task 8 (X5) rewrites the adjacent `%`-dispatch code in this same function; the
+task order keeps them serial.
 
 - [ ] **Step 1: Add the full-table matrix test**
 
-  Add this rstest directly after `formats_moment_tokens` in the `date_format` test module. It is green before and after: every table entry already translates correctly.
+  Add this rstest directly after `formats_moment_tokens` in the `date_format`
+  test module. It is green before and after: every table entry already
+  translates correctly.
 
   ```rust
         #[rstest]
@@ -1878,14 +2339,17 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  The input is Sunday, July 5, 2026 at 04:05:03.123: single-digit fields make every padded and unpadded pair render differently. `SS`/`S` exercise the `%2f`/`%1f` precision directives.
+  The input is Sunday, July 5, 2026 at 04:05:03.123: single-digit fields make
+  every padded and unpadded pair render differently. `SS`/`S` exercise the
+  `%2f`/`%1f` precision directives.
 
   Run: `mise run test:unit covers_the_full_moment_token_table`
   Expected: PASS (23 cases: all 21 table entries, `Do`, one bracket literal).
 
 - [ ] **Step 2: Add the run-rejection test (the intended red)**
 
-  Add this rstest after the matrix test. Twelve cases fail before Step 3 because those runs compose silently today. Four cases pass before and after.
+  Add this rstest after the matrix test. Twelve cases fail before Step 3 because
+  those runs compose silently today. Four cases pass before and after.
 
   ```rust
         #[rstest]
@@ -1929,14 +2393,21 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  `YYY` and `ddddd` are red first because the current scanner reports only the leftover fragment (`Y` and `d`). The `dd`, `d`, `yyy`, `do` cases are pins: they report the same token name before and after.
+  `YYY` and `ddddd` are red first because the current scanner reports only the
+  leftover fragment (`Y` and `d`). The `dd`, `d`, `yyy`, `do` cases are pins:
+  they report the same token name before and after.
 
-  Run: `mise run test:unit rejects_runs_that_are_not_moment_tokens`
-  Expected: FAIL with 12 red cases (`DDD`, `DDDD`, `MMMMM`, `HHH`, `hhh`, `mmm`, `sss`, `SSSS`, `YYYYYY`, `YYYYYYYY`, `YYY`, `ddddd`). The 4 pins pass. This is the intended red. Do not proceed until the failures match this list.
+  Run: `mise run test:unit rejects_runs_that_are_not_moment_tokens` Expected:
+  FAIL with 12 red cases (`DDD`, `DDDD`, `MMMMM`, `HHH`, `hhh`, `mmm`, `sss`,
+  `SSSS`, `YYYYYY`, `YYYYYYYY`, `YYY`, `ddddd`). The 4 pins pass. This is the
+  intended red. Do not proceed until the failures match this list.
 
 - [ ] **Step 3: Rewrite the alphabetic branch and add the lookup helper**
 
-  In `src/temporal/token.rs`, leave the bracket branch and the `Do` branch above it unchanged. The `Do` check must stay first: it consumes `Do` before run consumption can see the `D`. Replace the whole `else if current_byte.is_ascii_alphabetic()` branch:
+  In `src/temporal/token.rs`, leave the bracket branch and the `Do` branch above
+  it unchanged. The `Do` check must stay first: it consumes `Do` before run
+  consumption can see the `D`. Replace the whole
+  `else if current_byte.is_ascii_alphabetic()` branch:
 
   ```rust
           } else if current_byte.is_ascii_alphabetic() {
@@ -2004,12 +2475,19 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  Keep `match_moment_run` private. No other function changes. The bracket branch, the `Do` branch, the non-alphabetic fallback, `pattern_to_strftime`'s `%` dispatch, `ordinal_suffix`, `TemporalTokenError`, and its `Display` all stay as Task 6 wrote them.
+  Keep `match_moment_run` private. No other function changes. The bracket
+  branch, the `Do` branch, the non-alphabetic fallback, `pattern_to_strftime`'s
+  `%` dispatch, `ordinal_suffix`, `TemporalTokenError`, and its `Display` all
+  stay as Task 6 wrote them.
 
 - [ ] **Step 4: Run the translator tests**
 
-  Run: `mise run test:unit moment`
-  Expected: PASS. The new matrix (23 cases) passes. The new rejection table (16 cases, now including `YYY` reporting `YYY` and `ddddd` reporting `ddddd`) passes. The pre-existing pins (`formats_moment_tokens`, the `Q` unsupported-token test, the unclosed-bracket test, `format_bindings_never_emit_percent_plus`) all pass through the unchanged engine wrapper.
+  Run: `mise run test:unit moment` Expected: PASS. The new matrix (23 cases)
+  passes. The new rejection table (16 cases, now including `YYY` reporting `YYY`
+  and `ddddd` reporting `ddddd`) passes. The pre-existing pins
+  (`formats_moment_tokens`, the `Q` unsupported-token test, the unclosed-bracket
+  test, `format_bindings_never_emit_percent_plus`) all pass through the
+  unchanged engine wrapper.
 
   Run: `mise run test:unit date_format`
   Expected: PASS (the rest of the filter suite renders unchanged).
@@ -2021,7 +2499,7 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 6: Commit**
 
-  ```
+  ```text
   git add src/temporal/token.rs src/template/engine/date.rs
   git commit -m "refactor(temporal): match moment tokens by full letter-run"
   ```
@@ -2031,17 +2509,50 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 8 (X5): Detect the strftime dialect by % outside brackets
 
 **Files:**
-- Modify: `src/temporal/token.rs` (dialect dispatch, two new helpers, one import, two dead spots in `moment_to_strftime`, doc comments)
-- Modify: `src/delimiter.rs` (add `find_closing_flat`, the flat sibling of `find_closing`, directly after it)
+
+- Modify: `src/temporal/token.rs` (dialect dispatch, two new helpers, one
+  import, two dead spots in `moment_to_strftime`, doc comments)
+- Modify: `src/delimiter.rs` (add `find_closing_flat`, the flat sibling of
+  `find_closing`, directly after it)
 - Modify: `src/temporal/error.rs` (the `UnclosedBracket` `Display` arm)
-- Modify: `src/template/engine/date.rs` (the `date_format` doc paragraphs and the wrapper doc line; tests)
+- Modify: `src/template/engine/date.rs` (the `date_format` doc paragraphs and
+  the wrapper doc line; tests)
 - Baseline: `tests/baselines/pub-tokens.txt` (+1); no GLOSSARY changes.
 
-**Context:** the dialect decision today is `pattern.contains('%')` anywhere in the pattern. Jiff has no bracket-literal syntax of its own, so every bracketed `%` runs as a real directive on the strftime path: `[%Y]` renders `[2026]`, `[Today's %Y]` renders `[Today's 2026]`, `[100%] and %H:%M` dies in jiff on `%]`, and unclosed `[Daily %H` silently renders `[Daily 14`. Meanwhile the moment path's bracket-escaping branches (copy literal content, double `%`) are unreachable for any pattern that contains `%`. The locked fix: the dialect is decided by `%` outside any bracket literal, and the bracket scan moves ahead of the decision so one function owns the unclosed-bracket error for both dialects. `pattern_to_strftime` becomes: `percent_outside_brackets(pattern)?` selects strftime (new `escape_bracket_percents` copies the pattern, drops the delimiters, doubles `%` inside brackets) or moment (tokenizer unchanged). Both scans jump bracket literals through a new `DelimiterType::find_closing_flat` in `src/delimiter.rs`, the flat sibling of `find_closing`: it returns the byte offset of the first closing character, with no quote, escape, or nesting tracking, so a stray `]` stays literal content and an inner `[` stays inside the literal, matching what the moment scanner already produces. Two spots in `moment_to_strftime` die: its unclosed-bracket arm (the scan ran first, so the pattern is closed by then) and the bare-`%` push in the non-alphabetic fallback (the moment path only runs when no `%` sits outside brackets); Task 7 left both for this task, and the tasks run serially. Error-contract changes, all in the plan's accepted list: unclosed-bracket now precedes the token walk, so `Q [x` reports the unclosed bracket instead of the `Q` token (pinned red-first); the `UnclosedBracket` `Display` drops "moment-dialect" because the error is now dialect-neutral (the pin asserts only the `unclosed bracket literal` prefix, so it stays green after the rename below). Four doc spots are owned by this task and must not be re-touched by Task D: the `date_format` syntax paragraph, the `date_format` `# Errors` paragraph, the engine wrapper's `%`-contains wording, and `pattern_to_strftime`'s own doc in `token.rs`.
+**Context:** the dialect decision today is `pattern.contains('%')` anywhere in
+the pattern. Jiff has no bracket-literal syntax of its own, so every bracketed
+`%` runs as a real directive on the strftime path: `[%Y]` renders `[2026]`,
+`[Today's %Y]` renders `[Today's 2026]`, `[100%] and %H:%M` dies in jiff on
+`%]`, and unclosed `[Daily %H` silently renders `[Daily 14`. Meanwhile the
+moment path's bracket-escaping branches (copy literal content, double `%`) are
+unreachable for any pattern that contains `%`. The locked fix: the dialect is
+decided by `%` outside any bracket literal, and the bracket scan moves ahead of
+the decision so one function owns the unclosed-bracket error for both dialects.
+`pattern_to_strftime` becomes: `percent_outside_brackets(pattern)?` selects
+strftime (new `escape_bracket_percents` copies the pattern, drops the
+delimiters, doubles `%` inside brackets) or moment (tokenizer unchanged). Both
+scans jump bracket literals through a new `DelimiterType::find_closing_flat` in
+`src/delimiter.rs`, the flat sibling of `find_closing`: it returns the byte
+offset of the first closing character, with no quote, escape, or nesting
+tracking, so a stray `]` stays literal content and an inner `[` stays inside the
+literal, matching what the moment scanner already produces. Two spots in
+`moment_to_strftime` die: its unclosed-bracket arm (the scan ran first, so the
+pattern is closed by then) and the bare-`%` push in the non-alphabetic fallback
+(the moment path only runs when no `%` sits outside brackets); Task 7 left both
+for this task, and the tasks run serially. Error-contract changes, all in the
+plan's accepted list: unclosed-bracket now precedes the token walk, so `Q [x`
+reports the unclosed bracket instead of the `Q` token (pinned red-first); the
+`UnclosedBracket` `Display` drops "moment-dialect" because the error is now
+dialect-neutral (the pin asserts only the `unclosed bracket literal` prefix, so
+it stays green after the rename below). Four doc spots are owned by this task
+and must not be re-touched by Task D: the `date_format` syntax paragraph, the
+`date_format` `# Errors` paragraph, the engine wrapper's `%`-contains wording,
+and `pattern_to_strftime`'s own doc in `token.rs`.
 
 - [ ] **Step 1: Add the bracket-behavior tests (the intended red)**
 
-  Add this rstest in the `date_format` test module of `src/template/engine/date.rs`:
+  Add this rstest in the `date_format` test module of
+  `src/template/engine/date.rs`:
 
   ```rust
         #[rstest]
@@ -2071,7 +2582,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Then rewrite the existing unclosed-bracket test so it covers both dialects, and add the precedence pin:
+  Then rewrite the existing unclosed-bracket test so it covers both dialects,
+  and add the precedence pin:
 
   ```rust
         #[test]
@@ -2103,7 +2615,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  The first test replaces `rejects_unclosed_bracket_literal_in_moment_dialect`. Rename it. Change its input to `[Daily %H`. The new input contains `%` and takes the strftime path today.
+  The first test replaces `rejects_unclosed_bracket_literal_in_moment_dialect`.
+  Rename it. Change its input to `[Daily %H`. The new input contains `%` and
+  takes the strftime path today.
 
   Run: `mise run test:unit bracket`
   Expected: FAIL. Red:
@@ -2111,12 +2625,15 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   - `bracket_percent_day` (today renders `[05] YYYY`)
   - `bracket_apostrophe` (today renders `[Today's 2026]`)
   - `mixed_percent_bracket_and_directive` (today jiff errors on `%]`)
-  - `rejects_unclosed_bracket_literal_in_any_dialect` (today renders `[Daily 14`)
-  - `unclosed_bracket_takes_precedence_over_unsupported_token` (today reports the `Q` token)
+  - `rejects_unclosed_bracket_literal_in_any_dialect` (today renders
+    `[Daily 14`)
+  - `unclosed_bracket_takes_precedence_over_unsupported_token` (today reports
+    the `Q` token)
 
   Green: `stray_close_bracket` and `plain_strftime`. This is the intended red.
 
-- [ ] **Step 2: Add `find_closing_flat`, rewrite the dialect dispatch, and add the two helpers**
+- [ ] **Step 2: Add `find_closing_flat`, rewrite the dialect dispatch, and add the
+  two helpers**
 
   In `src/delimiter.rs`, add `find_closing_flat` directly after `find_closing`:
 
@@ -2159,7 +2676,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       moment_to_strftime(pattern, datetime)
   ```
 
-  Then add `use crate::DelimiterType;` above `use super::error::TemporalTokenError;` in the imports, and add the two helpers directly after `pattern_to_strftime`:
+  Then add `use crate::DelimiterType;` above
+  `use super::error::TemporalTokenError;` in the imports, and add the two
+  helpers directly after `pattern_to_strftime`:
 
   ```rust
   /// Returns `true` when `%` occurs outside any bracket literal.
@@ -2213,11 +2732,13 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  The scan must walk the whole pattern: an early exit on `%` would miss a later unclosed bracket.
+  The scan must walk the whole pattern: an early exit on `%` would miss a later
+  unclosed bracket.
 
 - [ ] **Step 3: Remove the two dead spots in `moment_to_strftime`**
 
-  Delete the unclosed-bracket arm inside the bracket branch. The scan in Step 2 already rejected every unclosed pattern before this function runs:
+  Delete the unclosed-bracket arm inside the bracket branch. The scan in Step 2
+  already rejected every unclosed pattern before this function runs:
 
   ```rust
               if bytes.get(i) != Some(&b']') {
@@ -2227,9 +2748,12 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
               }
   ```
 
-  The `while` loop above it and the `let literal = ...` line below it stay as they are. `TemporalTokenError::UnclosedBracket` is now constructed in exactly one place.
+  The `while` loop above it and the `let literal = ...` line below it stay as
+  they are. `TemporalTokenError::UnclosedBracket` is now constructed in exactly
+  one place.
 
-  Then simplify the non-alphabetic fallback. The moment path only runs when no `%` sits outside brackets, so `ch == '%'` is unreachable there:
+  Then simplify the non-alphabetic fallback. The moment path only runs when no
+  `%` sits outside brackets, so `ch == '%'` is unreachable there:
 
   ```rust
               i = i.saturating_add(ch.len_utf8());
@@ -2247,11 +2771,13 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
               result.push(ch);
   ```
 
-  The `%`-doubling inside bracket literals stays: it lives in the bracket branch and is now reachable, which is the point of this task.
+  The `%`-doubling inside bracket literals stays: it lives in the bracket branch
+  and is now reachable, which is the point of this task.
 
 - [ ] **Step 4: Update the message wording and the four doc spots**
 
-  In `src/temporal/error.rs`, the `Display` arm for `UnclosedBracket` loses "moment-dialect" (the error is dialect-neutral now):
+  In `src/temporal/error.rs`, the `Display` arm for `UnclosedBracket` loses
+  "moment-dialect" (the error is dialect-neutral now):
 
   ```rust
               Self::UnclosedBracket { pattern } => write!(
@@ -2292,7 +2818,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   /// bracket literals like `[Daily]`) are translated.
   ```
 
-  (its `# Errors` paragraph already names both variants and needs no change). In `src/template/engine/date.rs`, the `date_format` syntax paragraph:
+  (its `# Errors` paragraph already names both variants and needs no change). In
+  `src/template/engine/date.rs`, the `date_format` syntax paragraph:
 
   ```rust
   /// Formats according to either a strftime pattern (containing `%`) or common
@@ -2342,27 +2869,31 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 5: Run the translator tests**
 
-  Run: `mise run test:unit bracket`
-  Expected: PASS (all six cases and both error tests; `stray_close_bracket` and `plain_strftime` stayed green throughout).
+  Run: `mise run test:unit bracket` Expected: PASS (all six cases and both error
+  tests; `stray_close_bracket` and `plain_strftime` stayed green throughout).
 
-  Run: `mise run test:unit moment`
-  Expected: PASS with the full token matrix, the run-rejection table, the `Q` unsupported-token pin, and `format_bindings_never_emit_percent_plus`. The `%+` test's sample pattern has no bracketed `%`, so its premise is unchanged.
+  Run: `mise run test:unit moment` Expected: PASS with the full token matrix,
+  the run-rejection table, the `Q` unsupported-token pin, and
+  `format_bindings_never_emit_percent_plus`. The `%+` test's sample pattern has
+  no bracketed `%`, so its premise is unchanged.
 
 - [ ] **Step 6: Regenerate the pub-token baseline**
 
   Run:
 
-  ```
+  ```text
   git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
   ```
 
   Expected: the diff adds exactly one line:
 
-  ```
+  ```text
   src/delimiter.rs: pub(crate) fn find_closing_flat(self, input: &str) -> Option<usize> {
   ```
 
-  and nothing else changes. Both `cargo public-api` baselines stay byte-identical: `find_closing_flat` is `pub(crate)` inside an already-public module, so no new reachable path appears.
+  and nothing else changes. Both `cargo public-api` baselines stay
+  byte-identical: `find_closing_flat` is `pub(crate)` inside an already-public
+  module, so no new reachable path appears.
 
 - [ ] **Step 7: Run the full gate**
 
@@ -2371,7 +2902,7 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 8: Commit**
 
-  ```
+  ```text
   git add src/temporal/token.rs src/delimiter.rs src/temporal/error.rs src/template/engine/date.rs tests/baselines/pub-tokens.txt
   git commit -m "fix(temporal): decide the date dialect by % outside brackets"
   ```
@@ -2381,17 +2912,42 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 9 (H2): Rename `DateNamespace` to `DateOps` with a stateless register
 
 **Files:**
-- Modify: `src/template/engine/date.rs` (type name, const name, register signature/doc, call sites)
+
+- Modify: `src/template/engine/date.rs` (type name, const name, register
+  signature/doc, call sites)
 - Modify: `src/template/engine.rs` (import and one call site)
 - Baseline: exactly 2 line rewrites, no count change.
 
-**Context:** `DateNamespace` is a stateless unit struct, yet it registers through a consuming `register(self, env)`, which is the convention only for the stateful ops (`FileOps`, `PathOps`, `QueryOps`, `SchemaOps`, `UiOps`, all constructed with captured data: `SchemaOps::new(service).register(&mut env)` and `PathOps::new(root).register(&mut env)`). Every stateless sibling (`StrOps`, `NumOps`, `YamlOps`) exposes an associated `register(env)`, and `YamlOps` documents the rule verbatim: "This is an associated function because `YamlOps` carries no state." The namespace module breaks two more conventions: its const is `NAMESPACE_METHODS` while every other module says `METHODS` (`file.rs:40`), and its type name ends in `Namespace` while every engine module exports `*Ops`. This task makes the module match its neighbors: `DateOps`, `METHODS`, associated `register(env)` that builds the object at the `add_global` line. `#[derive(Debug)]` **stays**: `minijinja::Object: fmt::Debug + Send + Sync`, so the derive is load-bearing here (`StrOps`/`NumOps` omit it only because they register filters and never implement `Object`). Ordering: this task follows Task 2 (O3), which already rewrote `get_value`, so the rename touches no live design edits. Churn: 11 source references (9 in `date.rs` including the module-doc link and four test sites, 2 in `engine.rs`) plus the baseline. This is behavior-equivalent by construction: the existing `get_value` and `enumerate` tests are the pin (green before and after). GLOSSARY: no edit; `DateOps` is an internal type name, and the `date` namespace itself is unchanged.
+**Context:** `DateNamespace` is a stateless unit struct, yet it registers
+through a consuming `register(self, env)`, which is the convention only for the
+stateful ops (`FileOps`, `PathOps`, `QueryOps`, `SchemaOps`, `UiOps`, all
+constructed with captured data: `SchemaOps::new(service).register(&mut env)` and
+`PathOps::new(root).register(&mut env)`). Every stateless sibling (`StrOps`,
+`NumOps`, `YamlOps`) exposes an associated `register(env)`, and `YamlOps`
+documents the rule verbatim: "This is an associated function because `YamlOps`
+carries no state." The namespace module breaks two more conventions: its const
+is `NAMESPACE_METHODS` while every other module says `METHODS` (`file.rs:40`),
+and its type name ends in `Namespace` while every engine module exports `*Ops`.
+This task makes the module match its neighbors: `DateOps`, `METHODS`, associated
+`register(env)` that builds the object at the `add_global` line.
+`#[derive(Debug)]` **stays**: `minijinja::Object: fmt::Debug + Send + Sync`, so
+the derive is load-bearing here (`StrOps`/`NumOps` omit it only because they
+register filters and never implement `Object`). Ordering: this task follows Task
+2 (O3), which already rewrote `get_value`, so the rename touches no live design
+edits. Churn: 11 source references (9 in `date.rs` including the module-doc link
+and four test sites, 2 in `engine.rs`) plus the baseline. This is
+behavior-equivalent by construction: the existing `get_value` and `enumerate`
+tests are the pin (green before and after). GLOSSARY: no edit; `DateOps` is an
+internal type name, and the `date` namespace itself is unchanged.
 
 - [ ] **Step 1: Rename the type, the const, and the call style**
 
-  In `src/template/engine/date.rs`, replace every `NAMESPACE_METHODS` with `METHODS` (4 occurrences: the const, `enumerate`, and the two enumerate tests).
+  In `src/template/engine/date.rs`, replace every `NAMESPACE_METHODS` with
+  `METHODS` (4 occurrences: the const, `enumerate`, and the two enumerate
+  tests).
 
-  In `src/template/engine/date.rs` and `src/template/engine.rs`, replace every `DateNamespace` with `DateOps` at these sites:
+  In `src/template/engine/date.rs` and `src/template/engine.rs`, replace every
+  `DateNamespace` with `DateOps` at these sites:
   - the module-doc link
   - the struct definition
   - `impl DateOps` and `impl Object for DateOps`
@@ -2400,7 +2956,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   - the `engine.rs` import
   - the `engine.rs` registration call
 
-  Then fix the two registration call sites that the rename left in method-call form, to match the `StrOps::register(&mut env)` style:
+  Then fix the two registration call sites that the rename left in method-call
+  form, to match the `StrOps::register(&mut env)` style:
 
   ```rust
   DateOps.register(&mut env);
@@ -2414,7 +2971,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 2: Make `register` stateless**
 
-  In `src/template/engine/date.rs`, replace the signature, doc, and `add_global` line:
+  In `src/template/engine/date.rs`, replace the signature, doc, and `add_global`
+  line:
 
   ```rust
       /// Registers the `date` global plus every flat `date_*` filter and `is_*`
@@ -2452,40 +3010,44 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         env.add_global("date", Value::from_object(DateOps));
   ```
 
-  Nothing else in the body changes. Keep `#[derive(Debug)]` above the struct: `Object` needs `Debug`.
+  Nothing else in the body changes. Keep `#[derive(Debug)]` above the struct:
+  `Object` needs `Debug`.
 
 - [ ] **Step 3: Regenerate the pub-token baseline**
 
   Run:
 
-  ```
+  ```text
   git grep -I -E '^[[:space:]]*pub(\([^)]*\))?[[:space:]]+' src/ | sed -E 's/^([^:]+):[[:space:]]*(.*)/\1: \2/; s/[[:space:]]+/ /g' | LC_ALL=C sort > tests/baselines/pub-tokens.txt
   ```
 
   Expected: exactly two rewritten lines, no additions or removals:
 
-  ```
+  ```text
   -src/template/engine/date.rs: pub(super) fn register(self, env: &mut Environment<'static>) {
   +src/template/engine/date.rs: pub(super) fn register(env: &mut Environment<'static>) {
   -src/template/engine/date.rs: pub(super) struct DateNamespace;
   +src/template/engine/date.rs: pub(super) struct DateOps;
   ```
 
-  Both `cargo public-api` baselines stay byte-identical: everything is `pub(super)`.
+  Both `cargo public-api` baselines stay byte-identical: everything is
+  `pub(super)`.
 
 - [ ] **Step 4: Run the tests**
 
-  Run: `mise run test:unit date`
-  Expected: PASS (the `get_value` and `enumerate` test mods compile against `DateOps` and `METHODS`, and `enumerate_lists_every_method` still matches `Enumerator::Str(METHODS)` structurally).
+  Run: `mise run test:unit date` Expected: PASS (the `get_value` and `enumerate`
+  test mods compile against `DateOps` and `METHODS`, and
+  `enumerate_lists_every_method` still matches `Enumerator::Str(METHODS)`
+  structurally).
 
 - [ ] **Step 5: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: PASS (fmt, check including `check:visibility`, lint, full test suite).
+  Run: `mise run verify` Expected: PASS (fmt, check including
+  `check:visibility`, lint, full test suite).
 
 - [ ] **Step 6: Commit**
 
-  ```
+  ```text
   git add src/template/engine/date.rs src/template/engine.rs tests/baselines/pub-tokens.txt
   git commit -m "refactor(template): rename DateNamespace to DateOps with stateless register"
   ```
@@ -2495,16 +3057,48 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 10 (X1a): Render canonical patterns with the sign outside the year width
 
 **Files:**
+
 - Create: `src/temporal/fmt.rs`
-- Modify: `src/temporal/mod.rs` (register `fmt`, re-export the renderer), `src/temporal/datetime.rs` (imports, `Display`, `Serialize`, tests), `src/temporal/date.rs` (widen the proptest year range; test only)
-- Baseline: regen `tests/baselines/pub-tokens.txt` (+2); both `cargo public-api` snapshots stay byte-identical.
+- Modify: `src/temporal/mod.rs` (register `fmt`, re-export the renderer),
+  `src/temporal/datetime.rs` (imports, `Display`, `Serialize`, tests),
+  `src/temporal/date.rs` (widen the proptest year range; test only)
+- Baseline: regen `tests/baselines/pub-tokens.txt` (+2); both `cargo public-api`
+  snapshots stay byte-identical.
 - No doc or GLOSSARY changes.
 
-**Context:** The crate holds two year conventions side by side. `DateValue`'s `Display` (date.rs:131-154) writes the sign outside the four-digit width (`-0009-01-01`), and jiff's `%F` does the same (printer.rs:454-468 writes `-` itself, then pads the absolute year to four digits). Jiff's `%Y` counts the sign inside the width (`fmt_year` returns `ItemInteger::new(b'0', 4, year)`, printer.rs:802, so year -9 prints as `-009`). `DateTimeValue`'s `Display` (:301-305) and `Serialize` (:365-369) both render `canonical_pattern()` through `%Y`, so a negative-year value displays `-009-01-01T00:00:00`, which the crate's four-digit-year rule rejects on re-parse (date.rs:524 pins that rejection): `parse(Display(x))` loses the value, and the date-half disagrees with `DateValue` for the same instant. The task adds `src/temporal/fmt.rs`: a seven-entry table (`DEFAULT_DATE_PATTERN`, `"%Y-%m"`, the four `canonical_pattern()` datetime shapes, `"%F"`) maps each canonical pattern to a form, and `render_canonical_pattern(civil_dt, pattern)` writes the year itself (sign outside, mirroring date.rs:136-140) and lets jiff render only yearless tails (`%m-%d`, `%H:%M:%S` plus an optional fraction), so no `%Y` sign convention can leak in. A non-canonical pattern returns `None`; `Display` and `Serialize` keep today's jiff path on `None`, and `canonical_pattern_is_in_the_render_table` proves that arm unreachable for canonical patterns. Positive-year output is byte-identical before and after (sign-outside equals `%Y` for year >= 0), so every existing rendering test stays green; Task 11's engine half routes `format_strtime` through the same renderer. The asymmetry pin records why the renderer must lead: jiff's strtime parser accepts sign+3 digit years (`-009`) while the crate's own parser rejects them, so parse-side leniency can never justify display-side leniency. Visibility: +2 pub tokens, both `pub(crate)`. GLOSSARY: **no edit**; `render_canonical_pattern` and `CanonicalForm` are internal implementation names, not domain vocabulary.
+**Context:** The crate holds two year conventions side by side. `DateValue`'s
+`Display` (date.rs:131-154) writes the sign outside the four-digit width
+(`-0009-01-01`), and jiff's `%F` does the same (printer.rs:454-468 writes `-`
+itself, then pads the absolute year to four digits). Jiff's `%Y` counts the sign
+inside the width (`fmt_year` returns `ItemInteger::new(b'0', 4, year)`,
+printer.rs:802, so year -9 prints as `-009`). `DateTimeValue`'s `Display`
+(:301-305) and `Serialize` (:365-369) both render `canonical_pattern()` through
+`%Y`, so a negative-year value displays `-009-01-01T00:00:00`, which the crate's
+four-digit-year rule rejects on re-parse (date.rs:524 pins that rejection):
+`parse(Display(x))` loses the value, and the date-half disagrees with
+`DateValue` for the same instant. The task adds `src/temporal/fmt.rs`: a
+seven-entry table (`DEFAULT_DATE_PATTERN`, `"%Y-%m"`, the four
+`canonical_pattern()` datetime shapes, `"%F"`) maps each canonical pattern to a
+form, and `render_canonical_pattern(civil_dt, pattern)` writes the year itself
+(sign outside, mirroring date.rs:136-140) and lets jiff render only yearless
+tails (`%m-%d`, `%H:%M:%S` plus an optional fraction), so no `%Y` sign
+convention can leak in. A non-canonical pattern returns `None`; `Display` and
+`Serialize` keep today's jiff path on `None`, and
+`canonical_pattern_is_in_the_render_table` proves that arm unreachable for
+canonical patterns. Positive-year output is byte-identical before and after
+(sign-outside equals `%Y` for year >= 0), so every existing rendering test stays
+green; Task 11's engine half routes `format_strtime` through the same renderer.
+The asymmetry pin records why the renderer must lead: jiff's strtime parser
+accepts sign+3 digit years (`-009`) while the crate's own parser rejects them,
+so parse-side leniency can never justify display-side leniency. Visibility: +2
+pub tokens, both `pub(crate)`. GLOSSARY: **no edit**; `render_canonical_pattern`
+and `CanonicalForm` are internal implementation names, not domain vocabulary.
 
 - [ ] **Step 1: Add the red negative-year tests**
 
-  Add two tests to datetime.rs's test module, beside the existing serde round-trip tests. The same scope already imports `ZoneGuard`, `DateTimeValue`, and `serde_json`.
+  Add two tests to datetime.rs's test module, beside the existing serde
+  round-trip tests. The same scope already imports `ZoneGuard`, `DateTimeValue`,
+  and `serde_json`.
 
   ```rust
         #[test]
@@ -2536,7 +3130,11 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Add the full-range property inside `mod proptests` (:1842), beside the existing round-trip proptest. The strategy sweeps seconds across jiff's whole supported range instead of building year/month/day dates: local midnight near the range edge can fall below `Timestamp::MIN`, and that arrange step must never panic.
+  Add the full-range property inside `mod proptests` (:1842), beside the
+  existing round-trip proptest. The strategy sweeps seconds across jiff's whole
+  supported range instead of building year/month/day dates: local midnight near
+  the range edge can fall below `Timestamp::MIN`, and that arrange step must
+  never panic.
 
   ```rust
         proptest! {
@@ -2559,20 +3157,29 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  In `src/temporal/date.rs`'s `mod proptests`, widen `iso_display_round_trips_supported_dates`'s year strategy. Change `year in 0_i32..=9999` to `year in -9999_i32..=9999` (X1a: "extend proptests to `-9999..=9999`"). This is a **pin (green before and after)**: `DateValue`'s hand-rolled `Display` already writes the sign outside the width.
+  In `src/temporal/date.rs`'s `mod proptests`, widen
+  `iso_display_round_trips_supported_dates`'s year strategy. Change
+  `year in 0_i32..=9999` to `year in -9999_i32..=9999` (X1a: "extend proptests
+  to `-9999..=9999`"). This is a **pin (green before and after)**: `DateValue`'s
+  hand-rolled `Display` already writes the sign outside the width.
 
-  Run: `mise run test:unit iso_display_round_trips_supported_dates`
-  Expected: PASS green on the unmodified tree; it pins the date-side encoder X1a builds on.
+  Run: `mise run test:unit iso_display_round_trips_supported_dates` Expected:
+  PASS green on the unmodified tree; it pins the date-side encoder X1a builds
+  on.
 
-  Run: `mise run test:unit negative_years_with_the_sign`
-  Expected: FAIL: jiff's `%Y` pads the sign into the width, so both tests see `-009-01-01T00:00:00` and `"-009-01-01T00:00:00Z"`. This is the intended red.
+  Run: `mise run test:unit negative_years_with_the_sign` Expected: FAIL: jiff's
+  `%Y` pads the sign into the width, so both tests see `-009-01-01T00:00:00` and
+  `"-009-01-01T00:00:00Z"`. This is the intended red.
 
-  Run: `mise run test:unit display_reparses_for_every_supported_year`
-  Expected: FAIL: the property stops on a negative-year case where `parse_iso` rejects the three-digit-year spelling.
+  Run: `mise run test:unit display_reparses_for_every_supported_year` Expected:
+  FAIL: the property stops on a negative-year case where `parse_iso` rejects the
+  three-digit-year spelling.
 
 - [ ] **Step 2: Create `src/temporal/fmt.rs`**
 
-  The table keys use the existing `DEFAULT_*` constants, so the pattern list cannot drift from the constants. `render_year` mirrors `DateValue`'s sign handling at date.rs:136-140.
+  The table keys use the existing `DEFAULT_*` constants, so the pattern list
+  cannot drift from the constants. `render_year` mirrors `DateValue`'s sign
+  handling at date.rs:136-140.
 
   ```rust
   //! Renders canonical date-time patterns with one year convention.
@@ -2811,10 +3418,13 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  The `None` arm preserves the old code path byte for byte; Step 5's membership test proves it unreachable for canonical patterns.
+  The `None` arm preserves the old code path byte for byte; Step 5's membership
+  test proves it unreachable for canonical patterns.
 
-  Run: `mise run test:unit negative_years_with_the_sign` and `mise run test:unit display_reparses_for_every_supported_year`
-  Expected: PASS: both tests and the property now round-trip, because the table writes `-0009` where jiff's `%Y` wrote `-009`.
+  Run: `mise run test:unit negative_years_with_the_sign` and
+  `mise run test:unit display_reparses_for_every_supported_year` Expected: PASS:
+  both tests and the property now round-trip, because the table writes `-0009`
+  where jiff's `%Y` wrote `-009`.
 
 - [ ] **Step 5: Add the table, year, and asymmetry tests**
 
@@ -2964,7 +3574,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  Add the membership test to the datetime.rs test module, beside the two Step 1 tests. It pins all four `canonical_pattern()` precision branches against the table:
+  Add the membership test to the datetime.rs test module, beside the two Step 1
+  tests. It pins all four `canonical_pattern()` precision branches against the
+  table:
 
   ```rust
         #[test]
@@ -2995,8 +3607,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Run: `mise run test:unit fmt` and `mise run test:unit canonical_pattern_is_in_the_render_table`
-  Expected: PASS: six fmt tests (the rstest contributes five cases) plus the membership test.
+  Run: `mise run test:unit fmt` and
+  `mise run test:unit canonical_pattern_is_in_the_render_table` Expected: PASS:
+  six fmt tests (the rstest contributes five cases) plus the membership test.
 
 - [ ] **Step 6: Regenerate the pub-token baseline (+2 lines)**
 
@@ -3007,12 +3620,18 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   git diff tests/baselines/pub-tokens.txt
   ```
 
-  Expected: exactly two added lines, `src/temporal/fmt.rs: pub(crate) fn render_canonical_pattern(datetime: civil::DateTime, pattern: &str) -> Option<String> {` and `src/temporal/mod.rs: pub(crate) use fmt::render_canonical_pattern;`; no other lines change. A wider diff means a visibility mistake (for example `CanonicalForm` made `pub(crate)`): fix the source instead of accepting the snapshot.
+  Expected: exactly two added lines,
+  `src/temporal/fmt.rs: pub(crate) fn render_canonical_pattern(datetime: civil::DateTime, pattern: &str) -> Option<String> {`
+  and `src/temporal/mod.rs: pub(crate) use fmt::render_canonical_pattern;`; no
+  other lines change. A wider diff means a visibility mistake (for example
+  `CanonicalForm` made `pub(crate)`): fix the source instead of accepting the
+  snapshot.
 
 - [ ] **Step 7: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (`fmt`, `check` incl. `check:visibility`: both public-api diffs empty because every new item is `pub(crate)`, pub-token diff empty after the regen, `lint --no-fix`, `test`).
+  Run: `mise run verify` Expected: green (`fmt`, `check` incl.
+  `check:visibility`: both public-api diffs empty because every new item is
+  `pub(crate)`, pub-token diff empty after the regen, `lint --no-fix`, `test`).
 
 - [ ] **Step 8: Commit**
 
@@ -3026,15 +3645,52 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 11 (X1b + X6): Route strftime rendering through the canonical renderer and align zone-dependent day tokens
 
 **Files:**
-- Modify: `src/template/engine/date.rs` (`format_strtime`, the three mixed-dialect sites, tests in `mod now` and `mod date_format`)
-- Baseline: regen `tests/baselines/pub-tokens.txt`; expected no diff (every touched item stays private). Both `cargo public-api` snapshots stay byte-identical.
+
+- Modify: `src/template/engine/date.rs` (`format_strtime`, the three
+  mixed-dialect sites, tests in `mod now` and `mod date_format`)
+- Baseline: regen `tests/baselines/pub-tokens.txt`; expected no diff (every
+  touched item stays private). Both `cargo public-api` snapshots stay
+  byte-identical.
 - No doc or GLOSSARY changes.
 
-**Context:** Half one (X1b): `format_strtime` (date.rs:424-437) is the engine's chokepoint, all six rendering sites funnel through it, and today it hands every pattern straight to `jiff::fmt::strtime::format`. Task 10 built `temporal::render_canonical_pattern`, which writes the sign outside the year width for canonical shapes, but templates never reach it: `{{ "-0009-01-01" | date_format("%Y-%m-%d") }}` still renders `-009-01-01`, the spelling `DateValue`'s four-digit rule rejects on reparse, so rendering and the crate parser disagree for the same value. The fix is one guard at the chokepoint: consult `render_canonical_pattern(datetime.datetime(), strftime)` first and keep the jiff path for `None`. Positive years are byte-identical (the table renders them exactly as jiff does), non-canonical patterns still fall through, and a bad pattern still raises `invalid date format` after the miss. Half two (X6): moment-dialect translation bakes datetime-dependent text into the strftime string; `Do` is written as a literal ordinal from the `civil::DateTime` it is handed (date.rs:576-580; Task 6 moves it into `token.rs`), while `%d` renders from the `zoned` value at format time. The three sites that mix both dialects (`Anchor::render` :256-263, `date_format` :471-479, `weekday` :934-947) hand the translator `local_datetime_in(...)`, the raw civil clock, and resolve the zoned instant only afterwards. On a skipped local day the two clocks differ: Samoa's 2011-12-30 never existed (the 2011-12-29 23:59:59 jump skips a whole day), `zoned_datetime_in` lands on 2011-12-31 while `local_datetime_in` stays on Dec 30, so `date_format("Do")` renders `30th` beside `date_format("%d")` rendering `31`. The fix reorders all three sites: resolve the zoned value first, feed `zoned.datetime()` to the translator, then format, so one clock feeds both dialects. A pinned side effect: zone/instant resolution now runs before pattern translation, so `-9999-01-01` under `Etc/GMT-14` (local midnight before jiff's minimum instant) reports the range failure even when the pattern is also invalid; today the pattern error wins. `local_zone()` lookup already precedes the pattern at every site and stays first. Sites that pass only `canonical_pattern()` (`render_period_edge` :695-712, `shift_by_unit` :796-812, `from_timestamp` :357) hand the translator no datetime, so they need no reorder; the chokepoint guard still fixes their negative years. Visibility: none, every touched item stays private. GLOSSARY: no edit, no new domain vocabulary.
+**Context:** Half one (X1b): `format_strtime` (date.rs:424-437) is the engine's
+chokepoint, all six rendering sites funnel through it, and today it hands every
+pattern straight to `jiff::fmt::strtime::format`. Task 10 built
+`temporal::render_canonical_pattern`, which writes the sign outside the year
+width for canonical shapes, but templates never reach it:
+`{{ "-0009-01-01" | date_format("%Y-%m-%d") }}` still renders `-009-01-01`, the
+spelling `DateValue`'s four-digit rule rejects on reparse, so rendering and the
+crate parser disagree for the same value. The fix is one guard at the
+chokepoint: consult `render_canonical_pattern(datetime.datetime(), strftime)`
+first and keep the jiff path for `None`. Positive years are byte-identical (the
+table renders them exactly as jiff does), non-canonical patterns still fall
+through, and a bad pattern still raises `invalid date format` after the miss.
+Half two (X6): moment-dialect translation bakes datetime-dependent text into the
+strftime string; `Do` is written as a literal ordinal from the `civil::DateTime`
+it is handed (date.rs:576-580; Task 6 moves it into `token.rs`), while `%d`
+renders from the `zoned` value at format time. The three sites that mix both
+dialects (`Anchor::render` :256-263, `date_format` :471-479, `weekday` :934-947)
+hand the translator `local_datetime_in(...)`, the raw civil clock, and resolve
+the zoned instant only afterwards. On a skipped local day the two clocks differ:
+Samoa's 2011-12-30 never existed (the 2011-12-29 23:59:59 jump skips a whole
+day), `zoned_datetime_in` lands on 2011-12-31 while `local_datetime_in` stays on
+Dec 30, so `date_format("Do")` renders `30th` beside `date_format("%d")`
+rendering `31`. The fix reorders all three sites: resolve the zoned value first,
+feed `zoned.datetime()` to the translator, then format, so one clock feeds both
+dialects. A pinned side effect: zone/instant resolution now runs before pattern
+translation, so `-9999-01-01` under `Etc/GMT-14` (local midnight before jiff's
+minimum instant) reports the range failure even when the pattern is also
+invalid; today the pattern error wins. `local_zone()` lookup already precedes
+the pattern at every site and stays first. Sites that pass only
+`canonical_pattern()` (`render_period_edge` :695-712, `shift_by_unit` :796-812,
+`from_timestamp` :357) hand the translator no datetime, so they need no reorder;
+the chokepoint guard still fixes their negative years. Visibility: none, every
+touched item stays private. GLOSSARY: no edit, no new domain vocabulary.
 
 - [ ] **Step 1: Add the red negative-year engine tests**
 
-  Add one test to `mod date_format` (date.rs:1426), beside `format_bindings_never_emit_percent_plus` at the end of that module:
+  Add one test to `mod date_format` (date.rs:1426), beside
+  `format_bindings_never_emit_percent_plus` at the end of that module:
 
   ```rust
         #[test]
@@ -3055,7 +3711,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Add one test to `mod now` (date.rs:1176), beside `now_rejects_an_unknown_kwarg` at the end of that module:
+  Add one test to `mod now` (date.rs:1176), beside
+  `now_rejects_an_unknown_kwarg` at the end of that module:
 
   ```rust
         #[test]
@@ -3076,11 +3733,12 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Run: `mise run test:unit renders_a_negative_year_with_the_sign`
-  Expected: FAIL: jiff's `%Y` pads the sign into the width, so the filter renders `-009-01-01`. This is the intended red.
+  Run: `mise run test:unit renders_a_negative_year_with_the_sign` Expected:
+  FAIL: jiff's `%Y` pads the sign into the width, so the filter renders
+  `-009-01-01`. This is the intended red.
 
-  Run: `mise run test:unit engine::date::tests::now`
-  Expected: FAIL: the `Anchor::render` path shows the same sign padding. Intended red.
+  Run: `mise run test:unit engine::date::tests::now` Expected: FAIL: the
+  `Anchor::render` path shows the same sign padding. Intended red.
 
 - [ ] **Step 2: Consult the canonical renderer inside `format_strtime`**
 
@@ -3140,7 +3798,10 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  The guard reads `datetime.datetime()` (the civil half of the zoned value), so every site's canonical output comes from one renderer. The `source_pattern` in the error message stays the caller's original pattern, not the canonical translation.
+  The guard reads `datetime.datetime()` (the civil half of the zoned value), so
+  every site's canonical output comes from one renderer. The `source_pattern` in
+  the error message stays the caller's original pattern, not the canonical
+  translation.
 
   Run: `mise run test:unit renders_a_negative_year_with_the_sign`
   Expected: PASS, `-0009-01-01`.
@@ -3148,8 +3809,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   Run: `mise run test:unit engine::date::tests::now`
   Expected: PASS, `-0009-01-01`.
 
-  Run: `mise run test:unit engine::date`
-  Expected: PASS in full, no regression: positive years render byte-identically through the table.
+  Run: `mise run test:unit engine::date` Expected: PASS in full, no regression:
+  positive years render byte-identically through the table.
 
 - [ ] **Step 3: Add the red zone-alignment tests**
 
@@ -3198,11 +3859,15 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Run: `mise run test:unit skipped_local_days_render_one_day`
-  Expected: FAIL: `Do` bakes the day from `local_datetime_in` (Dec 30 gives `30th`) while `%d` renders the shifted `zoned` day, so the template renders `30th|31`. This is the intended red.
+  Run: `mise run test:unit skipped_local_days_render_one_day` Expected: FAIL:
+  `Do` bakes the day from `local_datetime_in` (Dec 30 gives `30th`) while `%d`
+  renders the shifted `zoned` day, so the template renders `30th|31`. This is
+  the intended red.
 
-  Run: `mise run test:unit zone_resolution_errors_precede`
-  Expected: FAIL: `date_format` translates the pattern before resolving the point's instant, so the message names `unsupported moment-dialect token`. This is the intended red.
+  Run: `mise run test:unit zone_resolution_errors_precede` Expected: FAIL:
+  `date_format` translates the pattern before resolving the point's instant, so
+  the message names `unsupported moment-dialect token`. This is the intended
+  red.
 
 - [ ] **Step 4: Resolve the zoned value first at all three mixed-dialect sites**
 
@@ -3285,13 +3950,16 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
           Ok(Value::from(format_strtime(&zoned, &pat, format)?))
   ```
 
-  Each site keeps its existing error mapping and local names; only the order changes. `render_period_edge`, `shift_by_unit`, and `from_timestamp` pass `canonical_pattern()` or a caller pattern with no translator, so they stay untouched.
+  Each site keeps its existing error mapping and local names; only the order
+  changes. `render_period_edge`, `shift_by_unit`, and `from_timestamp` pass
+  `canonical_pattern()` or a caller pattern with no translator, so they stay
+  untouched.
 
   Run: `mise run test:unit skipped_local_days_render_one_day`
   Expected: PASS, `31st|31`.
 
-  Run: `mise run test:unit zone_resolution_errors_precede`
-  Expected: PASS, the message is `date arithmetic overflowed the supported range`.
+  Run: `mise run test:unit zone_resolution_errors_precede` Expected: PASS, the
+  message is `date arithmetic overflowed the supported range`.
 
   Run: `mise run test:unit engine::date`
   Expected: PASS in full.
@@ -3303,12 +3971,13 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   git diff --stat tests/baselines/pub-tokens.txt
   ```
 
-  Expected: no diff. Every item this task touches (`format_strtime`, `date_format`, `weekday`, `Anchor::render`, the new tests) is private.
+  Expected: no diff. Every item this task touches (`format_strtime`,
+  `date_format`, `weekday`, `Anchor::render`, the new tests) is private.
 
 - [ ] **Step 6: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (fmt, check with zero warnings, clippy with zero warnings, full test suite).
+  Run: `mise run verify` Expected: green (fmt, check with zero warnings, clippy
+  with zero warnings, full test suite).
 
 - [ ] **Step 7: Commit**
 
@@ -3322,15 +3991,40 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 12 (X8b): Make `CalendarError::Zone` carry the `DateError` instead of its text
 
 **Files:**
-- Modify: `src/temporal/error.rs` (`Zone` variant, `into_date_error`, `LocalZoneLookup` docs, tests), `src/temporal/datetime.rs` (`from_local`), `src/temporal/point.rs` (`local_zone_for_calendar`), `src/template/engine/date.rs` (`render_calendar_error`, new test)
-- Baseline: regen `tests/baselines/pub-tokens.txt`; expected no diff. The `cargo public-api` snapshots stay untouched because `CalendarError` is `pub(crate)`.
+
+- Modify: `src/temporal/error.rs` (`Zone` variant, `into_date_error`,
+  `LocalZoneLookup` docs, tests), `src/temporal/datetime.rs` (`from_local`),
+  `src/temporal/point.rs` (`local_zone_for_calendar`),
+  `src/template/engine/date.rs` (`render_calendar_error`, new test)
+- Baseline: regen `tests/baselines/pub-tokens.txt`; expected no diff. The
+  `cargo public-api` snapshots stay untouched because `CalendarError` is
+  `pub(crate)`.
 - No GLOSSARY change.
 
-**Context:** One failed time-zone lookup gets diagnosed four times. `local_zone()` fails as `DateError::LocalZoneLookup` whose `input` is the zone-discovery detail (`system zone: {detail}`, zone.rs:31-35). Both `CalendarError::Zone` constructors then stringify that Display into a `Box<str>` (`point.rs:780` inside `local_zone_for_calendar`, `datetime.rs:128` inside `from_local`). The variant's thiserror attribute prepends its own label (`local zone lookup failed for {input}`, error.rs:145), so `CalendarError::Zone`'s Display reads `local zone lookup failed for local zone lookup failed for \`system zone: ...\``. The engine adds a third layer for templates (`local timezone lookup failed for {input:?}`, date.rs:1105-1111), and `into_date_error` (error.rs:155-167) re-wraps the whole stacked text as a fresh `LocalZoneLookup.input` for typed parsers, producing a triple stack through one `?`. The docs lie about the payload while this happens: the `Zone` field doc says it stores "the local clock time that could not be resolved", and the `LocalZoneLookup` docs (error.rs:54-60) say `input` is a naive clock-time input, while production puts zone-discovery detail there. The fix stores the error instead of a copy of its words: `Zone { source: DateError }` behind `#[error("{source}")]` with `#[source]`, so Display renders the DateError's own text (one diagnosis), `source()` reports it (inspectable chain), both constructors pass `local_zone()`'s error through unchanged, `into_date_error` returns the stored source directly, and the engine renders `source.to_string()`. `filter.rs:742` matches `CalendarError::Zone { .. }` and needs no edit; `point.rs:199-201` (`DatePoint::date`) only propagates the helper's error and needs no edit either. The exact top-level template wording is still the engine's, not temporal's; Task 13 collapses both renderers onto temporal `Display`. Every test this task rewrites pins the single-prefix rendering, so the double-prefix bug cannot return. Visibility: none, `pub(crate) enum CalendarError` and its field lines carry no `pub` token.
+**Context:** One failed time-zone lookup gets diagnosed four times.
+`local_zone()` fails as `DateError::LocalZoneLookup` whose `input` is the
+zone-discovery detail (`system zone: {detail}`, zone.rs:31-35). Both
+`CalendarError::Zone` constructors then stringify that Display into a `Box<str>`
+(`point.rs:780` inside `local_zone_for_calendar`, `datetime.rs:128` inside
+`from_local`). The variant's thiserror attribute prepends its own label
+(`local zone lookup failed for {input}`, error.rs:145), so
+`CalendarError::Zone`'s Display reads
+`local zone lookup failed for local zone lookup failed for \`system zone:
+...\``. The engine adds a third layer for templates (`local timezone lookup
+failed for
+{input:?}`, date.rs:1105-1111), and `into_date_error` (error.rs:155-167) re-wraps the whole stacked text as a fresh `LocalZoneLookup.input` for typed parsers, producing a triple stack through one `?`. The docs lie about the payload while this happens: the `Zone` field doc says it stores "the local clock time that could not be resolved", and the `LocalZoneLookup` docs (error.rs:54-60) say `input` is a naive clock-time input, while production puts zone-discovery detail there. The fix stores the error instead of a copy of its words: `Zone
+{ source: DateError
+}` behind `#[error("{source}")]` with `#[source]`, so Display renders the DateError's own text (one diagnosis), `source()` reports it (inspectable chain), both constructors pass `local_zone()`'s error through unchanged, `into_date_error` returns the stored source directly, and the engine renders `source.to_string()`. `filter.rs:742` matches `CalendarError::Zone
+{ ..
+}` and needs no edit; `point.rs:199-201` (`DatePoint::date`) only propagates the helper's error and needs no edit either. The exact top-level template wording is still the engine's, not temporal's; Task 13 collapses both renderers onto temporal `Display`. Every test this task rewrites pins the single-prefix rendering, so the double-prefix bug cannot return. Visibility: none, `pub(crate)
+enum CalendarError` and its field lines carry no `pub` token.
 
 - [ ] **Step 1: Add the red double-prefix test**
 
-  Add one test to `mod error_translation` (date.rs:2408), beside `preserves_the_local_zone_lookup_diagnosis`. It constructs `Zone` exactly the way the production constructors do today, by storing the DateError's Display text:
+  Add one test to `mod error_translation` (date.rs:2408), beside
+  `preserves_the_local_zone_lookup_diagnosis`. It constructs `Zone` exactly the
+  way the production constructors do today, by storing the DateError's Display
+  text:
 
   ```rust
         #[test]
@@ -3356,7 +4050,9 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   ```
 
   Run: `mise run test:unit renders_a_zone_failure_with_one_lookup_prefix`
-  Expected: FAIL: the rendered message stacks three labels, `local timezone lookup failed for "local zone lookup failed for \`system zone: clock unavailable\`"`. This is the intended red.
+  Expected: FAIL: the rendered message stacks three labels,
+  `local timezone lookup failed for "local zone lookup failed for \`system zone:
+  clock unavailable\`"`. This is the intended red.
 
 - [ ] **Step 2: Store the `DateError` itself**
 
@@ -3441,7 +4137,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
           })?;
   ```
 
-  In `src/template/engine/date.rs`, change the `Zone` arm of `render_calendar_error`:
+  In `src/template/engine/date.rs`, change the `Zone` arm of
+  `render_calendar_error`:
 
   ```rust
           CalendarError::Zone {
@@ -3467,7 +4164,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
           ),
   ```
 
-  Flip the construction line in the Step 1 test to the new shape (its assertion does not move):
+  Flip the construction line in the Step 1 test to the new shape (its assertion
+  does not move):
 
   ```rust
               let error = render_calendar_error(CalendarError::Zone {
@@ -3475,7 +4173,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
               });
   ```
 
-  Rewrite the two `error.rs` tests that construct the old shape. In `mod formatting`, change `renders_the_zone_calendar_error`:
+  Rewrite the two `error.rs` tests that construct the old shape. In
+  `mod formatting`, change `renders_the_zone_calendar_error`:
 
   ```rust
         #[test]
@@ -3512,7 +4211,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  In `mod conversions`, change `maps_zone_calendar_failure_to_local_zone_lookup_error`:
+  In `mod conversions`, change
+  `maps_zone_calendar_failure_to_local_zone_lookup_error`:
 
   ```rust
         #[test]
@@ -3553,13 +4253,15 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   ```
 
   Run: `mise run test:unit renders_a_zone_failure_with_one_lookup_prefix`
-  Expected: PASS: the template message is the DateError's own text, `local zone lookup failed for \`system zone: clock unavailable\``.
+  Expected: PASS: the template message is the DateError's own text,
+  `local zone lookup failed for \`system zone: clock unavailable\``.
 
-  Run: `mise run test:unit error::tests`
-  Expected: PASS: both rewritten tests hold the single-prefix rendering and the direct pass-through in `into_date_error`.
+  Run: `mise run test:unit error::tests` Expected: PASS: both rewritten tests
+  hold the single-prefix rendering and the direct pass-through in
+  `into_date_error`.
 
-  Run: `mise run test:unit engine::date`
-  Expected: PASS in full; `render_date_error`'s own `LocalZoneLookup` arm is untouched.
+  Run: `mise run test:unit engine::date` Expected: PASS in full;
+  `render_date_error`'s own `LocalZoneLookup` arm is untouched.
 
 - [ ] **Step 3: Pin the exposed source**
 
@@ -3592,7 +4294,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 4: Correct the `LocalZoneLookup` docs**
 
-  In `src/temporal/error.rs`, the variant and field docs currently claim the payload is a naive clock time, which production never stores. Change:
+  In `src/temporal/error.rs`, the variant and field docs currently claim the
+  payload is a naive clock time, which production never stores. Change:
 
   ```rust
       /// Reports that the process-local zone could not resolve a naive input.
@@ -3621,7 +4324,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
       },
   ```
 
-  The Display text does not move; it is part of the crate's contract (error.rs module doc).
+  The Display text does not move; it is part of the crate's contract (error.rs
+  module doc).
 
 - [ ] **Step 5: Regenerate the public-token baseline**
 
@@ -3630,12 +4334,13 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   git diff --stat tests/baselines/pub-tokens.txt
   ```
 
-  Expected: no diff. The enum declaration line is unchanged and variant fields carry no `pub` token.
+  Expected: no diff. The enum declaration line is unchanged and variant fields
+  carry no `pub` token.
 
 - [ ] **Step 6: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (fmt, check with zero warnings, clippy with zero warnings, full test suite).
+  Run: `mise run verify` Expected: green (fmt, check with zero warnings, clippy
+  with zero warnings, full test suite).
 
 - [ ] **Step 7: Commit**
 
@@ -3649,16 +4354,51 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 13 (O7): Collapse both error renderers onto temporal `Display` with the origin rule
 
 **Files:**
-- Modify: `src/template/engine/date.rs` (`render_date_error`, `render_calendar_error`, `date_out_of_range_error` doc, `mod error_translation` tests)
-- Baseline: regen `tests/baselines/pub-tokens.txt`; expected no diff (both renderers stay private). The `cargo public-api` snapshots stay untouched; temporal's Display text is unchanged, only the engine's substitutes are removed.
-- Accepted behavior changes, each pinned below: template zone messages adopt `local zone lookup failed for \`...\``, template range messages adopt `date/time value is out of range`, and range errors gain a `Caused by:` line in miette because the `CalendarError` now rides in the source chain.
+
+- Modify: `src/template/engine/date.rs` (`render_date_error`,
+  `render_calendar_error`, `date_out_of_range_error` doc,
+  `mod error_translation` tests)
+- Baseline: regen `tests/baselines/pub-tokens.txt`; expected no diff (both
+  renderers stay private). The `cargo public-api` snapshots stay untouched;
+  temporal's Display text is unchanged, only the engine's substitutes are
+  removed.
+- Accepted behavior changes, each pinned below: template zone messages adopt
+  `local zone lookup failed for \`...\``, template range messages adopt `date/time
+  value is out of range`, and range errors gain a `Caused
+  by:` line in miette because the `CalendarError` now rides in the source chain.
 - No GLOSSARY change.
 
-**Context:** The engine keeps a private vocabulary for temporal failures and it disagrees with the crate's own. `render_date_error` (date.rs:1082-1095) rewords `LocalZoneLookup` as `local timezone lookup failed for {input:?}`, and `render_calendar_error` maps `OutOfRange` to `date_out_of_range_error()` (`date arithmetic overflowed the supported range`, :1074-1080), so templates see messages that appear nowhere in temporal's Display contract (error.rs module doc makes each variant's Display text part of the crate's contract). The origin rule settles who speaks: failures that originate in temporal render temporal's Display through `invalid_operation(error.to_string(), error)`, and failures that originate in engine argument validation keep the engine's own text. The argument-plane sites are exactly `date_out_of_range_error()`'s six callers (:774, :824, :839, :840, :870, :900: `checked_neg` on `i64::MIN` and `u64` to `i64` conversions raised before any calendar arithmetic runs), and they are untouched, so two range messages coexist correctly on two different planes. After Task 12, `CalendarError::Zone`'s Display already equals the inner DateError's text, so collapsing its arm is behavior-neutral there; the changes land on `render_date_error`'s `LocalZoneLookup` arm (wording) and `render_calendar_error`'s `OutOfRange` arm (wording plus a source chain). Breakage inventory: one zone string (the `render_date_error` arm, test :2418), one range string (`:1104`, test :2438); tests :2455 and :2480 assert the range string is absent from parse failures and stay green, and Task 12's `renders_a_zone_failure_with_one_lookup_prefix` stays green because the forwarded Display yields the same bytes. Only `src/template/engine/date.rs` references these renderers; no other crate or golden output quotes either string. Visibility: none.
+**Context:** The engine keeps a private vocabulary for temporal failures and it
+disagrees with the crate's own. `render_date_error` (date.rs:1082-1095) rewords
+`LocalZoneLookup` as `local timezone lookup failed for {input:?}`, and
+`render_calendar_error` maps `OutOfRange` to `date_out_of_range_error()`
+(`date arithmetic overflowed the supported range`, :1074-1080), so templates see
+messages that appear nowhere in temporal's Display contract (error.rs module doc
+makes each variant's Display text part of the crate's contract). The origin rule
+settles who speaks: failures that originate in temporal render temporal's
+Display through `invalid_operation(error.to_string(), error)`, and failures that
+originate in engine argument validation keep the engine's own text. The
+argument-plane sites are exactly `date_out_of_range_error()`'s six callers
+(:774, :824, :839, :840, :870, :900: `checked_neg` on `i64::MIN` and `u64` to
+`i64` conversions raised before any calendar arithmetic runs), and they are
+untouched, so two range messages coexist correctly on two different planes.
+After Task 12, `CalendarError::Zone`'s Display already equals the inner
+DateError's text, so collapsing its arm is behavior-neutral there; the changes
+land on `render_date_error`'s `LocalZoneLookup` arm (wording) and
+`render_calendar_error`'s `OutOfRange` arm (wording plus a source chain).
+Breakage inventory: one zone string (the `render_date_error` arm, test :2418),
+one range string (`:1104`, test :2438); tests :2455 and :2480 assert the range
+string is absent from parse failures and stay green, and Task 12's
+`renders_a_zone_failure_with_one_lookup_prefix` stays green because the
+forwarded Display yields the same bytes. Only `src/template/engine/date.rs`
+references these renderers; no other crate or golden output quotes either
+string. Visibility: none.
 
 - [ ] **Step 1: Rewrite the two wording tests (red)**
 
-  In `mod error_translation` (date.rs:2408), change the message assertion inside `preserves_the_local_zone_lookup_diagnosis` (keep the kind and source-chain assertions):
+  In `mod error_translation` (date.rs:2408), change the message assertion inside
+  `preserves_the_local_zone_lookup_diagnosis` (keep the kind and source-chain
+  assertions):
 
   ```rust
             assert_eq!(error.kind(), ErrorKind::InvalidOperation);
@@ -3714,11 +4454,14 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
         }
   ```
 
-  Run: `mise run test:unit preserves_the_local_zone_lookup_diagnosis`
-  Expected: FAIL: the engine still says `local timezone lookup failed`, so the single-prefix count is 0. This is the intended red.
+  Run: `mise run test:unit preserves_the_local_zone_lookup_diagnosis` Expected:
+  FAIL: the engine still says `local timezone lookup failed`, so the
+  single-prefix count is 0. This is the intended red.
 
-  Run: `mise run test:unit reports_range_failures_with_temporal_display_and_a_source`
-  Expected: FAIL: the engine still renders `date arithmetic overflowed the supported range`. This is the intended red.
+  Run:
+  `mise run test:unit reports_range_failures_with_temporal_display_and_a_source`
+  Expected: FAIL: the engine still renders
+  `date arithmetic overflowed the supported range`. This is the intended red.
 
 - [ ] **Step 2: Collapse both renderers**
 
@@ -3755,7 +4498,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  In the same file, change `render_calendar_error` (its `Zone` arm is the post-Task-12 shape):
+  In the same file, change `render_calendar_error` (its `Zone` arm is the
+  post-Task-12 shape):
 
   ```rust
   /// Translates a computed calendar failure into a render error.
@@ -3783,9 +4527,12 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
   }
   ```
 
-  `InvalidValue` and `YearNotFourDigits` already rendered `error.to_string()`, so those paths are byte-identical. The `Zone` arm is byte-identical too because `#[error("{source}")]` renders the inner DateError.
+  `InvalidValue` and `YearNotFourDigits` already rendered `error.to_string()`,
+  so those paths are byte-identical. The `Zone` arm is byte-identical too
+  because `#[error("{source}")]` renders the inner DateError.
 
-  Reword `date_out_of_range_error`'s doc so the origin rule is written down where the argument-plane callers are:
+  Reword `date_out_of_range_error`'s doc so the origin rule is written down
+  where the argument-plane callers are:
 
   ```rust
   /// Builds the error for calendar arithmetic that exceeds the supported Jiff
@@ -3809,14 +4556,19 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
   The function body and its six callers stay untouched.
 
-  Run: `mise run test:unit preserves_the_local_zone_lookup_diagnosis`
-  Expected: PASS, one `local zone lookup failed` occurrence and the DateError still downcastable from the source chain.
+  Run: `mise run test:unit preserves_the_local_zone_lookup_diagnosis` Expected:
+  PASS, one `local zone lookup failed` occurrence and the DateError still
+  downcastable from the source chain.
 
-  Run: `mise run test:unit reports_range_failures_with_temporal_display_and_a_source`
-  Expected: PASS, `date/time value is out of range` with the `CalendarError` in the source chain.
+  Run:
+  `mise run test:unit reports_range_failures_with_temporal_display_and_a_source`
+  Expected: PASS, `date/time value is out of range` with the `CalendarError` in
+  the source chain.
 
-  Run: `mise run test:unit engine::date`
-  Expected: PASS in full. Task 12's `renders_a_zone_failure_with_one_lookup_prefix` holds (the forwarded Display gives the same bytes). The argument-plane tests at :2455/:2480 keep asserting the engine overflow string only where it still lives.
+  Run: `mise run test:unit engine::date` Expected: PASS in full. Task 12's
+  `renders_a_zone_failure_with_one_lookup_prefix` holds (the forwarded Display
+  gives the same bytes). The argument-plane tests at :2455/:2480 keep asserting
+  the engine overflow string only where it still lives.
 
 - [ ] **Step 3: Regenerate the public-token baseline**
 
@@ -3829,8 +4581,8 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 
 - [ ] **Step 4: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (fmt, check with zero warnings, clippy with zero warnings, full test suite).
+  Run: `mise run verify` Expected: green (fmt, check with zero warnings, clippy
+  with zero warnings, full test suite).
 
 - [ ] **Step 5: Commit**
 
@@ -3844,14 +4596,76 @@ Recorded after the branch-final plan-conformance audit (two independent auditors
 ### Task 14 (O4): Move pattern rendering into `DatePoint::format_in`
 
 **Files:**
-- Modify: `src/temporal/error.rs` (module doc, enum summary, `InvalidFormat` variant, Display test case), `src/temporal/point.rs` (`format_in` plus a new `mod format_in`), `src/template/engine/date.rs` (six call sites, delete `format_strtime`, strengthen the `%J` test)
-- Baseline: regen `tests/baselines/pub-tokens.txt` (+1 line, `format_in`) and both `cargo public-api` snapshots (+3 lines each: `DateError::InvalidFormat` and its two fields).
-- Accepted behavior changes, each pinned below: an unrenderable pattern's message gains `: <Jiff's reason>`, Jiff's error leaves the source chain (its text now rides in the message), and the unreachable range edge behind sites 4-5 reports `DateError::InvalidValue` through `into_date_error` instead of `CalendarError::OutOfRange`.
+
+- Modify: `src/temporal/error.rs` (module doc, enum summary, `InvalidFormat`
+  variant, Display test case), `src/temporal/point.rs` (`format_in` plus a new
+  `mod format_in`), `src/template/engine/date.rs` (six call sites, delete
+  `format_strtime`, strengthen the `%J` test)
+- Baseline: regen `tests/baselines/pub-tokens.txt` (+1 line, `format_in`) and
+  both `cargo public-api` snapshots (+3 lines each: `DateError::InvalidFormat`
+  and its two fields).
+- Accepted behavior changes, each pinned below: an unrenderable pattern's
+  message gains `: <Jiff's reason>`, Jiff's error leaves the source chain (its
+  text now rides in the message), and the unreachable range edge behind sites
+  4-5 reports `DateError::InvalidValue` through `into_date_error` instead of
+  `CalendarError::OutOfRange`.
 - No GLOSSARY change.
 
-**Context:** After Task 11 the engine still owns pattern execution. `format_strtime` (engine/date.rs) holds the canonical guard and the Jiff fallback, and six sites call it: `Anchor::render` (:260), `date_format` (:479), `weekday` (:939), `render_period_edge` (:704), `shift_by_unit` (:804), `from_timestamp` (:351). O4 gives execution to temporal. `DatePoint::format_in(self, pattern, zone)` resolves the zoned value, tries `render_canonical_pattern(zoned.datetime(), pattern)`, falls back to `jiff::fmt::strtime::format(pattern, &zoned)`, and reports a Jiff failure as a new `DateError::InvalidFormat { pattern, reason }`. The name joins the point.rs `_in(zone)` family (`local_datetime_in`, `zoned_datetime_in`). `DateError` is the error the crate's contract names: the error.rs module doc makes each Display string contractual, and the failing pattern belongs to the failure identity, so the error lives there rather than in `CalendarError`. Jiff's `Error` cannot ride inside `DateError` because `DateError` derives `Clone` + `Eq`, so Jiff's diagnosis folds into Display as a reason-preserving superset: `invalid date format {pattern:?}: {reason}`. Nothing pins the old wording. `invalid date format` appears once in src (engine date.rs:432), in no test and no golden file, and both `%J` tests assert `ErrorKind::InvalidOperation` only, so Step 3 strengthens the filter test into a full pin and red-writes nothing else. Two side effects ride along as accepted: Jiff's error leaves the source chain, and the message gains `: <reason>`. Sites 1-3 keep their post-Task-11 pre-resolution (zoned first), so `zone_resolution_errors_precede_pattern_errors` still sees `render_calendar_error`'s range text; `format_in` resolves a second time from the same point and the same fixed zone, which is deterministic, and its inner resolution can only fail where the pre-resolution already failed, so the `into_date_error` bridge never fires on those sites. Sites 4-6 resolve only inside `format_in`; the range edge behind sites 4-5 (`snap`/`shift` succeeded but local midnight sits outside Jiff's instant range) then reports `DateError::InvalidValue` through `into_date_error`, the bridge typed parsers already use (datetime.rs:344), instead of `CalendarError::OutOfRange`. No test reaches that edge, and `DatePoint::date`'s failure renders unchanged, so only that diagnostic moves. Site 6 rebuilds the value it builds today: `zoned_datetime_in`'s DateTime arm is `datetime.utc().to_zoned(zone.clone())` (point.rs:242), byte-identical to the current `.utc().to_zoned(zone)`. Engine ownership ends at the `ErrorKind`: every site maps `DateError` through `render_date_error`, which since Task 13 is `invalid_operation(error.to_string(), error)`, so no new arm appears. `DatePoint` is `Copy`, so a site can still use its point after calling `format_in`. Visibility: `format_in` carries no `pub` token; `DateError::InvalidFormat` is public API, hence the snapshot regen. Gate: Step 1's probe proves the engine still owns `jiff::fmt::strtime`; X1b already delivered correctness, so the task earns its keep only when execution should move wholesale to temporal.
+**Context:** After Task 11 the engine still owns pattern execution.
+`format_strtime` (engine/date.rs) holds the canonical guard and the Jiff
+fallback, and six sites call it: `Anchor::render` (:260), `date_format` (:479),
+`weekday` (:939), `render_period_edge` (:704), `shift_by_unit` (:804),
+`from_timestamp` (:351). O4 gives execution to temporal.
+`DatePoint::format_in(self, pattern, zone)` resolves the zoned value, tries
+`render_canonical_pattern(zoned.datetime(), pattern)`, falls back to
+`jiff::fmt::strtime::format(pattern, &zoned)`, and reports a Jiff failure as a
+new `DateError::InvalidFormat { pattern, reason }`. The name joins the point.rs
+`_in(zone)` family (`local_datetime_in`, `zoned_datetime_in`). `DateError` is
+the error the crate's contract names: the error.rs module doc makes each Display
+string contractual, and the failing pattern belongs to the failure identity, so
+the error lives there rather than in `CalendarError`. Jiff's `Error` cannot ride
+inside `DateError` because `DateError` derives `Clone` + `Eq`, so Jiff's
+diagnosis folds into Display as a reason-preserving superset:
+`invalid date format {pattern:?}: {reason}`. Nothing pins the old wording.
+`invalid date format` appears once in src (engine date.rs:432), in no test and
+no golden file, and both `%J` tests assert `ErrorKind::InvalidOperation` only,
+so Step 3 strengthens the filter test into a full pin and red-writes nothing
+else. Two side effects ride along as accepted: Jiff's error leaves the source
+chain, and the message gains `: <reason>`. Sites 1-3 keep their post-Task-11
+pre-resolution (zoned first), so `zone_resolution_errors_precede_pattern_errors`
+still sees `render_calendar_error`'s range text; `format_in` resolves a second
+time from the same point and the same fixed zone, which is deterministic, and
+its inner resolution can only fail where the pre-resolution already failed, so
+the `into_date_error` bridge never fires on those sites. Sites 4-6 resolve only
+inside `format_in`; the range edge behind sites 4-5 (`snap`/`shift` succeeded
+but local midnight sits outside Jiff's instant range) then reports
+`DateError::InvalidValue` through `into_date_error`, the bridge typed parsers
+already use (datetime.rs:344), instead of `CalendarError::OutOfRange`. No test
+reaches that edge, and `DatePoint::date`'s failure renders unchanged, so only
+that diagnostic moves. Site 6 rebuilds the value it builds today:
+`zoned_datetime_in`'s DateTime arm is `datetime.utc().to_zoned(zone.clone())`
+(point.rs:242), byte-identical to the current `.utc().to_zoned(zone)`. Engine
+ownership ends at the `ErrorKind`: every site maps `DateError` through
+`render_date_error`, which since Task 13 is
+`invalid_operation(error.to_string(), error)`, so no new arm appears.
+`DatePoint` is `Copy`, so a site can still use its point after calling
+`format_in`. Visibility: `format_in` carries no `pub` token;
+`DateError::InvalidFormat` is public API, hence the snapshot regen. Gate: Step
+1's probe proves the engine still owns `jiff::fmt::strtime`; X1b already
+delivered correctness, so the task earns its keep only when execution should
+move wholesale to temporal.
 
-**Branches.** The steps below execute Branch A. If review rejects the new public contract line (`DateError::InvalidFormat`), execute the same steps under Branch B: `format_in` returns `Result<String, CalendarError>`; resolution propagates with `?` unchanged (no `into_date_error` bridge, so sites 4-5 keep today's range text exactly); the failure is a new `pub(crate) CalendarError::Format { pattern: Box<str>, reason: Box<str> }` with the same Display string; the six sites map it through `render_calendar_error`; Step 3's test downcasts the source to `CalendarError::Format`; Step 2's Display case moves to `CalendarError`'s test module; and Step 7 regenerates only `pub-tokens.txt` (+1 there), because `CalendarError` is `pub(crate)` and both public-api snapshots stay byte-identical.
+**Branches.** The steps below execute Branch A. If review rejects the new public
+contract line (`DateError::InvalidFormat`), execute the same steps under Branch
+B: `format_in` returns `Result<String, CalendarError>`; resolution propagates
+with `?` unchanged (no `into_date_error` bridge, so sites 4-5 keep today's range
+text exactly); the failure is a new
+`pub(crate) CalendarError::Format { pattern: Box<str>, reason: Box<str> }` with
+the same Display string; the six sites map it through `render_calendar_error`;
+Step 3's test downcasts the source to `CalendarError::Format`; Step 2's Display
+case moves to `CalendarError`'s test module; and Step 7 regenerates only
+`pub-tokens.txt` (+1 there), because `CalendarError` is `pub(crate)` and both
+public-api snapshots stay byte-identical.
 
 Branch B's `format_in` signature in full:
 
@@ -3867,10 +4681,14 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 1: Probe the gate**
 
-  Run: `rg 'jiff::fmt::strtime' src/template/engine/`
-  Expected: exactly one match, inside `format_strtime`. The engine still owns execution, so continue with Branch A as written.
+  Run: `rg 'jiff::fmt::strtime' src/template/engine/` Expected: exactly one
+  match, inside `format_strtime`. The engine still owns execution, so continue
+  with Branch A as written.
 
-  If there is no match, decide before continuing. Run: `rg 'format_in' src/temporal`. A hit means execution already moved. Cancel this task. Start Task 15. No hit means the engine lost execution without an owner, so execute Steps 2-9 under Branch B.
+  If there is no match, decide before continuing. Run:
+  `rg 'format_in' src/temporal`. A hit means execution already moved. Cancel
+  this task. Start Task 15. No hit means the engine lost execution without an
+  owner, so execute Steps 2-9 under Branch B.
 
 - [ ] **Step 2: Add `DateError::InvalidFormat`**
 
@@ -3939,7 +4757,9 @@ Everything else, including both red tests' intent, is unchanged.
   }
   ```
 
-  In the same file, add one case to `renders_exact_display_text_for_date_errors`, after the `local_zone_lookup` case:
+  In the same file, add one case to
+  `renders_exact_display_text_for_date_errors`, after the `local_zone_lookup`
+  case:
 
   ```rust
         #[case::invalid_format(
@@ -3951,8 +4771,10 @@ Everything else, including both red tests' intent, is unchanged.
         )]
   ```
 
-  Run: `mise run test:unit renders_exact_display_text_for_date_errors`
-  Expected: PASS, the new case pins `invalid date format "%J": unknown conversion \`%J\``. No exhaustive `DateError` match remains elsewhere (Task 13 collapsed `render_date_error`), so the new variant breaks no compile.
+  Run: `mise run test:unit renders_exact_display_text_for_date_errors` Expected:
+  PASS, the new case pins
+  `invalid date format "%J": unknown conversion \`%J\``. No exhaustive `DateError` match remains elsewhere (Task 13 collapsed `render_date_error`),
+  so the new variant breaks no compile.
 
 - [ ] **Step 3: Strengthen the `%J` filter test (red)**
 
@@ -4003,12 +4825,15 @@ Everything else, including both red tests' intent, is unchanged.
         }
   ```
 
-  Run: `mise run test:unit rejects_an_invalid_format_specifier`
-  Expected: FAIL: the detail is still `invalid date format "%J"` without a reason, so the `contains` assertion trips. This is the intended red. The kind assertion still passes.
+  Run: `mise run test:unit rejects_an_invalid_format_specifier` Expected: FAIL:
+  the detail is still `invalid date format "%J"` without a reason, so the
+  `contains` assertion trips. This is the intended red. The kind assertion still
+  passes.
 
 - [ ] **Step 4: Add the red `format_in` tests**
 
-  In `src/temporal/point.rs`, add `mod format_in` to the tests mod, between `point_at` and `mod parse`:
+  In `src/temporal/point.rs`, add `mod format_in` to the tests mod, between
+  `point_at` and `mod parse`:
 
   ```rust
     fn point_at(text: &str) -> DatePoint {
@@ -4064,12 +4889,14 @@ Everything else, including both red tests' intent, is unchanged.
         use pretty_assertions::assert_eq;
   ```
 
-  Run: `mise run test:unit format_in`
-  Expected: FAIL: the test binary does not compile because `DatePoint::format_in` does not exist. This is the intended red.
+  Run: `mise run test:unit format_in` Expected: FAIL: the test binary does not
+  compile because `DatePoint::format_in` does not exist. This is the intended
+  red.
 
 - [ ] **Step 5: Implement `format_in`**
 
-  In `src/temporal/point.rs`, insert the method after `zoned_datetime_in`, before the `UTC-stored Date-Time` helper:
+  In `src/temporal/point.rs`, insert the method after `zoned_datetime_in`,
+  before the `UTC-stored Date-Time` helper:
 
   ```rust
             Self::DateTime(datetime) => {
@@ -4125,10 +4952,13 @@ Everything else, including both red tests' intent, is unchanged.
     /// Returns the UTC-stored Date-Time equivalent of this date point.
   ```
 
-  The resolution runs first, so a range failure reports before any pattern renders, exactly as the sites do today. The canonical shortcut consumes the resolved civil datetime, the same value Task 11's guard reads.
+  The resolution runs first, so a range failure reports before any pattern
+  renders, exactly as the sites do today. The canonical shortcut consumes the
+  resolved civil datetime, the same value Task 11's guard reads.
 
-  Run: `mise run test:unit format_in`
-  Expected: PASS. `-0009-01-01` comes from the crate's encoder; `%J` reports `InvalidFormat` with pattern `%J` and a non-empty reason.
+  Run: `mise run test:unit format_in` Expected: PASS. `-0009-01-01` comes from
+  the crate's encoder; `%J` reports `InvalidFormat` with pattern `%J` and a
+  non-empty reason.
 
 - [ ] **Step 6: Rewire the six sites and remove `format_strtime`**
 
@@ -4214,7 +5044,8 @@ Everything else, including both red tests' intent, is unchanged.
         ))
   ```
 
-  Change the tail of `render_period_edge` (its head is the post-Task-5 `snap` shape):
+  Change the tail of `render_period_edge` (its head is the post-Task-5 `snap`
+  shape):
 
   ```rust
     let shifted = date_point
@@ -4227,7 +5058,8 @@ Everything else, including both red tests' intent, is unchanged.
         pat,
     )
 }
-  ```
+
+  ```text
 
   to:
 
@@ -4285,7 +5117,9 @@ Everything else, including both red tests' intent, is unchanged.
                         .map_err(render_date_error)
   ```
 
-  Sites 1-3 keep their pre-resolution and its `render_calendar_error` mapping; only the final line changes. Sites 4-6 keep their `canonical_pattern()` locals; `format_in` now owns resolution.
+  Sites 1-3 keep their pre-resolution and its `render_calendar_error` mapping;
+  only the final line changes. Sites 4-6 keep their `canonical_pattern()`
+  locals; `format_in` now owns resolution.
 
   Remove `format_strtime` (the post-Task-11 shape, doc comment included):
 
@@ -4319,13 +5153,17 @@ Everything else, including both red tests' intent, is unchanged.
   }
   ```
 
-  The function disappears entirely. The `invalid_operation` import stays for both renderers.
+  The function disappears entirely. The `invalid_operation` import stays for
+  both renderers.
 
-  Run: `mise run test:unit rejects_an_invalid_format_specifier`
-  Expected: PASS, the message contains `invalid date format "%J":` and the source downcasts to `DateError::InvalidFormat` with pattern `%J`.
+  Run: `mise run test:unit rejects_an_invalid_format_specifier` Expected: PASS,
+  the message contains `invalid date format "%J":` and the source downcasts to
+  `DateError::InvalidFormat` with pattern `%J`.
 
-  Run: `mise run test:unit engine::date`
-  Expected: PASS in full: the Apia `Do|%d` pin, the precedence pin, both negative-year pins, and `now_returns_an_error_instead_of_panicking_on_an_invalid_format` (kind-only) all hold.
+  Run: `mise run test:unit engine::date` Expected: PASS in full: the Apia
+  `Do|%d` pin, the precedence pin, both negative-year pins, and
+  `now_returns_an_error_instead_of_panicking_on_an_invalid_format` (kind-only)
+  all hold.
 
   Run: `rg 'jiff::fmt::strtime' src/template/engine/`
   Expected: no output. The engine holds zero format-execution references.
@@ -4339,12 +5177,17 @@ Everything else, including both red tests' intent, is unchanged.
   git diff --stat tests/baselines/
   ```
 
-  Expected: `pub-tokens.txt` gains one line, `src/temporal/point.rs: pub(crate) fn format_in(self, pattern: &str, zone: &TimeZone) -> Result<String, DateError> {`. Each `public-api` snapshot gains three lines: the `InvalidFormat` variant plus its `pattern` and `reason` field lines, sorted before `InvalidValue`. Under Branch B, run only the first command and expect one `CalendarError::Format` line with no snapshot diff.
+  Expected: `pub-tokens.txt` gains one line,
+  `src/temporal/point.rs: pub(crate) fn format_in(self, pattern: &str, zone: &TimeZone) -> Result<String, DateError> {`.
+  Each `public-api` snapshot gains three lines: the `InvalidFormat` variant plus
+  its `pattern` and `reason` field lines, sorted before `InvalidValue`. Under
+  Branch B, run only the first command and expect one `CalendarError::Format`
+  line with no snapshot diff.
 
 - [ ] **Step 8: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (fmt, check with zero warnings, clippy with zero warnings, full test suite).
+  Run: `mise run verify` Expected: green (fmt, check with zero warnings, clippy
+  with zero warnings, full test suite).
 
 - [ ] **Step 9: Commit**
 
@@ -4358,12 +5201,40 @@ Everything else, including both red tests' intent, is unchanged.
 ### Task 15 (H1): Move duration rendering out of `date.rs` into its own module
 
 **Files:**
+
 - Create: `src/template/engine/duration.rs`
-- Modify: `src/template/engine/date.rs` (drop the two filter registrations, the function, the test module), `src/template/engine.rs` (module list, import, registration call, two doc lists)
-- Baseline: regen `tests/baselines/pub-tokens.txt` (+2 lines, `DurationOps` and its `register`); both `cargo public-api` snapshots stay byte-identical.
+- Modify: `src/template/engine/date.rs` (drop the two filter registrations, the
+  function, the test module), `src/template/engine.rs` (module list, import,
+  registration call, two doc lists)
+- Baseline: regen `tests/baselines/pub-tokens.txt` (+2 lines, `DurationOps` and
+  its `register`); both `cargo public-api` snapshots stay byte-identical.
 - No GLOSSARY change.
 
-**Context:** `date.rs` opens with "Registers date and time helpers for templates" and its filter bullet lists `date_format`, `timestamp`, `date_add`, ... , `date_diff` with no duration entry, yet the file registers `duration_format` and `durationformat` (date.rs:85-86), defines `duration_format` (:627-654), and owns the `durationformat` test module (:1674-1738). The first audit ranked this the top doc-truth mismatch: the header claims look complete while the file silently owns a non-date filter, and `engine.rs`'s helper-module list (:9-20) has no duration bullet either. H1 gives durations a module modeled exactly on the stateless siblings (`num.rs`, `string.rs`, `yaml.rs`): a unit struct, an associated `register(env)` whose doc says "This is an associated function because [...] carries no state", plain functions added through `Environment::add_filter`, and a tests mod with its own `env()` helper. `duration.rs` moves the function, its doc, the registration pair, and all four tests byte for byte; `date.rs` keeps its `DurationValue` import because `apply_offset` (:112) still parses duration strings, and it keeps `invalid_operation`, `Error`, and `ErrorKind` for its own filters. After the move `date.rs`'s module doc needs no edit: "the flat `date_*` filters and `is_*` tests" becomes exhaustive. `engine.rs` gains `mod duration;`, the `duration::DurationOps` import, one registration call after `DateOps::register`, a module-doc bullet between `date` and `file` (declaration order), and a truthful `new` doc: the sentence at :82-83 gains `[duration]` and closes the pre-existing `yaml` gap in the same breath. Behavior is unchanged: `TemplateEngine::new` registers the same filter names through a different module, and the moved tests are the pin (green before and after). Visibility: +2 `pub(super)` lines, no public API change.
+**Context:** `date.rs` opens with "Registers date and time helpers for
+templates" and its filter bullet lists `date_format`, `timestamp`,
+`date_add`, ... , `date_diff` with no duration entry, yet the file registers
+`duration_format` and `durationformat` (date.rs:85-86), defines
+`duration_format` (:627-654), and owns the `durationformat` test module
+(:1674-1738). The first audit ranked this the top doc-truth mismatch: the header
+claims look complete while the file silently owns a non-date filter, and
+`engine.rs`'s helper-module list (:9-20) has no duration bullet either. H1 gives
+durations a module modeled exactly on the stateless siblings (`num.rs`,
+`string.rs`, `yaml.rs`): a unit struct, an associated `register(env)` whose doc
+says "This is an associated function because [...] carries no state", plain
+functions added through `Environment::add_filter`, and a tests mod with its own
+`env()` helper. `duration.rs` moves the function, its doc, the registration
+pair, and all four tests byte for byte; `date.rs` keeps its `DurationValue`
+import because `apply_offset` (:112) still parses duration strings, and it keeps
+`invalid_operation`, `Error`, and `ErrorKind` for its own filters. After the
+move `date.rs`'s module doc needs no edit: "the flat `date_*` filters and `is_*`
+tests" becomes exhaustive. `engine.rs` gains `mod duration;`, the
+`duration::DurationOps` import, one registration call after `DateOps::register`,
+a module-doc bullet between `date` and `file` (declaration order), and a
+truthful `new` doc: the sentence at :82-83 gains `[duration]` and closes the
+pre-existing `yaml` gap in the same breath. Behavior is unchanged:
+`TemplateEngine::new` registers the same filter names through a different
+module, and the moved tests are the pin (green before and after). Visibility: +2
+`pub(super)` lines, no public API change.
 
 - [ ] **Step 1: Create the duration module**
 
@@ -4511,7 +5382,8 @@ Everything else, including both red tests' intent, is unchanged.
   }
   ```
 
-  The function, its doc, and the four tests are verbatim moves from `date.rs`. Only the module doc, the struct, `register`, and the `env()` helper are new.
+  The function, its doc, and the four tests are verbatim moves from `date.rs`.
+  Only the module doc, the struct, `register`, and the `env()` helper are new.
 
 - [ ] **Step 2: Strip the duration code from `date.rs`**
 
@@ -4531,7 +5403,8 @@ Everything else, including both red tests' intent, is unchanged.
         env.add_filter("timestamp", timestamp);
   ```
 
-  Remove `duration_format` and its doc comment (keep the `timestamp` doc that follows):
+  Remove `duration_format` and its doc comment (keep the `timestamp` doc that
+  follows):
 
   ```rust
   /// Renders a duration value or string in human-readable compound format.
@@ -4574,7 +5447,8 @@ Everything else, including both red tests' intent, is unchanged.
   /// Converts a piped date/time string to Unix seconds.
   ```
 
-  Remove the `durationformat` test module (keep the `timestamp` module that follows):
+  Remove the `durationformat` test module (keep the `timestamp` module that
+  follows):
 
   ```rust
       mod durationformat {
@@ -4652,7 +5526,9 @@ Everything else, including both red tests' intent, is unchanged.
       mod timestamp {
   ```
 
-  The `DurationValue` import at date.rs:44 stays; `apply_offset` (:112) still uses it. The module doc needs no edit: its `date_*` filter claim becomes exhaustive.
+  The `DurationValue` import at date.rs:44 stays; `apply_offset` (:112) still
+  uses it. The module doc needs no edit: its `date_*` filter claim becomes
+  exhaustive.
 
 - [ ] **Step 3: Wire the module into `engine.rs`**
 
@@ -4720,7 +5596,8 @@ Everything else, including both red tests' intent, is unchanged.
   //! - [`mod@file`] registers `file.write_to()` and `file.include()`.
   ```
 
-  Fix the submodule list in `TemplateEngine::new`'s doc (it omits `yaml` as well as duration):
+  Fix the submodule list in `TemplateEngine::new`'s doc (it omits `yaml` as well
+  as duration):
 
   ```rust
       /// Registers functions from the [`date`], [`mod@file`], [`path`], [`num`],
@@ -4739,11 +5616,12 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 4: Run the moved tests and the date suite**
 
-  Run: `mise run test:unit durationformat`
-  Expected: PASS, all four tests run from `duration.rs` with the same registrations.
+  Run: `mise run test:unit durationformat` Expected: PASS, all four tests run
+  from `duration.rs` with the same registrations.
 
-  Run: `mise run test:unit engine::date`
-  Expected: PASS in full. No date test renders a duration filter, so dropping the registration from `DateOps::register` changes nothing.
+  Run: `mise run test:unit engine::date` Expected: PASS in full. No date test
+  renders a duration filter, so dropping the registration from
+  `DateOps::register` changes nothing.
 
 - [ ] **Step 5: Regenerate the pub-token baseline**
 
@@ -4752,12 +5630,16 @@ Everything else, including both red tests' intent, is unchanged.
   git diff --stat tests/baselines/pub-tokens.txt
   ```
 
-  Expected: +2 lines, zero removals. Both lines are `src/template/engine/duration.rs:` entries (`pub(super) fn register(env: &mut Environment<'static>) {` and `pub(super) struct DurationOps;`), sorted between the `date.rs` and `error.rs` entries. The `cargo public-api` snapshots stay byte-identical.
+  Expected: +2 lines, zero removals. Both lines are
+  `src/template/engine/duration.rs:` entries
+  (`pub(super) fn register(env: &mut Environment<'static>) {` and
+  `pub(super) struct DurationOps;`), sorted between the `date.rs` and `error.rs`
+  entries. The `cargo public-api` snapshots stay byte-identical.
 
 - [ ] **Step 6: Run the full gate**
 
-  Run: `mise run verify`
-  Expected: green (fmt, check with zero warnings, clippy with zero warnings, full test suite).
+  Run: `mise run verify` Expected: green (fmt, check with zero warnings, clippy
+  with zero warnings, full test suite).
 
 - [ ] **Step 7: Commit**
 
@@ -4771,11 +5653,63 @@ Everything else, including both red tests' intent, is unchanged.
 ### Task 16 (D): Documentation truth pass and hygiene nits
 
 **Files:**
-- Modify: `src/template/engine/date.rs` (X3, X7a, X7b, X1c, three H5 nits), `src/temporal/GLOSSARY.md` (X7c), `src/temporal/duration.rs`, `src/temporal/error.rs` (X7d), `.scratch/temporal-core/spec.md`, `.scratch/temporal-core/divergence-register.md` (D5), `.scratch/temporal-core/issues/06-template-format-dialects.md` (Task 6 hand-off sweep)
-- Baseline: none. Doc text moves no `pub` line, so both `cargo public-api` snapshots and `tests/baselines/pub-tokens.txt` stay byte-identical.
-- `src/GLOSSARY.md`: no edit. Task 3's invariant test made its sync-contract claim machine-enforced.
 
-**Context:** The final pass closes the audit's documentation group (X3, X7a-d, X1c, D5, and the `is_leap_year` doc) plus the H5 hygiene nits, all against the post-Task-15 tree. X3: the `date_add`, `date_sub`, and `date_diff` docs promise `unit="ms"`, but the unit registry rejects `ms` (its own reject case is named `millisecond_compact`) and `DurationValue::parse` has no millisecond unit, so the documented spelling errors at runtime. X7a: `date_diff` cites `DateValue::whole_months_until`, which does not exist; the method that does the work is `DatePoint::diff` (point.rs:407), and the citation is plain code text, so the fix stays a backticked name with no new link. X7b: the module doc describes a retry cascade ("A full datetime is tried first, falling back...") while `DatePoint::parse` dispatches once on the input shape (`from_date_shape`, failure reason "not a date or date-time shape"). X7c: the temporal glossary calls `TimeUnit` one of the "eight accepted duration quantities" while `TEMPORAL_UNITS` is `[UnitSpec; 7]`; the catalog's `unit.rs:52` cite lands in `UNIT_LOOKUP`, which carries no count, and the "eight registered names" sentence at unit.rs:309 counts `DateUnit`'s eight field names and is correct, so only the glossary line changes. X7d: `DurationValue::parse`'s error list promises `MalformedNumber`, but a grep of `src/` shows the variant constructed only by the Display test at error.rs:252; the bullet comes out, the variant doc records its reachability, and the variant itself stays because it is public contract. The `is_leap_year` doc claims `i32` while the code used `i16::try_from`; Task 1 recorded that offloading makes the doc true, and Step 12 verifies it. X1c: `date_format` gains one paragraph on explicit `%Y` semantics (jiff counts the sign inside the width; canonical forms round-trip outside it), inserted after the `fmt::strtime` paragraph so the syntax paragraph, the `# Errors` paragraph, the engine wrapper line, and `pattern_to_strftime`'s doc, all owned by Task 8, stay byte-identical. D5: the spec's format-bindings bullet and divergence-register Entry 10 still describe chrono; both get jiff-era wording (`%+` fails hard under jiff, `%S` never renders `60`), and the spec edit matches on the line's prefix because Task 6 rewrote an earlier line in the same file. Task 6's hand-off: its Step 4 deferred `spec.md:104`'s chrono-era `format_with`/`DelayedFormat` bullet and issues/06's `format_with`/template-seam mentions to this pass; Step 8 sweeps the four mentions in the issue's living sections (What to build, Rules, and the two AC lines), while the Agent Brief, Triage Notes, and Comments sections stay untouched as historical records. H5 (catalog disposition D/P4): `mod date_diff` re-imports `ZoneGuard` though the tests root already imports it and `use super::*` re-exports it (the same path Task 3's notes rely on); `mod is_past_and_is_future` lacks the blank line its siblings have; and `impl Object for DateOps` sits between `weekday_or_error` and `parse_date_point` while `file.rs` and `query.rs` keep each `impl Object` beside its type, so the block moves next to `impl DateOps` as a byte-identical cut and paste. The block quoted in Step 11 is the post-Task-2 `get_value` body with Task 9's rename and Task 14's `from_timestamp` rewire applied; nothing references item order, so the move is behavior-neutral. GLOSSARY: `src/temporal/GLOSSARY.md` changes in Step 5; `src/GLOSSARY.md` stays untouched.
+- Modify: `src/template/engine/date.rs` (X3, X7a, X7b, X1c, three H5 nits),
+  `src/temporal/GLOSSARY.md` (X7c), `src/temporal/duration.rs`,
+  `src/temporal/error.rs` (X7d), `.scratch/temporal-core/spec.md`,
+  `.scratch/temporal-core/divergence-register.md` (D5),
+  `.scratch/temporal-core/issues/06-template-format-dialects.md` (Task 6
+  hand-off sweep)
+- Baseline: none. Doc text moves no `pub` line, so both `cargo public-api`
+  snapshots and `tests/baselines/pub-tokens.txt` stay byte-identical.
+- `src/GLOSSARY.md`: no edit. Task 3's invariant test made its sync-contract
+  claim machine-enforced.
+
+**Context:** The final pass closes the audit's documentation group (X3, X7a-d,
+X1c, D5, and the `is_leap_year` doc) plus the H5 hygiene nits, all against the
+post-Task-15 tree. X3: the `date_add`, `date_sub`, and `date_diff` docs promise
+`unit="ms"`, but the unit registry rejects `ms` (its own reject case is named
+`millisecond_compact`) and `DurationValue::parse` has no millisecond unit, so
+the documented spelling errors at runtime. X7a: `date_diff` cites
+`DateValue::whole_months_until`, which does not exist; the method that does the
+work is `DatePoint::diff` (point.rs:407), and the citation is plain code text,
+so the fix stays a backticked name with no new link. X7b: the module doc
+describes a retry cascade ("A full datetime is tried first, falling back...")
+while `DatePoint::parse` dispatches once on the input shape (`from_date_shape`,
+failure reason "not a date or date-time shape"). X7c: the temporal glossary
+calls `TimeUnit` one of the "eight accepted duration quantities" while
+`TEMPORAL_UNITS` is `[UnitSpec; 7]`; the catalog's `unit.rs:52` cite lands in
+`UNIT_LOOKUP`, which carries no count, and the "eight registered names" sentence
+at unit.rs:309 counts `DateUnit`'s eight field names and is correct, so only the
+glossary line changes. X7d: `DurationValue::parse`'s error list promises
+`MalformedNumber`, but a grep of `src/` shows the variant constructed only by
+the Display test at error.rs:252; the bullet comes out, the variant doc records
+its reachability, and the variant itself stays because it is public contract.
+The `is_leap_year` doc claims `i32` while the code used `i16::try_from`; Task 1
+recorded that offloading makes the doc true, and Step 12 verifies it. X1c:
+`date_format` gains one paragraph on explicit `%Y` semantics (jiff counts the
+sign inside the width; canonical forms round-trip outside it), inserted after
+the `fmt::strtime` paragraph so the syntax paragraph, the `# Errors` paragraph,
+the engine wrapper line, and `pattern_to_strftime`'s doc, all owned by Task 8,
+stay byte-identical. D5: the spec's format-bindings bullet and
+divergence-register Entry 10 still describe chrono; both get jiff-era wording
+(`%+` fails hard under jiff, `%S` never renders `60`), and the spec edit matches
+on the line's prefix because Task 6 rewrote an earlier line in the same file.
+Task 6's hand-off: its Step 4 deferred `spec.md:104`'s chrono-era
+`format_with`/`DelayedFormat` bullet and issues/06's `format_with`/template-seam
+mentions to this pass; Step 8 sweeps the four mentions in the issue's living
+sections (What to build, Rules, and the two AC lines), while the Agent Brief,
+Triage Notes, and Comments sections stay untouched as historical records. H5
+(catalog disposition D/P4): `mod date_diff` re-imports `ZoneGuard` though the
+tests root already imports it and `use super::*` re-exports it (the same path
+Task 3's notes rely on); `mod is_past_and_is_future` lacks the blank line its
+siblings have; and `impl Object for DateOps` sits between `weekday_or_error` and
+`parse_date_point` while `file.rs` and `query.rs` keep each `impl Object` beside
+its type, so the block moves next to `impl DateOps` as a byte-identical cut and
+paste. The block quoted in Step 11 is the post-Task-2 `get_value` body with Task
+9's rename and Task 14's `from_timestamp` rewire applied; nothing references
+item order, so the move is behavior-neutral. GLOSSARY:
+`src/temporal/GLOSSARY.md` changes in Step 5; `src/GLOSSARY.md` stays untouched.
 
 - [ ] **Step 1: Drop the `"ms"` promise from `date_add` and `date_sub`**
 
@@ -4898,7 +5832,8 @@ Everything else, including both red tests' intent, is unchanged.
   /// # Errors
   ```
 
-  The syntax paragraph and the `# Errors` paragraph belong to Task 8. Do not touch either.
+  The syntax paragraph and the `# Errors` paragraph belong to Task 8. Do not
+  touch either.
 
 - [ ] **Step 5: Correct the quantity count in the temporal glossary (X7c)**
 
@@ -4931,7 +5866,8 @@ Everything else, including both red tests' intent, is unchanged.
       /// contract.
   ```
 
-  In `src/temporal/duration.rs`, remove the unreachable bullet from `parse`'s error list:
+  In `src/temporal/duration.rs`, remove the unreachable bullet from `parse`'s
+  error list:
 
   ```rust
       /// - [`DurationError::MalformedNumber`] if a component has invalid number
@@ -4947,7 +5883,8 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 7: Refresh the chrono-era format notes (D5)**
 
-  In `.scratch/temporal-core/divergence-register.md`, change Entry 10's divergence line:
+  In `.scratch/temporal-core/divergence-register.md`, change Entry 10's
+  divergence line:
 
   ```markdown
   - **Divergence**: Core formatting uses `chrono::format::strftime` syntax, while template date filters accept `moment.js` tokens via a scoped translation layer (bracket literals, `YYYY MM DD HH mm ss`, `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`). Unsupported moment tokens fail with an explicit diagnostic naming the token.
@@ -4959,7 +5896,9 @@ Everything else, including both red tests' intent, is unchanged.
   - **Divergence**: Core formatting uses jiff `strtime` syntax, while template date filters accept `moment.js` tokens via a scoped translation layer (bracket literals, `YYYY MM DD HH mm ss`, `Do`/`S` ordinals, `dddd`/`ddd`/`MMM`/`MMMM`). Unsupported moment tokens fail with an explicit diagnostic naming the token.
   ```
 
-  In `.scratch/temporal-core/spec.md`, replace the format-bindings line. The script matches on the line's prefix, so Task 6's earlier edit to the same file cannot break it:
+  In `.scratch/temporal-core/spec.md`, replace the format-bindings line. The
+  script matches on the line's prefix, so Task 6's earlier edit to the same file
+  cannot break it:
 
   ```bash
   python3 - <<'PY'
@@ -4987,9 +5926,12 @@ Everything else, including both red tests' intent, is unchanged.
 
   Expected: the script prints `rewrote format-bindings line`.
 
-- [ ] **Step 8: Sweep the retired `format_with`/`DelayedFormat` references (Task 6 hand-off)**
+- [ ] **Step 8: Sweep the retired `format_with`/`DelayedFormat` references (Task 6
+  hand-off)**
 
-  In `.scratch/temporal-core/spec.md`, replace the `Invalid-pattern` bullet. The script matches on the line's prefix, so Task 6's earlier edit to the same file cannot break it:
+  In `.scratch/temporal-core/spec.md`, replace the `Invalid-pattern` bullet. The
+  script matches on the line's prefix, so Task 6's earlier edit to the same file
+  cannot break it:
 
   ```bash
   python3 - <<'PY'
@@ -5017,7 +5959,9 @@ Everything else, including both red tests' intent, is unchanged.
 
   Expected: the script prints `rewrote invalid-pattern line`.
 
-  In `.scratch/temporal-core/issues/06-template-format-dialects.md`, sweep the four `format_with`/template-seam mentions in its living sections. The Agent Brief, Triage Notes, and Comments sections are historical and stay untouched:
+  In `.scratch/temporal-core/issues/06-template-format-dialects.md`, sweep the
+  four `format_with`/template-seam mentions in its living sections. The Agent
+  Brief, Triage Notes, and Comments sections are historical and stay untouched:
 
   ```bash
   python3 - <<'PY'
@@ -5071,7 +6015,8 @@ Everything else, including both red tests' intent, is unchanged.
   PY
   ```
 
-  Expected: the script prints `swept issues/06 format_with and template-seam mentions`.
+  Expected: the script prints
+  `swept issues/06 format_with and template-seam mentions`.
 
 - [ ] **Step 9: Remove the duplicate `ZoneGuard` import (H5)**
 
@@ -5090,7 +6035,8 @@ Everything else, including both red tests' intent, is unchanged.
 
   The tests root already imports `ZoneGuard`, and `use super::*` re-exports it.
 
-- [ ] **Step 10: Add the missing blank line before `mod is_past_and_is_future` (H5)**
+- [ ] **Step 10: Add the missing blank line before `mod is_past_and_is_future`
+  (H5)**
 
   In `src/template/engine/date.rs`, change:
 
@@ -5111,7 +6057,8 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 11: Move `impl Object for DateOps` next to `impl DateOps` (H5)**
 
-  First remove the block from its current position. In `src/template/engine/date.rs`, change:
+  First remove the block from its current position. In
+  `src/template/engine/date.rs`, change:
 
   ```rust
   impl Object for DateOps {
@@ -5283,16 +6230,18 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 12: Check the `is_leap_year` doc claim**
 
-  Run: `grep -n 'i16' src/template/engine/date.rs`
-  Expected: no matches. Task 1 rewrote `is_leap_year` onto `i32`, so the doc line that promises an `i32` year is now true.
+  Run: `grep -n 'i16' src/template/engine/date.rs` Expected: no matches. Task 1
+  rewrote `is_leap_year` onto `i32`, so the doc line that promises an `i32` year
+  is now true.
 
 - [ ] **Step 13: Run the gates**
 
-  Run: `mise run doc --all-features`
-  Expected: green (rustdoc builds with warnings denied; every doc link in the moved block and the edited comments resolves).
+  Run: `mise run doc --all-features` Expected: green (rustdoc builds with
+  warnings denied; every doc link in the moved block and the edited comments
+  resolves).
 
-  Run: `mise run verify`
-  Expected: green (fmt, check, lint, full test suite; no baseline regen: doc text only).
+  Run: `mise run verify` Expected: green (fmt, check, lint, full test suite; no
+  baseline regen: doc text only).
 
 - [ ] **Step 14: Commit**
 
@@ -5306,16 +6255,39 @@ Everything else, including both red tests' intent, is unchanged.
 ### Task 17 (F1): Quote the unit hint in filter unit rejections
 
 **Files:**
-- Modify: `src/lexer.rs` (`LexError::UnexpectedEndOfInput.expected` becomes `String`; two construction sites, two test literals)
-- Modify: `src/query/error.rs` (`unexpected_end` takes `impl Into<String>`; one test literal)
-- Modify: `src/query/grammar/filter.rs` (the `date_add`/`date_diff` unit branches quote the hint; delete `is_unrecognized_unit`; one new test)
-- Baseline: none (`pub` first lines change nowhere, so both `cargo public-api` snapshots stay byte-identical). No GLOSSARY changes.
 
-**Context:** after Task 3, `UnitError` carries the full spelling hint (`unknown unit "mo3" (expected y, mo, ...)`), but filter's validation still rejects a bad unit with the static expectation `"recognized duration unit"`, so the query diagnostic never lists the valid spellings. The adoption is deliberately narrow: the two validation branches call `TimeUnit::parse_spelling` and feed `error.to_string()` into `QuerySyntaxError::unexpected_end`; the two `evaluate` sites keep `from_spelling` by design, because evaluation stays `Option`-shaped and never fails on a spellable unit. The dynamic text needs one field type change: `LexError::UnexpectedEndOfInput.expected` becomes `String`. `LexError` is `pub(crate)`, so no public surface moves, and `unexpected_end` takes `impl Into<String>`, so its literal call sites compile unchanged; `LexError::UnexpectedToken.expected` stays `&'static str`, since per-variant field types mean nothing forces that widening. No test pins the old static phrase, the field type, or the widened signature, so the only new assertion is this task's own. The carrier keeps its phrasing: the user sees `unexpected end of input, expected unknown unit "mo3" (expected ...)`, and the pre-existing double `expected` is accepted as the carrier's own wording. GLOSSARY: **no edit**; no new domain vocabulary.
+- Modify: `src/lexer.rs` (`LexError::UnexpectedEndOfInput.expected` becomes
+  `String`; two construction sites, two test literals)
+- Modify: `src/query/error.rs` (`unexpected_end` takes `impl Into<String>`; one
+  test literal)
+- Modify: `src/query/grammar/filter.rs` (the `date_add`/`date_diff` unit
+  branches quote the hint; delete `is_unrecognized_unit`; one new test)
+- Baseline: none (`pub` first lines change nowhere, so both `cargo public-api`
+  snapshots stay byte-identical). No GLOSSARY changes.
+
+**Context:** after Task 3, `UnitError` carries the full spelling hint
+(`unknown unit "mo3" (expected y, mo, ...)`), but filter's validation still
+rejects a bad unit with the static expectation `"recognized duration unit"`, so
+the query diagnostic never lists the valid spellings. The adoption is
+deliberately narrow: the two validation branches call `TimeUnit::parse_spelling`
+and feed `error.to_string()` into `QuerySyntaxError::unexpected_end`; the two
+`evaluate` sites keep `from_spelling` by design, because evaluation stays
+`Option`-shaped and never fails on a spellable unit. The dynamic text needs one
+field type change: `LexError::UnexpectedEndOfInput.expected` becomes `String`.
+`LexError` is `pub(crate)`, so no public surface moves, and `unexpected_end`
+takes `impl Into<String>`, so its literal call sites compile unchanged;
+`LexError::UnexpectedToken.expected` stays `&'static str`, since per-variant
+field types mean nothing forces that widening. No test pins the old static
+phrase, the field type, or the widened signature, so the only new assertion is
+this task's own. The carrier keeps its phrasing: the user sees
+`unexpected end of input, expected unknown unit "mo3" (expected ...)`, and the
+pre-existing double `expected` is accepted as the carrier's own wording.
+GLOSSARY: **no edit**; no new domain vocabulary.
 
 - [ ] **Step 1: Write the failing test**
 
-  Add this rstest beside `rejects_unquoted_date_shapes_that_are_not_dates` in the `filter.rs` test module:
+  Add this rstest beside `rejects_unquoted_date_shapes_that_are_not_dates` in
+  the `filter.rs` test module:
 
   ```rust
         #[rstest]
@@ -5338,8 +6310,11 @@ Everything else, including both red tests' intent, is unchanged.
         }
   ```
 
-  Run: `mise run test:unit unit_rejections_quote_the_unit_hint`
-  Expected: FAIL: both cases parse to the static expectation, so the assertion reports `expected="recognized duration unit"`. The test compiles on the untouched tree: `expected` is `&str` there and `&String` after Step 2, and `contains` works for both.
+  Run: `mise run test:unit unit_rejections_quote_the_unit_hint` Expected: FAIL:
+  both cases parse to the static expectation, so the assertion reports
+  `expected="recognized duration unit"`. The test compiles on the untouched
+  tree: `expected` is `&str` there and `&String` after Step 2, and `contains`
+  works for both.
 
 - [ ] **Step 2: Make `LexError::UnexpectedEndOfInput.expected` a `String`**
 
@@ -5369,13 +6344,26 @@ Everything else, including both red tests' intent, is unchanged.
       },
   ```
 
-  Append `.into()` to `expected` in the `None =>` arms of `expect` (value `expected.desc`) and `expect_map` (value `expected_desc`). Both `UnexpectedToken` arms keep `expected: &'static str` unchanged. Append `.into()` to the `expected: "a literal value"` literal in `display_unexpected_end_of_input_includes_expected`, and to the `UnexpectedEndOfInput { span: span.clone(), expected: "y" }` literal in `span_returns_the_stored_source_span`. That test's `UnexpectedToken` literal keeps the plain `&'static str` form.
+  Append `.into()` to `expected` in the `None =>` arms of `expect` (value
+  `expected.desc`) and `expect_map` (value `expected_desc`). Both
+  `UnexpectedToken` arms keep `expected: &'static str` unchanged. Append
+  `.into()` to the `expected: "a literal value"` literal in
+  `display_unexpected_end_of_input_includes_expected`, and to the
+  `UnexpectedEndOfInput { span: span.clone(), expected: "y" }` literal in
+  `span_returns_the_stored_source_span`. That test's `UnexpectedToken` literal
+  keeps the plain `&'static str` form.
 
 - [ ] **Step 3: Widen `unexpected_end`**
 
-  In `src/query/error.rs`, change the parameter type from `expected: &'static str` to `expected: impl Into<String>` and the body field from `expected,` to `expected: expected.into(),`.
+  In `src/query/error.rs`, change the parameter type from
+  `expected: &'static str` to `expected: impl Into<String>` and the body field
+  from `expected,` to `expected: expected.into(),`.
 
-  In the `syntax_error_preserves_dialect_input_span_and_label` test, change the assertion's `expected: "a literal value",` to `expected: "a literal value".into(),`. The `"unexpected end of input, expected a literal value"` display pin stays unchanged: literals render byte-identically.
+  In the `syntax_error_preserves_dialect_input_span_and_label` test, change the
+  assertion's `expected: "a literal value",` to
+  `expected: "a literal value".into(),`. The
+  `"unexpected end of input, expected a literal value"` display pin stays
+  unchanged: literals render byte-identically.
 
 - [ ] **Step 4: Quote the hint in the two validation branches**
 
@@ -5408,11 +6396,18 @@ Everything else, including both red tests' intent, is unchanged.
                 } else {
   ```
 
-  Replace the `Self::DateDiff` unit branch, which has the same shape after `} else if args`, with the same block. The quoted condition appears in both arms. When editing, include the arm's `Self::` pattern line above the snippet.
+  Replace the `Self::DateDiff` unit branch, which has the same shape after
+  `} else if args`, with the same block. The quoted condition appears in both
+  arms. When editing, include the arm's `Self::` pattern line above the snippet.
 
-  The `args.len() == 3` term goes: the first branch already rejects every length outside 2 and 3, so `get(2)` is `Some` only when the length is 3. A valid unit keeps the old path: the `if let` does not fire and the arm yields `None`.
+  The `args.len() == 3` term goes: the first branch already rejects every length
+  outside 2 and 3, so `get(2)` is `Some` only when the length is 3. A valid unit
+  keeps the old path: the `if let` does not fire and the arm yields `None`.
 
-  Delete `is_unrecognized_unit` with its doc comment (`Whether this is a string literal that names no duration unit.`): the two branches were its only callers. `TimeUnit::from_spelling` stays: the evaluators and `parse_spelling` itself still call it.
+  Delete `is_unrecognized_unit` with its doc comment
+  (`Whether this is a string literal that names no duration unit.`): the two
+  branches were its only callers. `TimeUnit::from_spelling` stays: the
+  evaluators and `parse_spelling` itself still call it.
 
 - [ ] **Step 5: Run the affected suites**
 
@@ -5422,11 +6417,11 @@ Everything else, including both red tests' intent, is unchanged.
   Run: `mise run test:unit unexpected_end`
   Expected: PASS: the lexer display pins stay byte-identical.
 
-  Run: `mise run test:unit syntax_error_preserves`
-  Expected: PASS: the query pin `syntax_error_preserves_dialect_input_span_and_label` stays byte-identical.
+  Run: `mise run test:unit syntax_error_preserves` Expected: PASS: the query pin
+  `syntax_error_preserves_dialect_input_span_and_label` stays byte-identical.
 
-  Run: `mise run test:unit date_add`
-  Expected: PASS: the engine's `date_add_rejects_unknown_unit` and the filter acceptance tests are untouched.
+  Run: `mise run test:unit date_add` Expected: PASS: the engine's
+  `date_add_rejects_unknown_unit` and the filter acceptance tests are untouched.
 
 - [ ] **Step 6: Run the full gate**
 
@@ -5435,7 +6430,7 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 7: Commit**
 
-  ```
+  ```text
   git add src/lexer.rs src/query/error.rs src/query/grammar/filter.rs
   git commit -m "feat(query): quote the full unit hint in filter unit rejections"
   ```
@@ -5444,41 +6439,115 @@ Everything else, including both red tests' intent, is unchanged.
 
 ## Part 2: Jiff confinement (2026-10-28)
 
-**Context (part-level):** Tasks 1-17 moved every calendar decision behind `src/temporal/` seams, but the engine still *names* jiff: eight executable sites and twelve rustdoc lines in `src/template/engine/date.rs` carry `jiff`/`Jiff` tokens. Part 2 removes every one of them, so a future refactor cannot drift back into date internals by copying an engine line, and the boundary "no `jiff` outside `src/temporal/`" becomes checkable with one grep. Part 2 runs on merged `main` (the `temporal-offload` branch is merged and deleted).
+**Context (part-level):** Tasks 1-17 moved every calendar decision behind
+`src/temporal/` seams, but the engine still *names* jiff: eight executable sites
+and twelve rustdoc lines in `src/template/engine/date.rs` carry `jiff`/`Jiff`
+tokens. Part 2 removes every one of them, so a future refactor cannot drift back
+into date internals by copying an engine line, and the boundary "no `jiff`
+outside `src/temporal/`" becomes checkable with one grep. Part 2 runs on merged
+`main` (the `temporal-offload` branch is merged and deleted).
 
-**Scope:** IN: all of `src/` except `src/temporal/` and except `#[cfg(test)]` regions (raw-jiff oracles are deliberate; Task 4 pinned that independence). OUT: `.scratch/**`, `docs/**`, the `jiff = "=0.2.38"` pin in `Cargo.toml`, and everything inside `src/temporal/` including `src/temporal/GLOSSARY.md`. Anchors below were captured 2026-10-28 on merged `main`; re-verify each by symbol or content before editing.
+**Scope:** IN: all of `src/` except `src/temporal/` and except `#[cfg(test)]`
+regions (raw-jiff oracles are deliberate; Task 4 pinned that independence). OUT:
+`.scratch/**`, `docs/**`, the `jiff = "=0.2.38"` pin in `Cargo.toml`, and
+everything inside `src/temporal/` including `src/temporal/GLOSSARY.md`. Anchors
+below were captured 2026-10-28 on merged `main`; re-verify each by symbol or
+content before editing.
 
-**Boundary enforcement is execution-time only:** each task ends with a grep whose Expected state is stated inline. There is no committed boundary test and no ADR: once the grep comes back clean, the property is self-evident in the tree.
+**Boundary enforcement is execution-time only:** each task ends with a grep
+whose Expected state is stated inline. There is no committed boundary test and
+no ADR: once the grep comes back clean, the property is self-evident in the
+tree.
 
-**Inventory at capture (all in `src/template/engine/date.rs`):** code: `jiff::Timestamp::new` (:154), `Weekday(jiff::civil::Weekday)` (:226), `weekday_or_error` (:344), `parse_local_datetime` (:420), the `pattern_to_strftime` wrapper's parameter (:477), `.map(jiff::Timestamp::as_second)` (:498), `jiff::Timestamp::now` (:828, :845); prose: twelve `///` lines (:435, :439, :551, :580, :613, :636, :651, :667, :681, :697, :711, :860).
+**Inventory at capture (all in `src/template/engine/date.rs`):** code:
+`jiff::Timestamp::new` (:154), `Weekday(jiff::civil::Weekday)` (:226),
+`weekday_or_error` (:344), `parse_local_datetime` (:420), the
+`pattern_to_strftime` wrapper's parameter (:477),
+`.map(jiff::Timestamp::as_second)` (:498), `jiff::Timestamp::now` (:828, :845);
+prose: twelve `///` lines
+(:435, :439, :551, :580, :613, :636, :651, :667, :681, :697, :711, :860).
 
 **Design notes (researched 2026-10-28):**
 
-- **Range parity.** jiff's `Timestamp::new(secs, 0)` and `Timestamp::from_second(secs)` both reduce to `UnixEpochSeconds::checkc(secs)` plus `new_unchecked(secs, 0)`; the nanosecond-balancing and minimum-guard branches are unreachable at nanos = 0, so `DateTimeValue::from_unix_seconds` accepts exactly the range `Timestamp::new(unix_ts, 0)` accepted. The engine keeps its message byte-identical via `invalid_operation` (the shape every other error map in this file already uses); the `DateError` joins the source chain, so miette gains a `Caused by:` line on this path, the same class of change Task 13 accepted for range failures. The only pin is `rejects_a_timestamp_out_of_range_instead_of_panicking`, which asserts `ErrorKind::InvalidOperation` only. The chain-discarding `Error::new` alternative was rejected: it would preserve the chain byte-for-byte but breaks this file's source-preserving convention.
-- **Weekday.** `Anchor::Weekday` stores a validated `i64`; no `src/temporal/` signature changes (the typed-enum alternative was rejected earlier: about 40-50 lines of temporal churn for the same confinement). `weekday_or_error` is deleted; `weekday_index_error` carries the identical message; each application site validates exactly once through `weekday_from_number`. Observable delta, unpinned: when a shorthand `date.weekday(n, ...)` call has *other* invalid arguments too, the reference/kwargs error now precedes the weekday-index error; single-invalid inputs are unchanged and no test pins multi-error precedence.
-- **Wrapper.** The `pattern_to_strftime` wrapper is deleted, not re-signed: its parameter type *is* the jiff type. `crate::temporal::pattern_to_strftime` is imported instead, each of the three call sites inlines the one-line error map the wrapper held, and the `format_bindings_never_emit_percent_plus` test compiles unchanged through the import.
-- **Closure trap at :498.** `.map(|ts| ts.as_second())` is not an option: `lint` runs with `-D warnings` over pedantic (`Cargo.toml:180`), and its default fix registry contains `redundant_closure_for_method_calls`, so a fix run would rewrite the closure back onto a `jiff::` path. A `DatePoint::unix_seconds()` accessor is added instead (`.map(Timestamp::as_second)` path form, matching `point.rs:283` style).
-- **Clock reads.** `now_instant()` sits beside `DateTimeValue::now()` and returns the raw instant, so `is_past`/`is_future` keep their nanosecond-exact comparison; second truncation would change sub-second results.
-- **Baselines.** pub-tokens +2 (`now_instant`, `unix_seconds`); both public-api baselines unchanged (every new item is `pub(crate)`); zero test files edited; zero message or `ErrorKind` changes.
+- **Range parity.** jiff's `Timestamp::new(secs, 0)` and
+  `Timestamp::from_second(secs)` both reduce to `UnixEpochSeconds::checkc(secs)`
+  plus `new_unchecked(secs, 0)`; the nanosecond-balancing and minimum-guard
+  branches are unreachable at nanos = 0, so `DateTimeValue::from_unix_seconds`
+  accepts exactly the range `Timestamp::new(unix_ts, 0)` accepted. The engine
+  keeps its message byte-identical via `invalid_operation` (the shape every
+  other error map in this file already uses); the `DateError` joins the source
+  chain, so miette gains a `Caused by:` line on this path, the same class of
+  change Task 13 accepted for range failures. The only pin is
+  `rejects_a_timestamp_out_of_range_instead_of_panicking`, which asserts
+  `ErrorKind::InvalidOperation` only. The chain-discarding `Error::new`
+  alternative was rejected: it would preserve the chain byte-for-byte but breaks
+  this file's source-preserving convention.
+- **Weekday.** `Anchor::Weekday` stores a validated `i64`; no `src/temporal/`
+  signature changes (the typed-enum alternative was rejected earlier: about
+  40-50 lines of temporal churn for the same confinement). `weekday_or_error` is
+  deleted; `weekday_index_error` carries the identical message; each application
+  site validates exactly once through `weekday_from_number`. Observable delta,
+  unpinned: when a shorthand `date.weekday(n, ...)` call has *other* invalid
+  arguments too, the reference/kwargs error now precedes the weekday-index
+  error; single-invalid inputs are unchanged and no test pins multi-error
+  precedence.
+- **Wrapper.** The `pattern_to_strftime` wrapper is deleted, not re-signed: its
+  parameter type *is* the jiff type. `crate::temporal::pattern_to_strftime` is
+  imported instead, each of the three call sites inlines the one-line error map
+  the wrapper held, and the `format_bindings_never_emit_percent_plus` test
+  compiles unchanged through the import.
+- **Closure trap at :498.** `.map(|ts| ts.as_second())` is not an option: `lint`
+  runs with `-D warnings` over pedantic (`Cargo.toml:180`), and its default fix
+  registry contains `redundant_closure_for_method_calls`, so a fix run would
+  rewrite the closure back onto a `jiff::` path. A `DatePoint::unix_seconds()`
+  accessor is added instead (`.map(Timestamp::as_second)` path form, matching
+  `point.rs:283` style).
+- **Clock reads.** `now_instant()` sits beside `DateTimeValue::now()` and
+  returns the raw instant, so `is_past`/`is_future` keep their nanosecond-exact
+  comparison; second truncation would change sub-second results.
+- **Baselines.** pub-tokens +2 (`now_instant`, `unix_seconds`); both public-api
+  baselines unchanged (every new item is `pub(crate)`); zero test files edited;
+  zero message or `ErrorKind` changes.
 
-**Pins (existing tests, green before and after, no fake red):** `rejects_a_timestamp_out_of_range_instead_of_panicking`, `converts_a_piped_date_to_unix_seconds`, temporal `constructs_unix_seconds_at_both_supported_edges` and `rejects_unix_seconds_one_past_each_supported_edge` (pin the seam's range edges), `template_weekday_rejects_out_of_range_day_index` (integration), `returns_the_iso_weekday_number`, `format_bindings_never_emit_percent_plus`, temporal `in_leap_year` cases, `a_far_past_date_is_past_but_not_future`, `a_far_future_date_is_future_but_not_past`, `current_timestamp_is_neither_past_nor_future`.
+**Pins (existing tests, green before and after, no fake red):**
+`rejects_a_timestamp_out_of_range_instead_of_panicking`,
+`converts_a_piped_date_to_unix_seconds`, temporal
+`constructs_unix_seconds_at_both_supported_edges` and
+`rejects_unix_seconds_one_past_each_supported_edge` (pin the seam's range
+edges), `template_weekday_rejects_out_of_range_day_index` (integration),
+`returns_the_iso_weekday_number`, `format_bindings_never_emit_percent_plus`,
+temporal `in_leap_year` cases, `a_far_past_date_is_past_but_not_future`,
+`a_far_future_date_is_future_but_not_past`,
+`current_timestamp_is_neither_past_nor_future`.
 
 ---
 
 ### Task 18 (J1): Confine `jiff` code to `src/temporal/`
 
 **Files:**
-- Modify: `src/temporal/datetime.rs` (insert `now_instant` after `now()`, which ends at :121)
-- Modify: `src/temporal/point.rs` (insert `unix_seconds` after `instant()`, which ends at :287)
+
+- Modify: `src/temporal/datetime.rs` (insert `now_instant` after `now()`, which
+  ends at :121)
+- Modify: `src/temporal/point.rs` (insert `unix_seconds` after `instant()`,
+  which ends at :287)
 - Modify: `src/temporal/mod.rs` (line 50 re-export)
-- Modify: `src/template/engine/date.rs` (import list :46-53; code at :138, :153-162, :226, :265-267, :323, :343-354, :411-424, :459, :463-481 delete, :495-499, :746, :828, :845; doc links at :22, :852, :860; call at :866)
+- Modify: `src/template/engine/date.rs` (import list :46-53; code
+  at :138, :153-162, :226, :265-267, :323, :343-354, :411-424, :459, :463-481
+  delete, :495-499, :746, :828, :845; doc links at :22, :852, :860; call
+  at :866)
 - Baseline: `tests/baselines/pub-tokens.txt` (+2)
 
-**Context:** The engine swaps each jiff touchpoint for the temporal seam proven in the part-level notes: `from_unix_seconds`, `now_instant`, `unix_seconds`, a validated `i64` weekday, and `parse_local_year`. Behavior-equivalent by construction, pinned by the existing suite listed above; no new tests. The task ends with the execution-time boundary grep (code state), the pub-token regen, and the full gate.
+**Context:** The engine swaps each jiff touchpoint for the temporal seam proven
+in the part-level notes: `from_unix_seconds`, `now_instant`, `unix_seconds`, a
+validated `i64` weekday, and `parse_local_year`. Behavior-equivalent by
+construction, pinned by the existing suite listed above; no new tests. The task
+ends with the execution-time boundary grep (code state), the pub-token regen,
+and the full gate.
 
 - [ ] **Step 1: Add the two temporal seams**
 
-  In `src/temporal/datetime.rs`, insert immediately after `now()` (the method whose body ends at :121):
+  In `src/temporal/datetime.rs`, insert immediately after `now()` (the method
+  whose body ends at :121):
 
   ```rust
       /// Reads the raw current instant from the system clock.
@@ -5488,13 +6557,15 @@ Everything else, including both red tests' intent, is unchanged.
       }
   ```
 
-  In `src/temporal/mod.rs`, replace line 50 `pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;` with:
+  In `src/temporal/mod.rs`, replace line 50
+  `pub(crate) use datetime::DEFAULT_DATETIME_PATTERN;` with:
 
   ```rust
   pub(crate) use datetime::{DEFAULT_DATETIME_PATTERN, now_instant};
   ```
 
-  In `src/temporal/point.rs`, insert immediately after `instant()` (the method whose body ends at :287):
+  In `src/temporal/point.rs`, insert immediately after `instant()` (the method
+  whose body ends at :287):
 
   ```rust
       /// Returns this point's instant as Unix epoch seconds.
@@ -5510,7 +6581,9 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 2: Import the temporal pattern translator in the engine**
 
-  In `src/template/engine/date.rs`, add `pattern_to_strftime,` to the `crate::temporal::{...}` use list (:48-52), between `PeriodEdge,` and `resolve_period_edge,`:
+  In `src/template/engine/date.rs`, add `pattern_to_strftime,` to the
+  `crate::temporal::{...}` use list (:48-52), between `PeriodEdge,` and
+  `resolve_period_edge,`:
 
   ```rust
           CalendarError, CalendarPeriod, DateDiff, DateError, DatePoint,
@@ -5522,7 +6595,9 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 3: Swap the `from_timestamp` construction**
 
-  In `src/template/engine/date.rs`, replace the block from `let timestamp =` through the `})?;` (:153-159) and the `DatePoint::from(...)` line (:162). Before:
+  In `src/template/engine/date.rs`, replace the block from `let timestamp =`
+  through the `})?;` (:153-159) and the `DatePoint::from(...)` line (:162).
+  Before:
 
   ```rust
                       let timestamp =
@@ -5556,13 +6631,15 @@ Everything else, including both red tests' intent, is unchanged.
                           .map_err(render_date_error)
   ```
 
-  The message string stays byte-identical; only the source chain gains the `DateError`.
+  The message string stays byte-identical; only the source chain gains the
+  `DateError`.
 
 - [ ] **Step 4: Store the weekday as a validated `i64`**
 
   Four edits in `src/template/engine/date.rs`:
 
-  1. In `enum Anchor` (:226), replace `Weekday(jiff::civil::Weekday),` with `Weekday(i64),`.
+  1. In `enum Anchor` (:226), replace `Weekday(jiff::civil::Weekday),` with
+     `Weekday(i64),`.
   2. Replace `weekday_or_error` (:343-354, doc line plus whole function) with:
 
      ```rust
@@ -5611,14 +6688,16 @@ Everything else, including both red tests' intent, is unchanged.
                  }
      ```
 
-  4. In the `weekday` filter (:746), replace `let target_weekday = weekday_or_error(target_num)?;` with:
+  4. In the `weekday` filter (:746), replace
+     `let target_weekday = weekday_or_error(target_num)?;` with:
 
      ```rust
              let target_weekday = weekday_from_number(target_num)
                  .ok_or_else(|| weekday_index_error(target_num))?;
      ```
 
-  The error message text is unchanged; `weekday_from_number` is already imported (:51).
+  The error message text is unchanged; `weekday_from_number` is already imported
+  (:51).
 
 - [ ] **Step 5: Rename `parse_local_datetime` to `parse_local_year`**
 
@@ -5660,15 +6739,23 @@ Everything else, including both red tests' intent, is unchanged.
      }
      ```
 
-  2. In `is_leap_year` (:866), replace `i32::from(parse_local_datetime(s)?.year())` with `parse_local_year(s)?`.
-  3. Fix the three doc links: module header :22 `[`parse_local_datetime`]` becomes `[`parse_date_point`]` (it describes the funnel every parse takes); `is_leap_year` docs :852 and :860 `[`parse_local_datetime`]` become `[`parse_local_year`]`. Leave the words `Jiff-supported` at :860 for Task 19.
+  2. In `is_leap_year` (:866), replace
+     `i32::from(parse_local_datetime(s)?.year())` with `parse_local_year(s)?`.
+  3. Fix the three doc links: module header :22 `[`parse_local_datetime`]`
+     becomes `[`parse_date_point`]` (it describes the funnel every parse takes);
+     `is_leap_year` docs :852 and :860 `[`parse_local_datetime`]` become
+     `[`parse_local_year`]`. Leave the words `Jiff-supported` at :860 for Task
+     19.
 
 - [ ] **Step 6: Delete the wrapper and inline its error map**
 
   In `src/template/engine/date.rs`:
 
-  1. Delete the wrapper's doc comment and function, :463-481 (from `/// Translates `pattern` to a strftime pattern.` through the closing brace of `fn pattern_to_strftime`).
-  2. Replace each of the three call sites. The two `let pat = ...` lines (:323 and :753, identical text, indent 8) become:
+  1. Delete the wrapper's doc comment and function, :463-481 (from
+     `/// Translates `pattern` to a strftime pattern.` through the closing brace
+     of `fn pattern_to_strftime`).
+  2. Replace each of the three call sites. The two `let pat = ...` lines (:323
+     and :753, identical text, indent 8) become:
 
      ```rust
              let pat = pattern_to_strftime(format, local_datetime)
@@ -5682,7 +6769,8 @@ Everything else, including both red tests' intent, is unchanged.
              .map_err(|source| invalid_operation(source.to_string(), source))?;
      ```
 
-  3. The test `format_bindings_never_emit_percent_plus` (:1653) needs no edit: `use super::*` picks up the Step 2 import.
+  3. The test `format_bindings_never_emit_percent_plus` (:1653) needs no edit:
+     `use super::*` picks up the Step 2 import.
 
 - [ ] **Step 7: Route `timestamp()` through `unix_seconds`**
 
@@ -5709,33 +6797,43 @@ Everything else, including both red tests' intent, is unchanged.
 
 - [ ] **Step 8: Read the clock through `now_instant`**
 
-  In `is_past` (:828), replace `Ok(instant < jiff::Timestamp::now())` with `Ok(instant < crate::temporal::now_instant())`. In `is_future` (:845), replace `Ok(instant > jiff::Timestamp::now())` with `Ok(instant > crate::temporal::now_instant())`. Keep the `// Instant comparison, not point construction` comments.
+  In `is_past` (:828), replace `Ok(instant < jiff::Timestamp::now())` with
+  `Ok(instant < crate::temporal::now_instant())`. In `is_future` (:845), replace
+  `Ok(instant > jiff::Timestamp::now())` with
+  `Ok(instant > crate::temporal::now_instant())`. Keep the
+  `// Instant comparison, not point construction` comments.
 
 - [ ] **Step 9: Run the boundary grep (code state)**
 
   Run: `rg -n "jiff|Jiff" src/ --glob '!src/temporal/**'`
 
-  Expected: every remaining hit is either a `///` prose line in `src/template/engine/date.rs` (twelve of them, cleared by Task 19) or a line after that file's `#[cfg(test)]`. No executable code outside the test region names `jiff`.
+  Expected: every remaining hit is either a `///` prose line in
+  `src/template/engine/date.rs` (twelve of them, cleared by Task 19) or a line
+  after that file's `#[cfg(test)]`. No executable code outside the test region
+  names `jiff`.
 
 - [ ] **Step 10: Run the affected suites**
 
-  Run: `mise run test:unit rejects_a_timestamp`: PASS (kind pin on the swapped constructor).
-  Run: `mise run test:unit unix_seconds`: PASS (engine filter + temporal edge pins).
-  Run: `mise run test:unit weekday`: PASS (shorthand, filter, and integration paths).
-  Run: `mise run test:unit format_bindings`: PASS (wrapper call site via the import).
-  Run: `mise run test:unit past`: PASS (`is_past`/`is_future`).
-  Run: `mise run test:unit in_leap_year`: PASS (`parse_local_year` path).
+  Run: `mise run test:unit rejects_a_timestamp`: PASS (kind pin on the swapped
+  constructor). Run: `mise run test:unit unix_seconds`: PASS (engine filter +
+  temporal edge pins). Run: `mise run test:unit weekday`: PASS (shorthand,
+  filter, and integration paths). Run: `mise run test:unit format_bindings`:
+  PASS (wrapper call site via the import). Run: `mise run test:unit past`: PASS
+  (`is_past`/`is_future`). Run: `mise run test:unit in_leap_year`: PASS
+  (`parse_local_year` path).
 
 - [ ] **Step 11: Regen the pub-token snapshot and run the full gate**
 
-  Run the regen command from Conventions. Expected: exactly two added lines (`now_instant`, `unix_seconds`) and one rewritten line (the `pub(crate) use datetime::...` entry); nothing removed.
+  Run the regen command from Conventions. Expected: exactly two added lines
+  (`now_instant`, `unix_seconds`) and one rewritten line (the
+  `pub(crate) use datetime::...` entry); nothing removed.
 
-  Run: `mise run verify`
-  Expected: green (fmt, `check:visibility` against the regened snapshot, lint with `-D warnings`, full test suite).
+  Run: `mise run verify` Expected: green (fmt, `check:visibility` against the
+  regened snapshot, lint with `-D warnings`, full test suite).
 
 - [ ] **Step 12: Commit**
 
-  ```
+  ```text
   git add src/template/engine/date.rs src/temporal/datetime.rs src/temporal/point.rs src/temporal/mod.rs tests/baselines/pub-tokens.txt
   git commit -m "refactor(template): remove direct jiff usage from the date engine"
   ```
@@ -5745,19 +6843,32 @@ Everything else, including both red tests' intent, is unchanged.
 ### Task 19 (J2): Strip `jiff` names from date-engine prose
 
 **Files:**
+
 - Modify: `src/template/engine/date.rs` (twelve `///` lines)
 
-**Context:** After Task 18 the engine's executable code is jiff-free, but twelve rustdoc lines still say `Jiff`/`jiff`. This task rewords them so the boundary grep comes back with test-region hits only. The edits touch prose, not links: `[`fmt::strtime`]` keeps its brackets and target, only the word in front of it goes, so link resolution (and the green `mise run doc` status quo) is untouched. Enforcement stays execution-time: inventory grep in, boundary grep out, no committed test.
+**Context:** After Task 18 the engine's executable code is jiff-free, but twelve
+rustdoc lines still say `Jiff`/`jiff`. This task rewords them so the boundary
+grep comes back with test-region hits only. The edits touch prose, not links:
+`[`fmt::strtime`]` keeps its brackets and target, only the word in front of it
+goes, so link resolution (and the green `mise run doc` status quo) is untouched.
+Enforcement stays execution-time: inventory grep in, boundary grep out, no
+committed test.
 
 - [ ] **Step 1: Inventory the prose**
 
   Run: `rg -n "jiff|Jiff" src/ --glob '!src/temporal/**'`
 
-  Expected: twelve `///` hits, all in `src/template/engine/date.rs`, matching these content anchors (line numbers have shifted since capture): `Jiff [`fmt::strtime`]`, `jiff counts the sign`, `overflows Jiff's representable` (2 hits), `exceeds the Jiff representable` (7 hits), `Jiff-supported`, plus the test-region hits from Task 18.
+  Expected: twelve `///` hits, all in `src/template/engine/date.rs`, matching
+  these content anchors (line numbers have shifted since capture):
+  `Jiff [`fmt::strtime`]`, `jiff counts the sign`,
+  `overflows Jiff's representable` (2 hits), `exceeds the Jiff representable` (7
+  hits), `Jiff-supported`, plus the test-region hits from Task 18.
 
 - [ ] **Step 2: Apply the replacements**
 
-  In `src/template/engine/date.rs`, apply these five replacements (counts include the test-region-free inventory above; use replace-all for the multi-hit anchors):
+  In `src/template/engine/date.rs`, apply these five replacements (counts
+  include the test-region-free inventory above; use replace-all for the
+  multi-hit anchors):
 
   | # | Find | Replace | Hits |
   |---|------|---------|------|
@@ -5767,25 +6878,29 @@ Everything else, including both red tests' intent, is unchanged.
   | D | `exceeds the Jiff representable` | `exceeds the representable` | 7 |
   | E | `Jiff-supported` | `representable` | 1 |
 
-  Read each edited line after the change: the sentences must still parse (for E the line break before `civil-date range.` stays, yielding `outside the representable` + `civil-date range.`).
+  Read each edited line after the change: the sentences must still parse (for E
+  the line break before `civil-date range.` stays, yielding
+  `outside the representable` + `civil-date range.`).
 
 - [ ] **Step 3: Re-run the boundary grep**
 
   Run: `rg -n "jiff|Jiff" src/ --glob '!src/temporal/**'`
 
-  Expected: every remaining hit lies after `#[cfg(test)]` in `src/template/engine/date.rs`; no other file outside `src/temporal/` has a hit.
+  Expected: every remaining hit lies after `#[cfg(test)]` in
+  `src/template/engine/date.rs`; no other file outside `src/temporal/` has a
+  hit.
 
 - [ ] **Step 4: Run the doc gate and the full gate**
 
-  Run: `mise run doc`
-  Expected: clean (`RUSTDOCFLAGS=-D warnings`; no broken intra-doc links from the reworded lines).
+  Run: `mise run doc` Expected: clean (`RUSTDOCFLAGS=-D warnings`; no broken
+  intra-doc links from the reworded lines).
 
   Run: `mise run verify`
   Expected: green.
 
 - [ ] **Step 5: Commit**
 
-  ```
+  ```text
   git add src/template/engine/date.rs
   git commit -m "docs(template): drop jiff names from date engine prose"
   ```

@@ -93,7 +93,8 @@ This document checks the decisions and claims from
 
 ## 4. Facade Membership and `traces::testing`
 
-- **Spec Claim (Issue 06):** Sole test-only export surface is `traces::testing`, frozen at 46 identifiers.
+- **Spec Claim (Issue 06):** Sole test-only export surface is `traces::testing`,
+  frozen at 46 identifiers.
 - **Status Today:**
   - `src/lib.rs:182-183` doc comment states: *"The membership of this module is
     frozen: exactly the 46 identifiers required by external test targets under
@@ -151,20 +152,37 @@ This document checks the decisions and claims from
 
 ## 6. Decision Status Summary
 
-1. **Visibility Freeze (01):** Hard gates in mise, hk, and CI prevent unauthorized public API expansion.
-2. **Honesty First (02):** Non-refreshing loads and accurate doc comments remain standard.
-3. **Silent Green Guard (03):** Required features and non-empty nextest and doctest guards prevent vacuous green passes.
-4. **E2E Spawn-Only Invariant (08):** Zero `traces::` crate calls in `tests/e2e/`. Execution occurs strictly through spawned binaries via `Sandbox`.
-5. **Sandbox Isolation (09):** Scrubbed default-deny environment variables with explicit platform passthroughs.
-6. **Process Exit Contracts (10):** Numeric exit codes 0, 1, 2, and abort-to-134 pinned.
-7. **Capability Naming (19):** Directory structure strictly partitioned into capability modules.
+1. **Visibility Freeze (01):** Hard gates in mise, hk, and CI prevent
+   unauthorized public API expansion.
+2. **Honesty First (02):** Non-refreshing loads and accurate doc comments remain
+   standard.
+3. **Silent Green Guard (03):** Required features and non-empty nextest and
+   doctest guards prevent vacuous green passes.
+4. **E2E Spawn-Only Invariant (08):** Zero `traces::` crate calls in
+   `tests/e2e/`. Execution occurs strictly through spawned binaries via
+   `Sandbox`.
+5. **Sandbox Isolation (09):** Scrubbed default-deny environment variables with
+   explicit platform passthroughs.
+6. **Process Exit Contracts (10):** Numeric exit codes 0, 1, 2, and abort-to-134
+   pinned.
+7. **Capability Naming (19):** Directory structure strictly partitioned into
+   capability modules.
 
 ### Drifted Decisions
 
-1. **Facade Membership (06):** Symbol count drifted from 46 to 47 with the introduction of `DriftCause`. Doc comment at `src/lib.rs:182` is stale.
-2. **`ConfigService::default` Removal (17):** Issue 17 removed `impl Default for ConfigService`. Commit `ca96e8cd` restored `impl Default for ConfigService` to back production CLI runs with OS state directories, replacing `new()` and `at()`.
-3. **Shared `tests/common` Structure (07):** Issue 07 specified `tests/common` shared between `integration` and `e2e`. Commit `7b71ed06` moved it exclusively into `tests/e2e/config_fixture.rs`. Integration tests do not use it.
-4. **Config Staleness Manual Reload (04):** Issue 04 assumed manual reload upon config modification. Commits `40378704`/`207cc3fb` introduced automatic index invalidation on config drift.
+1. **Facade Membership (06):** Symbol count drifted from 46 to 47 with the
+   introduction of `DriftCause`. Doc comment at `src/lib.rs:182` is stale.
+2. **`ConfigService::default` Removal (17):** Issue 17 removed
+   `impl Default for ConfigService`. Commit `ca96e8cd` restored
+   `impl Default for ConfigService` to back production CLI runs with OS state
+   directories, replacing `new()` and `at()`.
+3. **Shared `tests/common` Structure (07):** Issue 07 specified `tests/common`
+   shared between `integration` and `e2e`. Commit `7b71ed06` moved it
+   exclusively into `tests/e2e/config_fixture.rs`. Integration tests do not use
+   it.
+4. **Config Staleness Manual Reload (04):** Issue 04 assumed manual reload upon
+   config modification. Commits `40378704`/`207cc3fb` introduced automatic index
+   invalidation on config drift.
 
 ### Dead Decisions & Stale Documentation
 

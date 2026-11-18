@@ -1,6 +1,7 @@
 # Ecosystem Claims Verification: Schemas, Types, and Vault Tooling
 
-- **Target File:** `.scratch/arch-design/research/20-prep/round5/R1-ecosystem-claims.md`
+- **Target File:**
+  `.scratch/arch-design/research/20-prep/round5/R1-ecosystem-claims.md`
 - **Scope:** Primary-source verification of six external ecosystem claims from
   prior research rounds (Dendron, Tana, SilverBullet, Metadata Enforcer,
   Obsidian Properties, and Logseq DB) and their impact on Ticket 20's Answer.
@@ -24,28 +25,29 @@ startup business realities rather than schema technical failure.
   a flat folder where dot notation encodes hierarchy (`foo.bar.baz.md`). Schemas
   match these dot-delimited hierarchy identifiers via glob patterns on `id` or
   `pattern`:
-  > "A schema is a YAML file with the following naming scheme `{name}.schema.yml`
-  > Below is an example of a four-level hierarchy describing cli commands. The
-  > `id` field of the schema is used to build a glob pattern which will be used
-  > to match notes matching the schema."
-  > — [Dendron Schemas Doc](https://wiki.dendron.so/notes/c5e5adde-5459-409b-b34d-a0d75cbb1052)
+  > "A schema is a YAML file with the following naming scheme
+  > `{name}.schema.yml` Below is an example of a four-level hierarchy describing
+  > cli commands. The `id` field of the schema is used to build a glob pattern
+  > which will be used to match notes matching the schema." —
+  > [Dendron Schemas Doc](https://wiki.dendron.so/notes/c5e5adde-5459-409b-b34d-a0d75cbb1052)
 - **Schemas are optional and advisory [V]:**
   > "Think of schemas as an optional type system for your notes that describe
   > the hierarchy of your data and are represented as a hierarchy, themselves...
   > Dendron doesn't force you to use schemas if you don't want to. This is why
-  > you can create notes that don't match any schema. Dendron will show you a `?`
-  > next to these results. Sometimes rules schemas are meant to be broken."
-  > — [Dendron Schemas Doc](https://wiki.dendron.so/notes/c5e5adde-5459-409b-b34d-a0d75cbb1052)
+  > you can create notes that don't match any schema. Dendron will show you a
+  > `?` next to these results. Sometimes rules schemas are meant to be broken."
+  > —
+  > [Dendron Schemas Doc](https://wiki.dendron.so/notes/c5e5adde-5459-409b-b34d-a0d75cbb1052)
 - **Namespaces allow arbitrary children [V]:**
   > "making a schema node a namespace automatically brings its immediate
   > children as part of the schema, even if they are not explicitly defined in
   > the schema definition. it will also automatically set the pattern to
-  > `{namespace}.*`"
-  > — [Dendron Schemas Doc](https://wiki.dendron.so/notes/c5e5adde-5459-409b-b34d-a0d75cbb1052)
+  > `{namespace}.*`" —
+  > [Dendron Schemas Doc](https://wiki.dendron.so/notes/c5e5adde-5459-409b-b34d-a0d75cbb1052)
 - **Cross-vault precedence on conflicts [V]:**
   > "Schemas are cross vault. If you have multiple schemas with same starting
-  > pattern, the last schema loaded takes precedence."
-  > — [Making Your First Schema](https://wiki.dendron.so/notes/5U4eAiqshI67VxIL40KWH)
+  > pattern, the last schema loaded takes precedence." —
+  > [Making Your First Schema](https://wiki.dendron.so/notes/5U4eAiqshI67VxIL40KWH)
 - **Refactoring support [V]:** Dendron provided built-in refactoring commands
   (`Dendron: Refactor Hierarchy`) using regex and capture groups to rename and
   reorganize hierarchies and matching schemas concurrently.
@@ -80,11 +82,11 @@ distinct tuple children rather than colliding or gating. Type constraints and
 - **Field inheritance via Extend [V]:**
   > "Pick a supertag from the list and the default content will populate with
   > template objects from that tag. Think of it as a projection. You cannot move
-  > or delete content that originates from an extended tag, but you can add
-  > more fields/nodes, and you can specify different default values to the
-  > fields."
-  > — [Tana Supertags Feature Guide](https://outliner.tana.inc/learn/features/supertags)
-  > — [When to use Extend in supertags](https://outliner.tana.inc/learn/guides/when-to-use-extend-in-supertags)
+  > or delete content that originates from an extended tag, but you can add more
+  > fields/nodes, and you can specify different default values to the fields." —
+  > [Tana Supertags Feature Guide](https://outliner.tana.inc/learn/features/supertags)
+  > —
+  > [When to use Extend in supertags](https://outliner.tana.inc/learn/guides/when-to-use-extend-in-supertags)
 - **Multi-parent inheritance in underlying schema [V]:** In Tana's JSON export,
   inheritance is modeled by an `extends` tuple (`SYS_A13`) attached to a
   `metaNode`. A single tag can reference multiple parent supertag IDs (e.g.
@@ -93,8 +95,8 @@ distinct tuple children rather than colliding or gating. Type constraints and
   > "Child supertags inherit fields from parent supertags. A node tagged with
   > `#outcome-goal` effectively has fields from `#goal-base` and
   > `#Stream | Objectives`. Field values may be stored at any level of the
-  > inheritance hierarchy."
-  > — [Tana Field Structures Technical Reference](https://github.com/jcfischer/supertag-cli/blob/main/docs/TANA-FIELD-STRUCTURES.md)
+  > inheritance hierarchy." —
+  > [Tana Field Structures Technical Reference](https://github.com/jcfischer/supertag-cli/blob/main/docs/TANA-FIELD-STRUCTURES.md)
 - **Field identity and multi-supertag conflicts [V]:**
   - Fields are first-class nodes (`attrDef` with a unique ID).
   - If two supertags reference the *same* `attrDef` node ID, they share that
@@ -227,23 +229,22 @@ expressive and awkward for collection constraints and inheritance.
   >     description = models.TextField(optional=True)
   > ```
   >
-  > `metadata-enforcer check ~/vault`
-  > `metadata-enforcer fix ~/vault`"
-  > — [Omar Bohsali, v2 Announcement](https://omarish.com/p/metadata-enforcer-v2)
+  > `metadata-enforcer check ~/vault` `metadata-enforcer fix ~/vault`" —
+  > [Omar Bohsali, v2 Announcement](https://omarish.com/p/metadata-enforcer-v2)
 - **Explicit rationale for abandoning JSON Schema [V]:**
   > "Why not JSON Schema? Because we want something very expressive. We want to
-  > define what is legal and what is illegal and these rules must be
-  > expressive, legible, turning complete, and done through code. Version 1 used
-  > json-schema, but it wasn't indulgent enough."
-  > — [Omar Bohsali, Project Page](https://omarish.com/projects/metadata-enforcer)
+  > define what is legal and what is illegal and these rules must be expressive,
+  > legible, turning complete, and done through code. Version 1 used
+  > json-schema, but it wasn't indulgent enough." —
+  > [Omar Bohsali, Project Page](https://omarish.com/projects/metadata-enforcer)
   > "Why the rewrite: (1) This is the version I actually use... (2) One less
   > layer of abstraction... Python classes are already a language I (and my
   > tools) know. (3) Inheritance is free. Abstract bases, field overrides,
   > nested folder routes... (4) `class Meta` is a better home for collection
   > rules. Uniqueness, table-level constraints, indexes: easier to grow here
   > than by inventing more YAML next to JSON Schema. The goal is to get to
-  > PostgreSQL-level collection integrity enforcement..."
-  > — [Omar Bohsali, v2 Announcement](https://omarish.com/p/metadata-enforcer-v2)
+  > PostgreSQL-level collection integrity enforcement..." —
+  > [Omar Bohsali, v2 Announcement](https://omarish.com/p/metadata-enforcer-v2)
 
 ### 4.3 Impact on Ticket 20's Answer
 
@@ -272,8 +273,8 @@ this to be intended design.
   > "Calling `processFrontMatter` will destroy all previous formatting, and most
   > YAML features/syntax... A string's quotes can be removed, newlines are
   > removed, comments are removed, types are removed, timestamp types are
-  > modified, and inline structures (arrays) are converted to block style."
-  > — [Obsidian Forum #65851](https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851)
+  > modified, and inline structures (arrays) are converted to block style." —
+  > [Obsidian Forum #65851](https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851)
 - **Specific transformations reproduced and verified in #65851 [V]:**
   1. *Quote stripping:* Single quotes (`'course; note'`) and non-essential
      double quotes (`"deadbeef-123-$$"`) are stripped to bare unquoted text.
@@ -300,7 +301,8 @@ this to be intended design.
   > not expect for it to remain untouched."
   > — WhiteNoise (Obsidian moderator), Post 2 in #65851
 - **User impact and related issues [V]:** Similar user data loss reports appear
-  in [#101635](https://forum.obsidian.md/t/non-source-mode-property-edits-detrimentally-convert-flow-to-block-style-multi-level-yaml-list-of-lists-sequence-of-sequences/101635),
+  in
+  [#101635](https://forum.obsidian.md/t/non-source-mode-property-edits-detrimentally-convert-flow-to-block-style-multi-level-yaml-list-of-lists-sequence-of-sequences/101635),
   confirming that native Properties edits alter frontmatter indiscriminately.
 
 ### 5.3 Impact on Ticket 20's Answer
@@ -329,10 +331,10 @@ user confusion over "is-a" vs "has-a" modeling.
 ### 6.2 Primary Source Evidence
 
 - **Multi-parent extends is a documented core feature [V]:**
-  > "Tags act as classes (`type: 'tag'`). Tags declare `tagProperties` (schemas)
-  > ... In Logseq DB, tags can `extends` several parents; a root tag is the
-  > default parent."
-  > — [Logseq DB Documentation](https://github.com/logseq/docs/blob/master/db-version.md)
+  > "Tags act as classes (`type: 'tag'`). Tags declare `tagProperties`
+  > (schemas) ... In Logseq DB, tags can `extends` several parents; a root tag
+  > is the default parent." —
+  > [Logseq DB Documentation](https://github.com/logseq/docs/blob/master/db-version.md)
 - **Built-in cycle detection protects hierarchy integrity [V]:** Logseq's
   database backend explicitly detects and prevents circular extends graphs:
   - Error key `:class.validation/extends-cycle` ("A cycle has occurred in the
@@ -341,16 +343,19 @@ user confusion over "is-a" vs "has-a" modeling.
     introduce a cycle".
   - Offline sync handlers explicitly test and resolve "Offline conflicts with
     deleted nodes, parent cycle, and extends cycle".
-  > — [Logseq Repository rebase.md & ja.edn](https://github.com/logseq/logseq/blob/master/rebase.md)
+  > —
+  > [Logseq Repository rebase.md & ja.edn](https://github.com/logseq/logseq/blob/master/rebase.md)
 - **Analysis of cited forum thread #35010 [V]:**
-  - Thread: ["Confusion due to different behavior of how tags are extended"](https://discuss.logseq.com/t/confusion-due-to-different-behavior-of-how-tags-are-extended/35010)
+  - Thread:
+    ["Confusion due to different behavior of how tags are extended"](https://discuss.logseq.com/t/confusion-due-to-different-behavior-of-how-tags-are-extended/35010)
     (May 2026).
   - A single user (@Oesie) attempting to model schema.org types noticed that in
     Logseq DB's tree outline, a tag extending multiple parents appears under
     each parent branch (visual duplication).
   - When the user attempted to extend both an ancestor and a descendant
-    concurrently (`#Person` extending `Thing` and `Thing/Intangible/PostalAddress`),
-    the UI prevented redundant parent selection.
+    concurrently (`#Person` extending `Thing` and
+    `Thing/Intangible/PostalAddress`), the UI prevented redundant parent
+    selection.
   - The reply was from another community user (@Matias_Gonzalez), not a Logseq
     developer, clarifying ontological modeling: LocalBusiness and Person *have*
     a PostalAddress (composition via tag properties), rather than *being* a

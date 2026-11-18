@@ -40,7 +40,13 @@ would parse and validate without an unknown-field error.
 | `enable_mutators` | list of patterns | `[]` | `[]` |
 | `ignore_source_lines` | list of regexes | `[]` | `[]` |
 
-Sources: schema defaults, https://raw.githubusercontent.com/quality-gates/mutarust/main/schema/mutarust.schema.json ; struct defaults (`unwrap_or_default`, scores `Option`), `src/configuration.rs:78-94, 134-148`; "All fields are optional. A Boolean field defaults to `false`." in https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/config.md ("Policy Fields").
+Sources: schema defaults,
+<https://raw.githubusercontent.com/quality-gates/mutarust/main/schema/mutarust.schema.json> ;
+struct defaults (`unwrap_or_default`, scores `Option`),
+`src/configuration.rs:78-94, 134-148`; "All fields are optional. A Boolean field
+defaults to `false`." in
+<https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/config.md>
+("Policy Fields").
 
 Notes on the inventory:
 
@@ -170,10 +176,10 @@ TRUE / FALSE / STALE with its citation.
   change, but the categorical "no file-level exclude exists" is not literally
   true of the binary. This is the one claim in the file that is wrong in the
   direction that matters (it understates available levers).
-- "the **8** non-cli `src/**/error.rs` files ARE mutated": **STALE**. The
-  count was correct when written (comment introduced 2026-09-27, commit
-  `3c8a6b7a`), but `src/temporal/error.rs` was added 2026-10-12 (commit
-  `0da0f1d0`). There are now **9** non-cli `error.rs` files
+- "the **8** non-cli `src/**/error.rs` files ARE mutated": **STALE**. The count
+  was correct when written (comment introduced 2026-09-27, commit `3c8a6b7a`),
+  but `src/temporal/error.rs` was added 2026-10-12 (commit `0da0f1d0`). There
+  are now **9** non-cli `error.rs` files
   (`src/{config,dialog,index,query,schema,fields,template,engine,temporal}/error.rs`;
   `src/temporal` is a real module, `src/lib.rs:133`). The substantive claim,
   that they are all mutated (only `src/cli` is excluded), remains **TRUE**.
@@ -252,12 +258,12 @@ TRUE / FALSE / STALE with its citation.
 > `# Score gate: declined as a gate (ticket 12). Do not enable min_msi without`
 > `# a new recorded decision. Measurement stays optional; the full-project run`
 > `# stays deferred under the no-multi-hour-runs constraint.`
-> `# min_msi unit: integer percent 0-100 (config.md; cli.md `--min-msi PERCENT`).`
+> `# min_msi unit: integer percent 0-100 (config.md; cli.md `--min-msi
+> PERCENT`).`
 > `# The ci.md companion 75 is min_covered_msi, which we do NOT set: without`
 > `# --coverage a positive min_covered_msi exits 4.`
 > `# Historical scoped measurement (evidence, not a target): MSI =`
-> `#   0.8333333333333334 on strsim, 2026-09-28.`
-> `# min_msi: 60`
+> `#   0.8333333333333334 on strsim, 2026-09-28.` `# min_msi: 60`
 
 - "declined as a gate (ticket 12)": **TRUE**. Ticket 12 decision (e):
   "No universal MSI threshold. No primary source supports one."
@@ -277,10 +283,10 @@ TRUE / FALSE / STALE with its citation.
   `src/main.rs:1020-1029` (exit 4 when `minimum > 0` and no coverage; the
   `minimum == 0` case passes). The word "positive" in the comment is exactly
   right.
-- "MSI = 0.8333333333333334 on strsim, 2026-09-28": **TRUE** (local
-  evidence, not upstream). `docs/refs/quality_gates_mise_adoption.md:924,931,937`
-  records §11.1 "Scoped baseline run (2026-09-28)" with that exact MSI and
-  stats JSON; the baseline was committed the same day.
+- "MSI = 0.8333333333333334 on strsim, 2026-09-28": **TRUE** (local evidence,
+  not upstream). `docs/refs/quality_gates_mise_adoption.md:924,931,937` records
+  §11.1 "Scoped baseline run (2026-09-28)" with that exact MSI and stats JSON;
+  the baseline was committed the same day.
 - "full-project run stays deferred under the no-multi-hour-runs constraint" :
   **TRUE** as repo policy (ticket 12 deferrals; scoped `-m`/`-f`/`--git-diff`
   is the documented cost lever in `docs/refs/mutation_testing.md` §3).
@@ -403,16 +409,24 @@ Compared against live upstream `main` on 2026-11-02.
 
 **Upstream primary sources (fetched 2026-11-02):**
 
-- README: https://raw.githubusercontent.com/quality-gates/mutarust/main/README.md
-- Config reference: https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/config.md
-- CLI reference: https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/cli.md
-- CI guidance: https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/ci.md
-- Mutator list: https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/mutators.md
+- README:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/README.md>
+- Config reference:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/config.md>
+- CLI reference:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/cli.md>
+- CI guidance:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/ci.md>
+- Mutator list:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/docs/mutators.md>
 - JSON outputs / index / glossary / parity / selective-ci / quickstart /
   install / release / custom-mutators: same raw base under `docs/`
-- Config schema: https://raw.githubusercontent.com/quality-gates/mutarust/main/schema/mutarust.schema.json
-- Report schemas: `https://raw.githubusercontent.com/quality-gates/mutarust/main/schema/{report,agentic,summary,gitlab}.schema.json`
-- Example config: https://raw.githubusercontent.com/quality-gates/mutarust/main/mutarust.yml.example
+- Config schema:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/schema/mutarust.schema.json>
+- Report schemas:
+  `https://raw.githubusercontent.com/quality-gates/mutarust/main/schema/{report,agentic,summary,gitlab}.schema.json`
+- Example config:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/mutarust.yml.example>
 - Source (config parsing/validation): `src/configuration.rs` (struct
   `configuration.rs:10-33`, `FileConfiguration` `:134-148`, defaults `:78-94`,
   score validation `:175-182`, mutator patterns `:213-248`, empty-allowlist
@@ -424,11 +438,13 @@ Compared against live upstream `main` on 2026-11-02.
   `:931-953`, cfg classification `:440-455`, cfg ranges `:387`,
   mutation-range overlap `:218`); call site `src/execution.rs:1929`
 - Source (report filename): `src/report/mod.rs:26`
-- Manifest / changelog: https://raw.githubusercontent.com/quality-gates/mutarust/main/Cargo.toml
-  and .../CHANGELOG.md
-- crates.io: https://crates.io/api/v1/crates/mutarust (`max_version` 0.2.1,
+- Manifest / changelog:
+  <https://raw.githubusercontent.com/quality-gates/mutarust/main/Cargo.toml> and
+  .../CHANGELOG.md
+- crates.io: <https://crates.io/api/v1/crates/mutarust> (`max_version` 0.2.1,
   updated 2026-09-30; fetched with a User-Agent header)
-- GitHub tree API (file inventory): https://api.github.com/repos/quality-gates/mutarust/git/trees/main
+- GitHub tree API (file inventory):
+  <https://api.github.com/repos/quality-gates/mutarust/git/trees/main>
 
 **Local primary/first-party evidence:** `mutarust.yml`,
 `docs/refs/mutation_testing.md`, `docs/refs/quality_gates_mutarust.md`,

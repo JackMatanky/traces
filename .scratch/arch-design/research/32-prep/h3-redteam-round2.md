@@ -518,8 +518,8 @@ Ranked defects from this audit that touch ticket 32:
   skipped names and overlay-only rows make the persisted index differ from a
   naive parse. The claim needs the scope "indexed files, persisted store" [V].
 - Cost without user-visible benefit: the `stat_semantics` tag, the map plus the
-  dependency, the skeleton beyond the `.Traces` case, the U+FDD0 reservation, and
-  a raw-path template namespace with no named consumer.
+  dependency, the skeleton beyond the `.Traces` case, the U+FDD0 reservation,
+  and a raw-path template namespace with no named consumer.
 - Hole: a `.redb` format epoch bump follows from the new persisted path form but
   is not listed as a duty on ticket 25 [H]. The audit asked whether the
   `.Traces` prune needs the Unicode fold or only ASCII.
@@ -592,7 +592,8 @@ Re-measured NUL-form key sort at 50k. Method: synthetic paths with a mix of
   row, not the pre-built-key row. So the v2 sort claim is 2x to 5x too
   optimistic. It is still 1.4x to 3x faster than `Path::cmp`, so the decision
   stands.
-- The probe source is `/tmp/probe` and `local://probe`. The probe uses no worktree.
+- The probe source is `/tmp/probe` and `local://probe`. The probe uses no
+  worktree.
 
 Verdicts for ticket 32:
 
@@ -618,8 +619,8 @@ Ranked defects from this audit that touch ticket 32:
   On macOS, a case-only rename changes the key, and so the order, until the next
   scan. W32 weakness 7 says that only the next scan corrects the spelling [H].
   The v2 text did not call this a documented limitation.
-- Hole: no Windows check of `Path::cmp`. RedTeam29 has no Windows
-  ordering check. The NUL-key equivalence claim is macOS only [V]. Cross-platform
+- Hole: no Windows check of `Path::cmp`. RedTeam29 has no Windows ordering
+  check. The NUL-key equivalence claim is macOS only [V]. Cross-platform
   separator behavior is untested. The persisted form uses `/`. The original
   advice "say that `as_path()` on Windows accepts `/`" is superseded. Section 16
   moves native conversion into `ProjectRoot`.
@@ -790,8 +791,8 @@ New tests required:
 - `is_ignored_dir(file_name)` is exact-case. It covers `DEFAULT_IGNORED_DIRS`
   and the user env var `TRACES_IGNORED_DIRS` (`env_vars.rs:19-44`). Callers:
   `index/service.rs:427` and `config/discovery.rs:163`.
-- `.traces` is ignored by name only. `scan` has the dead `path != index_db` check
-  (`:435`).
+- `.traces` is ignored by name only. `scan` has the dead `path != index_db`
+  check (`:435`).
 - The v3 text made the match case-insensitive for `.traces` and "the ignored
   dirs". On Linux that also skips `Target/` and `Node_Modules/`. It changes user
   configured ignores. It changes config discovery if the predicate is shared.
@@ -878,10 +879,10 @@ Other supersessions and wording:
 
 Windows:
 
-- E-1 [H, std knowledge]: `Path::cmp` compares WTF-8 bytes, not UTF-16. For valid
-  Unicode it equals code-point order, which equals the NUL-form order. The audit
-  did not check this on Windows. The 3M-pair match test ran on macOS only. Add
-  the property test to Windows CI. CI already runs unit and e2e tests on all
+- E-1 [H, std knowledge]: `Path::cmp` compares WTF-8 bytes, not UTF-16. For
+  valid Unicode it equals code-point order, which equals the NUL-form order. The
+  audit did not check this on Windows. The 3M-pair match test ran on macOS only.
+  Add the property test to Windows CI. CI already runs unit and e2e tests on all
   three OSes. Integration tests run on Linux only.
 - E-2: untested. The list is below.
   - Separators in `RelativePath::from_os`.
@@ -908,7 +909,8 @@ Linux:
 - On case-sensitive trees, `Foo.md` and `foo.md` coexist. Exact first, then
   fold, gives a union. The audit asked for tests of both this case and the
   admission case-fold of `Target/` and similar names.
-- `Metadata::created()` can return `None` on some kernels. Ticket 21 handles that.
+- `Metadata::created()` can return `None` on some kernels. Ticket 21 handles
+  that.
 
 macOS:
 
@@ -1063,7 +1065,8 @@ Journal paths do not encode their separators as NUL.
 Earlier "journal form equals store form" wording refers to path values only.
 
 The final review resolves root relocation in favor of canonical-root binding.
-The old "`mv` replays" result remains prototype evidence, not the production rule.
+The old "`mv` replays" result remains prototype evidence, not the production
+rule.
 
 ## 16. Confirmed final review (2026-11-16)
 

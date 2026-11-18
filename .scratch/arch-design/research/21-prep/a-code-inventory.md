@@ -1,8 +1,22 @@
 # Current-tree code inventory: execution context and process ambient state
 
-Summary. [V] The source still reads process environment at two lazy global families, the system zone at temporal/query/template leaves, cwd at one CLI wrapper, and TTY at the terminal dialog adapter. The index database is **project-local**, not under the state directory. The most consequential unexpected coupling is that the *current* index still records zone-derived file dates and parses naive YAML dates into instants; [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md) describes a destination, not code already landed. This is research for [explicit execution context](../../issues/21-ambient-environment-and-execution-context.md), not a decision.
+Summary. [V] The source still reads process environment at two lazy global
+families, the system zone at temporal/query/template leaves, cwd at one CLI
+wrapper, and TTY at the terminal dialog adapter. The index database is
+**project-local**, not under the state directory. The most consequential
+unexpected coupling is that the *current* index still records zone-derived file
+dates and parses naive YAML dates into instants;
+[coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)
+describes a destination, not code already landed. This is research for
+[explicit execution context](../../issues/21-ambient-environment-and-execution-context.md),
+not a decision.
 
-Notation: [V] source or inspected diff; [H] inference, especially proposed threading cost and dependency internals; [P] candidate design. “Once” below means once **on first access per process**, not necessarily during `main`. Counts distinguish direct source call sites from transitive callers, tests, and parameterized test cases. Source references use current-tree paths and lines unless a commit is named.
+Notation: [V] source or inspected diff; [H] inference, especially proposed
+threading cost and dependency internals; [P] candidate design. “Once” below
+means once **on first access per process**, not necessarily during `main`.
+Counts distinguish direct source call sites from transitive callers, tests, and
+parameterized test cases. Source references use current-tree paths and lines
+unless a commit is named.
 
 ## 1. Environment and directory globals
 
@@ -14,7 +28,19 @@ Notation: [V] source or inspected diff; [H] inference, especially proposed threa
 | [V] `src/env_vars.rs:6-16`: `CEILING_DIRS` reads `TRACES_CEILING_DIRS` with `var_os`, `split_paths`, drops empty entries. | [V] `ConfigLocator::from_env` clones it per load/trust-subject resolution (`src/config/discovery.rs:43-46`); `nearest_local` compares ancestors, excludes ceilings (`98-113`). First access once, lookup per ancestor. | [V] Test-only locator constructor above bypasses it; e2e `run_with_envs` opts in (`tests/e2e/support.rs:378-402`). Config discovery/trust. |
 | [V] `src/env_vars.rs:18-45`: `IGNORED_DIRS` reads UTF-8 `TRACES_IGNORED_DIRS` with `std::env::var`; colon/comma splitting and trimming, added to `.git`, `target`, `node_modules`, `.traces`. | [V] `is_ignored_dir` consults frozen set **per walked directory** in `IndexerService::scan` (`src/index/service.rs:410-440`) and config subtree trust discovery (`src/config/discovery.rs:141-175`); `DirTree` itself does not read the env. Ignored root is deliberately still examined in subtree discovery. | [V] No injection parameter for index scan; unit tests cover default names only (`src/env_vars.rs:47-67`), e2e child opts in per process (`tests/e2e/env_policy.rs:121-178`). Config/trust/index. |
 
-[V] There are only **three direct runtime `std::env::var*` expressions** in `src`: `dirs.rs:193`, `env_vars.rs:9,29`; the first reads **nine named keys** across cfg branches (`HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH`, `XDG_CONFIG_HOME`, `APPDATA`, `XDG_STATE_HOME`, `LOCALAPPDATA`, `TRACES_STATE_DIR`), plus two `TRACES_*` keys in `env_vars.rs`. There is no production direct `TZ`, `NO_COLOR`, `PAGER`, `EDITOR`, `LANG`, `LC_*`, `PATH`, `TERM`, or `CLICOLOR` read in the inspected `src` matches. [H] Dependencies (Jiff zone discovery, inquire prompts, miette rendering) may consult additional host state internally; no such *project-owned* read is established by this inventory. `env!("CARGO_MANIFEST_DIR")` is compile-time and test-only, not a runtime env read (`src/dirs.rs:81-83`). On Unix `XDG_STATE_HOME` only matters if `TRACES_STATE_DIR` absent; on Windows `APPDATA` and `LOCALAPPDATA` are separate roots.
+[V] There are only **three direct runtime `std::env::var*` expressions** in
+`src`: `dirs.rs:193`, `env_vars.rs:9,29`; the first reads **nine named keys**
+across cfg branches (`HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH`,
+`XDG_CONFIG_HOME`, `APPDATA`, `XDG_STATE_HOME`, `LOCALAPPDATA`,
+`TRACES_STATE_DIR`), plus two `TRACES_*` keys in `env_vars.rs`. There is no
+production direct `TZ`, `NO_COLOR`, `PAGER`, `EDITOR`, `LANG`, `LC_*`, `PATH`,
+`TERM`, or `CLICOLOR` read in the inspected `src` matches. [H] Dependencies
+(Jiff zone discovery, inquire prompts, miette rendering) may consult additional
+host state internally; no such *project-owned* read is established by this
+inventory. `env!("CARGO_MANIFEST_DIR")` is compile-time and test-only, not a
+runtime env read (`src/dirs.rs:81-83`). On Unix `XDG_STATE_HOME` only matters if
+`TRACES_STATE_DIR` absent; on Windows `APPDATA` and `LOCALAPPDATA` are separate
+roots.
 
 ## 2. Clock, zone, filesystem time and evaluation leaves
 
@@ -28,25 +54,41 @@ Notation: [V] source or inspected diff; [H] inference, especially proposed threa
 | [V] `src/note/field.rs:109-115,273-310`: `as_date` and mixed `Date`/`DateTime` comparison call ambient-zone conversion. | [V] `NoteFieldValueRef::compare` may execute per filter comparison; `src/query/grammar/filter.rs:130-149,213-225,353-435,621-765` additionally calls zone in date arithmetic/functions **while evaluating rows** (`src/query/plan.rs:238-245`). Clock-free in current query code, but not zone-free. | [V] ZoneGuard test of date promotion at `src/note/field.rs:1040-1046`. Note/query/temporal. |
 | [V] `src/temporal/point.rs:194-200,779-782`: `DatePoint::date()` wraps system zone; `instant()` promotes bare date through ambient `DateTimeValue::try_from` (`246-260`); `_in(zone)` siblings support arithmetic. | [V] Call chains can hide one more system lookup even where direct `local_zone()` is absent. E.g. template natural-language `now.date()` (`src/template/engine/date.rs:161-184`), date filters' `parse_date_point` and `instant` (`1009-1026`). | [V] ZoneGuard or system zone; temporal/template/query. |
 
-[V] **Counterexample to an evaluation-only inventory today:** `src/note/metadata.rs:56-72` classifies YAML values through `FieldValueRef::from`; `src/field.rs:769-782,811-817` classifies ISO date-time strings through `DateTimeValue::parse_iso`; `src/temporal/datetime.rs:559-569` resolves naive strings into UTC. `src/index/service.rs:329-356` parses notes on Rayon workers and persists them, while `src/file.rs:66-98` persists creation-derived local `day`. [V] The [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md) says *future* naive values are civil; until its cutover, zone affects index contents. [H] A main-thread `ZoneGuard` does not propagate to Rayon worker threads because the override is thread-local; indexed notes parsed on workers may use system zone even if a caller pins its own thread. Distinguish this current behavior from the ticket's approved future invariants.
+[V] **Counterexample to an evaluation-only inventory today:**
+`src/note/metadata.rs:56-72` classifies YAML values through
+`FieldValueRef::from`; `src/field.rs:769-782,811-817` classifies ISO date-time
+strings through `DateTimeValue::parse_iso`; `src/temporal/datetime.rs:559-569`
+resolves naive strings into UTC. `src/index/service.rs:329-356` parses notes on
+Rayon workers and persists them, while `src/file.rs:66-98` persists
+creation-derived local `day`. [V] The
+[coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)
+says *future* naive values are civil; until its cutover, zone affects index
+contents. [H] A main-thread `ZoneGuard` does not propagate to Rayon worker
+threads because the override is thread-local; indexed notes parsed on workers
+may use system zone even if a caller pins its own thread. Distinguish this
+current behavior from the ticket's approved future invariants.
 
 ### 2.1. Direct zone and clock leaf register
 
-[V] Each entry is a direct production expression; transitive calls are additional.
+[V] Each entry is a direct production expression; transitive calls are
+additional.
 
 1. `src/temporal/datetime.rs:128`: resolve naive local time to an instant.
 2. `src/temporal/datetime.rs:192`: extract local calendar clock from an instant.
 3. `src/temporal/datetime.rs:342`: promote a bare date to local midnight.
 4. `src/temporal/point.rs:780`: zone wrapper used by `DatePoint::date()`.
-5. `src/query/grammar/filter.rs:386,399`: date plus/minus duration during expression evaluation.
+5. `src/query/grammar/filter.rs:386,399`: date plus/minus duration during
+   expression evaluation.
 6. `src/query/grammar/filter.rs:411`: date difference as a duration.
 7. `src/query/grammar/filter.rs:435`: duration plus date.
 8. `src/query/grammar/filter.rs:640,646`: start/end of calendar period.
 9. `src/query/grammar/filter.rs:673`: `date_add` by unit.
 10. `src/query/grammar/filter.rs:699`: `date_diff` by unit.
 11. `src/query/grammar/filter.rs:761`: `date_component` extraction.
-12. `src/template/engine/date.rs:121,132`: day/duration offset on shorthand anchor.
-13. `src/template/engine/date.rs:184`: move tomorrow/yesterday/period/weekday anchor.
+12. `src/template/engine/date.rs:121,132`: day/duration offset on shorthand
+    anchor.
+13. `src/template/engine/date.rs:184`: move tomorrow/yesterday/period/weekday
+    anchor.
 14. `src/template/engine/date.rs:254`: format a shorthand result.
 15. `src/template/engine/date.rs:346`: `date.from_timestamp` zone conversion.
 16. `src/template/engine/date.rs:449`: shared date-filter local datetime parser.
@@ -55,11 +97,22 @@ Notation: [V] source or inspected diff; [H] inference, especially proposed threa
 19. `src/template/engine/date.rs:799`: shift-by-unit filters.
 20. `src/template/engine/date.rs:928`: `weekday` movement/component.
 21. `src/template/engine/date.rs:987`: `date_diff` filter.
-22. `src/template/engine/date.rs:162,1010,1026`: `now` anchor and two comparison tests.
+22. `src/template/engine/date.rs:162,1010,1026`: `now` anchor and two comparison
+    tests.
 
-[V] `src/query/grammar/filter.rs:228-247` classifies a quoted date literal once at query build, but `ValueExpr::evaluate(row)` (`272-297`) and `CompareOp` (`785-836`) work on individual rows. `src/query/sort.rs:63-94` builds keys before `135-145` compares keys, not by resolving zone inside each comparator invocation. `src/template/engine/date.rs:238-260` can parse a reference, move an anchor and format a result in **one** invocation: those steps may resolve zone separately.
+[V] `src/query/grammar/filter.rs:228-247` classifies a quoted date literal once
+at query build, but `ValueExpr::evaluate(row)` (`272-297`) and `CompareOp`
+(`785-836`) work on individual rows. `src/query/sort.rs:63-94` builds keys
+before `135-145` compares keys, not by resolving zone inside each comparator
+invocation. `src/template/engine/date.rs:238-260` can parse a reference, move an
+anchor and format a result in **one** invocation: those steps may resolve zone
+separately.
 
-[V] All three production `Timestamp::now()` expressions are in template date; `SystemTime::now()` at `src/file.rs:114,135` is gated to test fixtures. `Instant::now()` at `tests/e2e/support.rs:405-453` is a watchdog, not a query clock. `metadata.modified()`/`created()` reads OS file timestamp *data*, not the current time.
+[V] All three production `Timestamp::now()` expressions are in template date;
+`SystemTime::now()` at `src/file.rs:114,135` is gated to test fixtures.
+`Instant::now()` at `tests/e2e/support.rs:405-453` is a watchdog, not a query
+clock. `metadata.modified()`/`created()` reads OS file timestamp *data*, not the
+current time.
 
 ## 3. Cwd, terminal, I/O, statics and other process boundaries
 
@@ -71,48 +124,160 @@ Notation: [V] source or inspected diff; [H] inference, especially proposed threa
 | [V] `src/yaml.rs:18-19` shared parser config; `src/temporal/datetime.rs:26` parser; `src/temporal/calendar.rs:80-83`, `src/temporal/unit.rs:47,191` static immutable maps/specs; `src/note/parser/input.rs:11-17` test-only default configs. | [V] Immutable implementation data, not process-dependent input. `src/query/results.rs:463-490,520-528` has **per-QuerySet** `OnceLock` for lazy memoized results; `src/template/engine/query.rs:205-233` caches index in **render-local** minijinja `State` typed extensions, not global static. | [V] No environment override required for these statics. YAML/temporal/note/query/template. |
 | [V] Project-source scan finds no direct `std::process::id`/`exit`, UID/eUID/username lookup, `NO_COLOR`, pager/editor setting, locale/collation, or terminal width supplier. | [V] Trust checks recorded canonical root and config-content companion hash (`src/config/trust.rs:188-215,231-279`; `src/file_tracker.rs:47-122,428-455`); no process-user trust gate in those paths. String ordering is Rust `.cmp` (`src/note/field.rs:300-310`), not locale collation. [H] Diagnostic/prompt dependencies may detect terminal capabilities; that would need a separate dependency audit. | [V] None identified in owned code. Trust/query/adapter. |
 
-[V] `src/index/mod.rs:47-48` defines the project-relative `INDEX_FILE` as `.traces/index.redb`; `src/index/store.rs:154-189` opens `root.join(INDEX_FILE)` and `src/index/service.rs:410-440` skips that file while scanning. The index is **under the project root**, not `TRACES_STATE_DIR`; the latter supplies the global trust/tracker roots.
+[V] `src/index/mod.rs:47-48` defines the project-relative `INDEX_FILE` as
+`.traces/index.redb`; `src/index/store.rs:154-189` opens `root.join(INDEX_FILE)`
+and `src/index/service.rs:410-440` skips that file while scanning. The index is
+**under the project root**, not `TRACES_STATE_DIR`; the latter supplies the
+global trust/tracker roots.
 
 ## 4. Actual composition and parameter-threading cost
 
-[V] `src/main.rs:10-35` only invokes `traces::cli::run` and maps outcome to exit code; the **effective constructor/composition root is `src/cli/mod.rs:223-227`**: build `Arc<TerminalDialogProvider>`, `ConfigService::new()`, parse clap, dispatch `Cli::run`. `Cli::run` and `Commands::run` both accept `Arc<dyn DialogProvider>` (`121-143,181-208`); there are **10 named subcommands**, but only **Init** and **Template** consume provider; eight match arms ignore it, while default `-i` also supplies it to Template. `src/template/engine.rs:109-165` then moves provider into `UiOps`; `QueryOps` owns query/index/schema services. `ConfigService` constructs its own two state-store roots (`src/config/service.rs:43-51`), **but** `ConfigLocator::from_env()` is reconstructed *inside* each load/trust request (`97-99,194-199`); `IndexerService::from(&Config)` gets root/config from argument and internally scans/opens store (`src/index/service.rs:47-59,209-230,410-440`). `QueryService::new` receives class field explicitly, not zone (`src/query/service.rs:57-77`). [V] All these types are currently within one crate; “core” versus “CLI” describes conceptual layering, not existing workspace crates.
+[V] `src/main.rs:10-35` only invokes `traces::cli::run` and maps outcome to exit
+code; the
+**effective constructor/composition root is `src/cli/mod.rs:223-227`**: build
+`Arc<TerminalDialogProvider>`, `ConfigService::new()`, parse clap, dispatch
+`Cli::run`. `Cli::run` and `Commands::run` both accept `Arc<dyn DialogProvider>`
+(`121-143,181-208`); there are **10 named subcommands**, but only **Init** and
+**Template** consume provider; eight match arms ignore it, while default `-i`
+also supplies it to Template. `src/template/engine.rs:109-165` then moves
+provider into `UiOps`; `QueryOps` owns query/index/schema services.
+`ConfigService` constructs its own two state-store roots
+(`src/config/service.rs:43-51`), **but** `ConfigLocator::from_env()` is
+reconstructed *inside* each load/trust request (`97-99,194-199`);
+`IndexerService::from(&Config)` gets root/config from argument and internally
+scans/opens store (`src/index/service.rs:47-59,209-230,410-440`).
+`QueryService::new` receives class field explicitly, not zone
+(`src/query/service.rs:57-77`). [V] All these types are currently within one
+crate; “core” versus “CLI” describes conceptual layering, not existing workspace
+crates.
 
-[V] Signatures on representative live paths (the numbers are **call-chain lengths**, not a promise that every method must grow a `&Context`):
+[V] Signatures on representative live paths (the numbers are
+**call-chain lengths**, not a promise that every method must grow a `&Context`):
 
-1. Config: `cli::run()` → `Cli::run(service,provider)` → `Commands::run(...)` → `run_with_config(service,handler)` → `load_config(service)` → `ConfigService::load(&self,cwd)` → `ConfigLocator::from_env()` → `ConfigLocator::project(&self,cwd)`/`nearest_local(&self,dir)` (`src/cli/mod.rs:121-143,181-227,248-275`; `src/config/service.rs:97-99`; `src/config/discovery.rs:40-47,73-113`). [P] Store roots and locator inputs can instead enter `ConfigService`/`ConfigLocator` constructors: **two constructor seams**, not eight new forwarding args.
-2. Trust: `Commands::run` → `trust::Trust::run`/`untrust::Untrust::run` → `resolve_trust_subjects(path,all)` → `current_dir()` if omitted → `ConfigService::trust_subjects(path,scope)` → `ConfigLocator::from_env()` → `nearest_local` or subtree `collect_descendant_configs(dir)` → per-dir `is_ignored_dir` (`src/cli/mod.rs:181-208,522-543`; `src/config/service.rs:194-199`; `src/config/discovery.rs:98-175`). [P] The **static** `trust_subjects` interface is one more injection seam; subtree walker filter requires the ignore set, not merely a modified `ConfigService::load`.
-3. Index refresh: `List::run(&self,config)` → `render` → `refresh_page_query(config,...)` → `refresh_query(config,...,mode)` → `IndexerService::from(config).refresh_store()` → `prepare_pass`/`RefreshPlan::collect` → `IndexerService::scan(root)` → `DirTree::filter(is_ignored_dir)` (`src/cli/list.rs:61-97`; `src/cli/mod.rs:335-390`; `src/index/service.rs:209-230,279-307,410-440`). [P] Placing scan policy on `IndexerService` would avoid threading a context through every refresh plan frame; explicit constructor + `scan` seam is the lower-bound change. Zone-dependent `FileMeta::derive_day` and note classification need a *separate* index parsing decision **until** [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md) lands.
-4. CLI query: `refresh_query` → `run_query_builder_from_store` → `QueryService::run_from_store(&self,store,builder)` → `QuerySet::new(plan.run(rows))` → `ExecutionPlan::apply` → `QueryTransform::apply` → `FilterExpr::is_matching(row)` → `ComparisonExpr::is_matching` → `ValueExpr::evaluate` → `ArithOp::evaluate_date`/`QueryFunction::evaluate` → temporal `_in(zone)` (`src/cli/mod.rs:335-365,470-487`; `src/query/service.rs:129-169`; `src/query/plan.rs:37-55,238-245`; `src/query/grammar/filter.rs:130-149,213-225,353-435,621-765`). **~9-11 frames** from command helper to deep evaluation; this is not one-hop context threading. Sort takes `QueryTransform::apply` → `SortOrder::sort` → `keys_for` → `key_for_term` → `SortKey::from_value_ref`/`TextShape::classify` → temporal (`src/query/sort.rs:63-94,135-145,351-399,457-475`), roughly **6 additional frames** below plan application. [P] Capturing an evaluation snapshot in plan/service/owned query objects may be less invasive than a `&Context` on every AST node, but lifetime/cache ownership must be decided.
-5. Template query: `Commands::run` → `Template::run` → `TemplateService` → `TemplateEngine::new(loader,Arc<dyn DialogProvider>,config)` → `QueryOps::{page,list,task}` → minijinja callback `QueryOps::run(&self,&mut State,source)` → `QueryService::run` → same plan/row/sort leaves; index is refresh-cached **per render**, not per process (`src/template/engine.rs:109-165`; `src/template/engine/query.rs:106-233`; `src/query/service.rs:104-113`; `src/query/results.rs:479-490`). Date namespace callbacks in `src/template/engine/date.rs:100-1026` call zone/clock directly; wiring `TemplateEngine::new` alone does not automatically pass a snapshot to static registered filters/functions. Dialog already crosses these frames via an `Arc`, but only UI uses it.
-6. [P] A single immutable `{zone, now}` per **query or render evaluation** must stay with lazy `QuerySet` until its `OnceLock` materializes (`src/query/results.rs:456-490`); a borrowed stack `&Context` attached only to `QueryService::run` is insufficient if caller renders or clones a deferred set later. Conversely, if evaluation is eager in `QueryBuilder` path (`src/query/service.rs:104-113`), verify the later `QuerySet` transformation path independently. Snapshotting for every row/comparison is avoidable.
+1. Config: `cli::run()` → `Cli::run(service,provider)` → `Commands::run(...)` →
+   `run_with_config(service,handler)` → `load_config(service)` →
+   `ConfigService::load(&self,cwd)` → `ConfigLocator::from_env()` →
+   `ConfigLocator::project(&self,cwd)`/`nearest_local(&self,dir)`
+   (`src/cli/mod.rs:121-143,181-227,248-275`; `src/config/service.rs:97-99`;
+   `src/config/discovery.rs:40-47,73-113`). [P] Store roots and locator inputs
+   can instead enter `ConfigService`/`ConfigLocator` constructors:
+   **two constructor seams**, not eight new forwarding args.
+2. Trust: `Commands::run` → `trust::Trust::run`/`untrust::Untrust::run` →
+   `resolve_trust_subjects(path,all)` → `current_dir()` if omitted →
+   `ConfigService::trust_subjects(path,scope)` → `ConfigLocator::from_env()` →
+   `nearest_local` or subtree `collect_descendant_configs(dir)` → per-dir
+   `is_ignored_dir` (`src/cli/mod.rs:181-208,522-543`;
+   `src/config/service.rs:194-199`; `src/config/discovery.rs:98-175`). [P] The
+   **static** `trust_subjects` interface is one more injection seam; subtree
+   walker filter requires the ignore set, not merely a modified
+   `ConfigService::load`.
+3. Index refresh: `List::run(&self,config)` → `render` →
+   `refresh_page_query(config,...)` → `refresh_query(config,...,mode)` →
+   `IndexerService::from(config).refresh_store()` →
+   `prepare_pass`/`RefreshPlan::collect` → `IndexerService::scan(root)` →
+   `DirTree::filter(is_ignored_dir)` (`src/cli/list.rs:61-97`;
+   `src/cli/mod.rs:335-390`; `src/index/service.rs:209-230,279-307,410-440`).
+   [P] Placing scan policy on `IndexerService` would avoid threading a context
+   through every refresh plan frame; explicit constructor + `scan` seam is the
+   lower-bound change. Zone-dependent `FileMeta::derive_day` and note
+   classification need a *separate* index parsing decision **until**
+   [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)
+   lands.
+4. CLI query: `refresh_query` → `run_query_builder_from_store` →
+   `QueryService::run_from_store(&self,store,builder)` →
+   `QuerySet::new(plan.run(rows))` → `ExecutionPlan::apply` →
+   `QueryTransform::apply` → `FilterExpr::is_matching(row)` →
+   `ComparisonExpr::is_matching` → `ValueExpr::evaluate` →
+   `ArithOp::evaluate_date`/`QueryFunction::evaluate` → temporal `_in(zone)`
+   (`src/cli/mod.rs:335-365,470-487`; `src/query/service.rs:129-169`;
+   `src/query/plan.rs:37-55,238-245`;
+   `src/query/grammar/filter.rs:130-149,213-225,353-435,621-765`).
+   **~9-11 frames** from command helper to deep evaluation; this is not one-hop
+   context threading. Sort takes `QueryTransform::apply` → `SortOrder::sort` →
+   `keys_for` → `key_for_term` → `SortKey::from_value_ref`/`TextShape::classify`
+   → temporal (`src/query/sort.rs:63-94,135-145,351-399,457-475`), roughly
+   **6 additional frames** below plan application. [P] Capturing an evaluation
+   snapshot in plan/service/owned query objects may be less invasive than a
+   `&Context` on every AST node, but lifetime/cache ownership must be decided.
+5. Template query: `Commands::run` → `Template::run` → `TemplateService` →
+   `TemplateEngine::new(loader,Arc<dyn DialogProvider>,config)` →
+   `QueryOps::{page,list,task}` → minijinja callback
+   `QueryOps::run(&self,&mut State,source)` → `QueryService::run` → same
+   plan/row/sort leaves; index is refresh-cached **per render**, not per process
+   (`src/template/engine.rs:109-165`; `src/template/engine/query.rs:106-233`;
+   `src/query/service.rs:104-113`; `src/query/results.rs:479-490`). Date
+   namespace callbacks in `src/template/engine/date.rs:100-1026` call zone/clock
+   directly; wiring `TemplateEngine::new` alone does not automatically pass a
+   snapshot to static registered filters/functions. Dialog already crosses these
+   frames via an `Arc`, but only UI uses it.
+6. [P] A single immutable `{zone, now}` per **query or render evaluation** must
+   stay with lazy `QuerySet` until its `OnceLock` materializes
+   (`src/query/results.rs:456-490`); a borrowed stack `&Context` attached only
+   to `QueryService::run` is insufficient if caller renders or clones a deferred
+   set later. Conversely, if evaluation is eager in `QueryBuilder` path
+   (`src/query/service.rs:104-113`), verify the later `QuerySet` transformation
+   path independently. Snapshotting for every row/comparison is avoidable.
 
-[H] Blindly adding `&ExecutionContext` to every listed frame would touch on the order of **20+ signatures** across CLI, config, index, query plan/grammar/sort, template callbacks, and temporal conversions; the evidence above identifies the paths but does **not** claim a precise global signature count because constructor ownership vs explicit argument is the unresolved choice. One-hop boundaries: `ConfigLocator::from_env`, store constructors, `Cwd::new`, `TerminalDialogProvider`, `TemplateEngine::new`; deep boundaries: filter AST, date filters, sort key text classification, note/index parse. [P] Split inputs at their owning seams rather than force I/O adapter, config roots, query snapshot and ignore set into all ten command handlers.
+[H] Blindly adding `&ExecutionContext` to every listed frame would touch on the
+order of **20+ signatures** across CLI, config, index, query plan/grammar/sort,
+template callbacks, and temporal conversions; the evidence above identifies the
+paths but does **not** claim a precise global signature count because
+constructor ownership vs explicit argument is the unresolved choice. One-hop
+boundaries: `ConfigLocator::from_env`, store constructors, `Cwd::new`,
+`TerminalDialogProvider`, `TemplateEngine::new`; deep boundaries: filter AST,
+date filters, sort key text classification, note/index parse. [P] Split inputs
+at their owning seams rather than force I/O adapter, config roots, query
+snapshot and ignore set into all ten command handlers.
 
 ### 4.1. Parameter/ownership checkpoints
 
-[V] These source signatures identify seams without assuming every frame must grow one argument.
+[V] These source signatures identify seams without assuming every frame must
+grow one argument.
 
-1. `src/cli/mod.rs:224-227`: `run()` owns argv parse and constructs the two adapters.
-2. `src/cli/mod.rs:121-143,181-208`: `Cli::run`/`Commands::run` already accept service and dialog provider.
-3. `src/cli/mod.rs:236-275`: `current_dir`, `load_config`, `run_with_config` keep cwd acquisition in CLI.
-4. `src/config/service.rs:43-65`: `ConfigService::new` selects state paths; `at` overrides both roots.
-5. `src/config/service.rs:97-99,194-199`: `load` and static `trust_subjects` independently build locators.
-6. `src/config/discovery.rs:40-61,73-113`: locator constructor supplies config home and ceilings.
-7. `src/config/discovery.rs:141-175`: subtree discovery is a second ignored-dir walker.
-8. `src/index/service.rs:47-59,209-230,410-440`: index constructor/refresh eventually reaches static scan and ignore filter.
-9. `src/index/service.rs:329-356`: note parse on Rayon workers means TLS overrides cannot supply worker zone.
-10. `src/cli/mod.rs:335-365,470-487`: refresh and query-builder helpers create IndexerService/QueryService.
-11. `src/query/service.rs:104-113,129-169`: two query entry points execute builder/plan.
-12. `src/query/plan.rs:37-55,238-245`: plan and transform apply filters/sort to rows.
-13. `src/query/grammar/filter.rs:130-149,213-225,272-297`: filter/comparison/value expressions go per row.
-14. `src/query/grammar/filter.rs:353-435,621-765`: date arithmetic/functions read zone at deep leaves.
-15. `src/query/sort.rs:63-94,135-145,351-399`: sort materializes zone-sensitive keys then compares.
-16. `src/template/engine.rs:109-165`: engine constructor owns the environment and render services.
-17. `src/template/engine/query.rs:106-233`: QueryOps calls QueryService via a minijinja callback.
-18. `src/template/engine/date.rs:83-109`: namespace registers free filter/test functions; constructor injection alone cannot reach them.
-19. `src/dialog/terminal.rs:43-115`: TTY probe stays with concrete adapter; no need to forward it through query.
+1. `src/cli/mod.rs:224-227`: `run()` owns argv parse and constructs the two
+   adapters.
+2. `src/cli/mod.rs:121-143,181-208`: `Cli::run`/`Commands::run` already accept
+   service and dialog provider.
+3. `src/cli/mod.rs:236-275`: `current_dir`, `load_config`, `run_with_config`
+   keep cwd acquisition in CLI.
+4. `src/config/service.rs:43-65`: `ConfigService::new` selects state paths; `at`
+   overrides both roots.
+5. `src/config/service.rs:97-99,194-199`: `load` and static `trust_subjects`
+   independently build locators.
+6. `src/config/discovery.rs:40-61,73-113`: locator constructor supplies config
+   home and ceilings.
+7. `src/config/discovery.rs:141-175`: subtree discovery is a second ignored-dir
+   walker.
+8. `src/index/service.rs:47-59,209-230,410-440`: index constructor/refresh
+   eventually reaches static scan and ignore filter.
+9. `src/index/service.rs:329-356`: note parse on Rayon workers means TLS
+   overrides cannot supply worker zone.
+10. `src/cli/mod.rs:335-365,470-487`: refresh and query-builder helpers create
+    IndexerService/QueryService.
+11. `src/query/service.rs:104-113,129-169`: two query entry points execute
+    builder/plan.
+12. `src/query/plan.rs:37-55,238-245`: plan and transform apply filters/sort to
+    rows.
+13. `src/query/grammar/filter.rs:130-149,213-225,272-297`:
+    filter/comparison/value expressions go per row.
+14. `src/query/grammar/filter.rs:353-435,621-765`: date arithmetic/functions
+    read zone at deep leaves.
+15. `src/query/sort.rs:63-94,135-145,351-399`: sort materializes zone-sensitive
+    keys then compares.
+16. `src/template/engine.rs:109-165`: engine constructor owns the environment
+    and render services.
+17. `src/template/engine/query.rs:106-233`: QueryOps calls QueryService via a
+    minijinja callback.
+18. `src/template/engine/date.rs:83-109`: namespace registers free filter/test
+    functions; constructor injection alone cannot reach them.
+19. `src/dialog/terminal.rs:43-115`: TTY probe stays with concrete adapter; no
+    need to forward it through query.
 
-[H] The count “20+ signatures if threaded everywhere” covers these cross-module paths but is a **scenario**, not a measured codemod count; captured service/plan fields and registered callback closures could each replace multiple arguments. [P] Ask whether snapshot ownership belongs on the query plan, QuerySet, render state, or each service, not merely where CLI first samples it.
+[H] The count “20+ signatures if threaded everywhere” covers these cross-module
+paths but is a **scenario**, not a measured codemod count; captured service/plan
+fields and registered callback closures could each replace multiple arguments.
+[P] Ask whether snapshot ownership belongs on the query plan, QuerySet, render
+state, or each service, not merely where CLI first samples it.
 
 ## 5. Present test costs and concurrency
 
@@ -126,7 +291,8 @@ Notation: [V] source or inspected diff; [H] inference, especially proposed threa
 
 ### 5.1. Source-count breakdown and parallelism boundary
 
-[V] Direct `ZoneGuard` guard-method call sites, with distinct enclosing functions:
+[V] Direct `ZoneGuard` guard-method call sites, with distinct enclosing
+functions:
 
 - `src/temporal/datetime.rs`: 33 sites / 33 functions.
 - `src/temporal/point.rs`: 26 sites / 24 functions.
@@ -147,20 +313,92 @@ Notation: [V] source or inspected diff; [H] inference, especially proposed threa
 - `src/index/entry.rs`: one (`same_dir`).
 - Total: 29 sites / 29 enclosing functions.
 
-[V] Cwd is process-wide, so cooperating readers and writers use the same mutex (`src/cli/cwd.rs:50-125`). Zone override is thread-local, so its tests can run on separate test threads without a global zone lock (`src/temporal/mod.rs:148-203`). E2e tests spawn children with isolated environment/cwd (`tests/e2e/support.rs:286-300,352-375`); two ignored child-only cases are driven by ordinary parent tests (`tests/e2e/support.rs:61-73`). None of these mechanisms freezes template `now`.
+[V] Cwd is process-wide, so cooperating readers and writers use the same mutex
+(`src/cli/cwd.rs:50-125`). Zone override is thread-local, so its tests can run
+on separate test threads without a global zone lock
+(`src/temporal/mod.rs:148-203`). E2e tests spawn children with isolated
+environment/cwd (`tests/e2e/support.rs:286-300,352-375`); two ignored child-only
+cases are driven by ordinary parent tests (`tests/e2e/support.rs:61-73`). None
+of these mechanisms freezes template `now`.
 
 ## 6. Hidden couplings and drift since `207cc3fb`
 
-1. [V] **Index zone input not only query:** `FileMeta.day` is written from filesystem creation-time local date (`src/file.rs:66-98`) and naive frontmatter datetime strings resolve during parallel index parsing (`src/note/metadata.rs:56-72`, `src/field.rs:769-782`, `src/index/service.rs:329-356`). This contradicts a literal reading of the [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md) as current behavior; it is a future cutover. Index database itself remains project-local (`src/index/store.rs:154-189`), so global `TRACES_STATE_DIR` is not its path.
-2. [V] **Two walkers share a global ignore policy:** per-directory calls in `src/index/service.rs:422-440` and `src/config/discovery.rs:141-175`; changing only index scan leaves trust `--all`/subtree discovery different. `CEILING_DIRS` only influences upward config discovery; neither var belongs in `DirTree` itself (`src/env_vars.rs:6-45`). Immutability means changing env after first access will not change either walker in a long-lived host.
-3. [V] **Global config can vary independently of explicit store roots:** `ConfigService::at` substitutes state roots but `ConfigService::load` still constructs `ConfigLocator::from_env` (`src/config/service.rs:47-99`), exposing global config and ceiling env to in-process hosts. The test-only HOME hack can hide a production-home issue from unit tests (`src/dirs.rs:81-83`).
-4. [V] **Zone reads hide in value methods**, not only date namespace: `NoteFieldValueRef::compare` (`src/note/field.rs:273-310`), `DatePoint::instant` (`src/temporal/point.rs:246-260`), `DateTimeValue::fmt` (`src/temporal/datetime.rs:293-305`), `DateValue::try_from(SystemTime)` (`src/temporal/date.rs:172-191`). No locale-specific collation found in these project-owned paths.
-5. [V] `git show 0dce868d -- src/temporal/mod.rs src/temporal/zone.rs src/template/engine/date.rs src/temporal/datetime.rs`: process-wide `RwLock` override + mutex `ZONE_LOCK`, `keep()`, and `ThreadZoneRestore` were removed; `ZONE_OVERRIDE` and parked `ZONE_GUARD` are now TLS, `reset()` added, `try_with` handles thread teardown, test now checks cross-thread isolation. The previous survey’s process-wide-zone-lock picture is stale. [H] This mitigates test races but makes per-thread fixture propagation to Rayon impossible without explicit context.
-6. [V] `git diff 207cc3fb..HEAD -- src/env_vars.rs src/config/discovery.rs src/index/service.rs src/template/engine/query.rs src/template/engine/cache.rs`: four default ignored names were extracted to `DEFAULT_IGNORED_DIRS`, **not changed**; discovery filter now relies on `DirTree::filter` root exemption, semantics intended unchanged; index scan refactored error handling but still consults global ignore per child; minijinja 3 typed render-state extension replaced temporary-key cache, so query index cache is explicitly per render. `src/dirs.rs`/`src/cli/cwd.rs` had no diffs in this inspected range; do not infer the whole codebase is frozen.
+1. [V] **Index zone input not only query:** `FileMeta.day` is written from
+   filesystem creation-time local date (`src/file.rs:66-98`) and naive
+   frontmatter datetime strings resolve during parallel index parsing
+   (`src/note/metadata.rs:56-72`, `src/field.rs:769-782`,
+   `src/index/service.rs:329-356`). This contradicts a literal reading of the
+   [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)
+   as current behavior; it is a future cutover. Index database itself remains
+   project-local (`src/index/store.rs:154-189`), so global `TRACES_STATE_DIR` is
+   not its path.
+2. [V] **Two walkers share a global ignore policy:** per-directory calls in
+   `src/index/service.rs:422-440` and `src/config/discovery.rs:141-175`;
+   changing only index scan leaves trust `--all`/subtree discovery different.
+   `CEILING_DIRS` only influences upward config discovery; neither var belongs
+   in `DirTree` itself (`src/env_vars.rs:6-45`). Immutability means changing env
+   after first access will not change either walker in a long-lived host.
+3. [V] **Global config can vary independently of explicit store roots:**
+   `ConfigService::at` substitutes state roots but `ConfigService::load` still
+   constructs `ConfigLocator::from_env` (`src/config/service.rs:47-99`),
+   exposing global config and ceiling env to in-process hosts. The test-only
+   HOME hack can hide a production-home issue from unit tests
+   (`src/dirs.rs:81-83`).
+4. [V] **Zone reads hide in value methods**, not only date namespace:
+   `NoteFieldValueRef::compare` (`src/note/field.rs:273-310`),
+   `DatePoint::instant` (`src/temporal/point.rs:246-260`), `DateTimeValue::fmt`
+   (`src/temporal/datetime.rs:293-305`), `DateValue::try_from(SystemTime)`
+   (`src/temporal/date.rs:172-191`). No locale-specific collation found in these
+   project-owned paths.
+5. [V]
+   `git show 0dce868d -- src/temporal/mod.rs src/temporal/zone.rs src/template/engine/date.rs src/temporal/datetime.rs`:
+   process-wide `RwLock` override + mutex `ZONE_LOCK`, `keep()`, and
+   `ThreadZoneRestore` were removed; `ZONE_OVERRIDE` and parked `ZONE_GUARD` are
+   now TLS, `reset()` added, `try_with` handles thread teardown, test now checks
+   cross-thread isolation. The previous survey’s process-wide-zone-lock picture
+   is stale. [H] This mitigates test races but makes per-thread fixture
+   propagation to Rayon impossible without explicit context.
+6. [V]
+   `git diff 207cc3fb..HEAD -- src/env_vars.rs src/config/discovery.rs src/index/service.rs src/template/engine/query.rs src/template/engine/cache.rs`:
+   four default ignored names were extracted to `DEFAULT_IGNORED_DIRS`,
+   **not changed**; discovery filter now relies on `DirTree::filter` root
+   exemption, semantics intended unchanged; index scan refactored error handling
+   but still consults global ignore per child; minijinja 3 typed render-state
+   extension replaced temporary-key cache, so query index cache is explicitly
+   per render. `src/dirs.rs`/`src/cli/cwd.rs` had no diffs in this inspected
+   range; do not infer the whole codebase is frozen.
 
 ## What this means for the grilling questions
 
-- [P] Candidate **context values**: explicit config/state store roots; discovered global config directory, upward ceilings, immutable ignore names; request/operation workspace cwd; evaluation zone and an instant sampled once per evaluation (derive `today` from same instant+zone). Place the zone/instant on deferred query plan/render state until evaluation completes, not solely on CLI stack. [V] Their consumers and frequency are documented above.
-- [P] Genuine **process boundary**: argv parse, stdout/stderr and `ExitCode` remain in CLI; `stdin.is_terminal` and inquire prompt I/O remain in `TerminalDialogProvider`; filesystem metadata reads stay with scanner (values may need explicit zone at conversion), rather than a giant generic context. `Cwd` already captures process cwd once *when requested*: passing its captured path to services is cheaper than changing process cwd. User identity, locale, editor/pager vars and color/width have no owned-code input to migrate on evidence here.
-- [P] Against universal `&ExecutionContext`: it would add cross-layer forwarding through ~9-11 query frames and static minijinja callbacks while coupling query arithmetic to trust roots and dialog TTY. Against keep-as-is: frozen lazy env in a long-lived host, hidden per-row zone reads, and three unpinned template clock reads cannot give per-workspace/per-request determinism; today’s tests rely on HOME substitution, TLS guards and child process env. A **narrower guard** retains cheap CLI compatibility but does not fix a host running different workspaces/zones in one process. Conversely, a single snapshot for all filesystem policy over a long-lived process may itself go stale; ask whether these values bind to host, workspace, operation, or evaluation.
-- [P] Critical sequencing: before enforcing [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)'s “zone only at evaluation,” remove zone-dependent persisted `FileMeta.day` and naive-datetime UTC coercion (or reclassify their intended semantics). Without that prerequisite, an evaluation-only context promises determinism the present index cannot supply. Default zone remains a decision to grill, not assumed UTC simply because e2e currently sets `TZ=UTC`.
+- [P] Candidate **context values**: explicit config/state store roots;
+  discovered global config directory, upward ceilings, immutable ignore names;
+  request/operation workspace cwd; evaluation zone and an instant sampled once
+  per evaluation (derive `today` from same instant+zone). Place the zone/instant
+  on deferred query plan/render state until evaluation completes, not solely on
+  CLI stack. [V] Their consumers and frequency are documented above.
+- [P] Genuine **process boundary**: argv parse, stdout/stderr and `ExitCode`
+  remain in CLI; `stdin.is_terminal` and inquire prompt I/O remain in
+  `TerminalDialogProvider`; filesystem metadata reads stay with scanner (values
+  may need explicit zone at conversion), rather than a giant generic context.
+  `Cwd` already captures process cwd once *when requested*: passing its captured
+  path to services is cheaper than changing process cwd. User identity, locale,
+  editor/pager vars and color/width have no owned-code input to migrate on
+  evidence here.
+- [P] Against universal `&ExecutionContext`: it would add cross-layer forwarding
+  through ~9-11 query frames and static minijinja callbacks while coupling query
+  arithmetic to trust roots and dialog TTY. Against keep-as-is: frozen lazy env
+  in a long-lived host, hidden per-row zone reads, and three unpinned template
+  clock reads cannot give per-workspace/per-request determinism; today’s tests
+  rely on HOME substitution, TLS guards and child process env. A
+  **narrower guard** retains cheap CLI compatibility but does not fix a host
+  running different workspaces/zones in one process. Conversely, a single
+  snapshot for all filesystem policy over a long-lived process may itself go
+  stale; ask whether these values bind to host, workspace, operation, or
+  evaluation.
+- [P] Critical sequencing: before enforcing
+  [coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)'s
+  “zone only at evaluation,” remove zone-dependent persisted `FileMeta.day` and
+  naive-datetime UTC coercion (or reclassify their intended semantics). Without
+  that prerequisite, an evaluation-only context promises determinism the present
+  index cannot supply. Default zone remains a decision to grill, not assumed UTC
+  simply because e2e currently sets `TZ=UTC`.

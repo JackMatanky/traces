@@ -43,7 +43,8 @@ The exact source and evidentiary basis for the numbers is located in
 > Lazy CST (skipped on hit):      34.69 µs/note  (1.01x baseline, +0.49 µs)
 > ```
 >
-> Key Finding: `parse_document` parses YAML twice internally (`parse_exactly_one`
+> Key Finding: `parse_document` parses YAML twice internally
+> (`parse_exactly_one`
 >
 > - `build_green_tree`, `cst/builder.rs:41-44`) [V]. The 'Lazy CST' strategy
 > parses the document with `from_str_with_config`, scans `Value`, and then
@@ -97,16 +98,18 @@ Noyalib provides `noyalib::cst`:
 2. **`cst::SyntaxKind`:** Defines `PlainScalar`, `SingleQuotedScalar`,
    `DoubleQuotedScalar`, `LiteralScalar`, `FoldedScalar`
    [V: `src/cst/syntax.rs:68-75`].
-3. **Per-Scalar Querying in 0.0.53:** No public function exists on `Document`
-   or `Value` to return `ScalarStyle` for a given field path. The caller must
-   call `doc.span_at(path)`, index into `doc.source()[start..end]`, and inspect
-   the boundary delimiter bytes (`"` or `'`) [V: `h-quote-escape-feasibility.md:31-50`].
+3. **Per-Scalar Querying in 0.0.53:** No public function exists on `Document` or
+   `Value` to return `ScalarStyle` for a given field path. The caller must call
+   `doc.span_at(path)`, index into `doc.source()[start..end]`, and inspect the
+   boundary delimiter bytes (`"` or `'`) [V:
+   `h-quote-escape-feasibility.md:31-50`].
 4. **Flaws of `doc.span_at` for Quote Inspection:**
    - On tagged scalars (`date: !!str "2025-01-15"`), `span_at` returns the span
      covering the tag and scalar (`!!str "2025-01-15"`), causing naive prefix
      checks (`starts_with('"')`) to fail [V: `src/cst/path.rs:396-401`].
    - Keys with dots require synthetic bracket paths (`["a.b"]`) [V].
-   - Aliases (`*x`) resolve to the anchor target's span [V: `src/cst/document.rs:634`].
+   - Aliases (`*x`) resolve to the anchor target's span [V:
+     `src/cst/document.rs:634`].
 5. **Additions in 0.0.57:**
    - Adds `Document::dominant_quote_style()` [V: `src/cst/emit.rs:72`]. This is
      a file-wide aggregate heuristic, not a per-scalar query API.

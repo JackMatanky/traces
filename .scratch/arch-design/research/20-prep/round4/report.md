@@ -86,8 +86,9 @@ recollection. The author's vault is not evidence anywhere in this file.
 
 ## 6. Outcome
 
-Recorded in [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md):
-order-independent multi-class rule, multiple `extends` parents kept, `global`
-as a lowest-precedence layer with its own code family, class binding by tag and
-path (an explicit known class suppresses bindings), `hint`, the exit-code
-split, and body-section schemas deferred to ticket 37.
+Recorded in
+[ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md):
+order-independent multi-class rule, multiple `extends` parents kept, `global` as
+a lowest-precedence layer with its own code family, class binding by tag and
+path (an explicit known class suppresses bindings), `hint`, the exit-code split,
+and body-section schemas deferred to ticket 37.

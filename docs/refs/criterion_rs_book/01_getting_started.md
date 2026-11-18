@@ -1,8 +1,10 @@
-# Getting Started #
+# Getting Started
 
-This is a quick walkthrough for adding Criterion.rs benchmarks to an existing crate.
+This is a quick walkthrough for adding Criterion.rs benchmarks to an existing
+crate.
 
-I'll assume that we have a crate, `mycrate`, whose `lib.rs` contains the following code:
+I'll assume that we have a crate, `mycrate`, whose `lib.rs` contains the
+following code:
 
 ```rust
 #[inline]
@@ -15,7 +17,7 @@ pub fn fibonacci(n: u64) -> u64 {
 }
 ```
 
-### Step 1 - Add Dependency to Cargo.toml ###
+## Step 1 - Add Dependency to Cargo.toml
 
 To enable Criterion.rs benchmarks, add the following to your `Cargo.toml` file:
 
@@ -28,15 +30,16 @@ name = "my_benchmark"
 harness = false
 ```
 
-This adds a development dependency on Criterion.rs, and declares a benchmark called `my_benchmark`
-without the standard benchmarking harness. It's important to disable the standard benchmark
-harness, because we'll later add our own and we don't want them to conflict.
+This adds a development dependency on Criterion.rs, and declares a benchmark
+called `my_benchmark` without the standard benchmarking harness. It's important
+to disable the standard benchmark harness, because we'll later add our own and
+we don't want them to conflict.
 
-### Step 2 - Add Benchmark ###
+### Step 2 - Add Benchmark
 
-As an example, we'll benchmark our implementation of the Fibonacci function. Create a benchmark
-file at `$PROJECT/benches/my_benchmark.rs` with the following contents (see the Details section
-below for an explanation of this code):
+As an example, we'll benchmark our implementation of the Fibonacci function.
+Create a benchmark file at `$PROJECT/benches/my_benchmark.rs` with the following
+contents (see the Details section below for an explanation of this code):
 
 ```rust
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -51,7 +54,7 @@ criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);
 ```
 
-### Step 3 - Run Benchmark ###
+### Step 3 - Run Benchmark
 
 To run this benchmark, use the following command:
 
@@ -59,7 +62,7 @@ To run this benchmark, use the following command:
 
 You should see output similar to this:
 
-```
+```text
      Running target/release/deps/example-423eedc43b2b3a93
 Benchmarking fib 20
 Benchmarking fib 20: Warming up for 3.0000 s
@@ -74,7 +77,7 @@ mean   [26.106 us 26.561 us] std. dev.      [808.98 ns 1.4722 us]
 median [25.733 us 25.988 us] med. abs. dev. [234.09 ns 544.07 ns]
 ```
 
-### Details ###
+### Details
 
 Let's go back and walk through that benchmark code in more detail.
 
@@ -84,41 +87,46 @@ use std::hint::black_box;
 use mycrate::fibonacci;
 ```
 
-First, we declare the criterion crate and import the [Criterion
-type](http://criterion-rs.github.io/criterion/struct.Criterion.html.FIXME). Criterion is the
-main type for the Criterion.rs library. It provides methods to configure and define groups of
-benchmarks. We also import `black_box`, which will be described later.
+First, we declare the criterion crate and import the
+[Criterion type](http://criterion-rs.github.io/criterion/struct.Criterion.html.FIXME).
+Criterion is the main type for the Criterion.rs library. It provides methods to
+configure and define groups of benchmarks. We also import `black_box`, which
+will be described later.
 
-In addition to this, we declare `mycrate` as an external crate and import our fibonacci function
-from it. Cargo compiles benchmarks (or at least, the ones in `/benches`) as if each one was a
-separate crate from the main crate. This means that we need to import our library crate as an
-external crate, and it means that we can only benchmark public functions.
+In addition to this, we declare `mycrate` as an external crate and import our
+fibonacci function from it. Cargo compiles benchmarks (or at least, the ones in
+`/benches`) as if each one was a separate crate from the main crate. This means
+that we need to import our library crate as an external crate, and it means that
+we can only benchmark public functions.
 
 ```rust
 fn criterion_benchmark(c: &mut Criterion) {
 ```
 
-Here we create a function to contain our benchmark code. The name of this function doesn't matter,
-but it should be clear and understandable.
+Here we create a function to contain our benchmark code. The name of this
+function doesn't matter, but it should be clear and understandable.
 
 ```rust
     c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
 }
 ```
 
-This is where the real work happens. The `bench_function` method defines a benchmark with a name
-and a closure. The name should be unique among all of the benchmarks for your project. The closure
-must accept one argument, a
-[Bencher](http://criterion-rs.github.io/criterion/struct.Bencher.html.FIXME). The bencher
-performs the benchmark - in this case, it simply calls our `fibonacci` function in a loop. There
-are a number of other ways to perform benchmarks, including the option to benchmark with arguments,
-and to compare the performance of two functions. See the API documentation for details on all of
-the different benchmarking options. Using the `black_box` function stops the compiler from
-constant-folding away the whole function and replacing it with a constant.
+This is where the real work happens. The `bench_function` method defines a
+benchmark with a name and a closure. The name should be unique among all of the
+benchmarks for your project. The closure must accept one argument, a
+[Bencher](http://criterion-rs.github.io/criterion/struct.Bencher.html.FIXME).
+The bencher performs the benchmark - in this case, it simply calls our
+`fibonacci` function in a loop. There are a number of other ways to perform
+benchmarks, including the option to benchmark with arguments, and to compare the
+performance of two functions. See the API documentation for details on all of
+the different benchmarking options. Using the `black_box` function stops the
+compiler from constant-folding away the whole function and replacing it with a
+constant.
 
-You may recall that we marked the `fibonacci` function as `#[inline]`. This allows it to be inlined
-across different crates. Since the benchmarks are technically a separate crate, that means it can
-be inlined into the benchmark, improving performance.
+You may recall that we marked the `fibonacci` function as `#[inline]`. This
+allows it to be inlined across different crates. Since the benchmarks are
+technically a separate crate, that means it can be inlined into the benchmark,
+improving performance.
 
 ```rust
 criterion_group!(benches, criterion_benchmark);
@@ -126,14 +134,15 @@ criterion_main!(benches);
 ```
 
 Here we invoke the `criterion_group!`
-[(link)](http://criterion-rs.github.io/criterion/macro.criterion_group.html.FIXME) macro to
-generate a benchmark group called benches, containing the `criterion_benchmark` function defined
-earlier. Finally, we invoke the `criterion_main!`
-[(link)](http://criterion-rs.github.io/criterion/macro.criterion_main.html.FIXME) macro to
-generate a main function which executes the `benches` group. See the API documentation for more
-information on these macros.
+[(link)](http://criterion-rs.github.io/criterion/macro.criterion_group.html.FIXME)
+macro to generate a benchmark group called benches, containing the
+`criterion_benchmark` function defined earlier. Finally, we invoke the
+`criterion_main!`
+[(link)](http://criterion-rs.github.io/criterion/macro.criterion_main.html.FIXME)
+macro to generate a main function which executes the `benches` group. See the
+API documentation for more information on these macros.
 
-### Step 4 - Optimize ###
+### Step 4 - Optimize
 
 This fibonacci function is quite inefficient. We can do better:
 
@@ -158,7 +167,7 @@ fn fibonacci(n: u64) -> u64 {
 
 Running the benchmark now produces output like this:
 
-```
+```text
      Running target/release/deps/example-423eedc43b2b3a93
 Benchmarking fib 20
 Benchmarking fib 20: Warming up for 3.0000 s
@@ -175,5 +184,6 @@ mean   [356.57 ps 362.74 ps] std. dev.      [10.672 ps 20.419 ps]
 median [351.57 ps 355.85 ps] med. abs. dev. [4.6479 ps 10.059 ps]
 ```
 
-As you can see, Criterion is statistically confident that our optimization has made an improvement.
-If we introduce a performance regression, Criterion will instead print a message indicating this.
+As you can see, Criterion is statistically confident that our optimization has
+made an improvement. If we introduce a performance regression, Criterion will
+instead print a message indicating this.

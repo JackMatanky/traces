@@ -39,7 +39,8 @@ Answer each numbered question separately.
 Do not introduce a dependency cycle to represent the final readiness check.
 Check affected conclusions again after ticket 37 resolves.
 
-Required reconciliation checks (added after re-verification on main @ `207cc3fb`):
+Required reconciliation checks (added after re-verification on main @
+`207cc3fb`):
 
 - Re-run the drift check before reconciling: `git diff 207cc3fb..main -- src
   tests docs`. Check any divergence from `reverification.md`.

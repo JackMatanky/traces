@@ -1,28 +1,44 @@
 # opencode Guard Plugins Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Enforce the mechanically-checkable ALWAYS/NEVER rules from `~/.config/opencode/AGENTS.md` via two global opencode plugins (Rust, Python) plus bash permission rules in the global opencode config.
+**Goal:** Enforce the mechanically-checkable ALWAYS/NEVER rules from
+`~/.config/opencode/AGENTS.md` via two global opencode plugins (Rust, Python)
+plus bash permission rules in the global opencode config.
 
-**Architecture:** Two self-contained, zero-dependency JS plugins in `~/.config/opencode/plugins/` (auto-discovered by opencode). Each exports a pure `scan*()` function (unit-testable with `node:test`) plus a default plugin export wiring `tool.execute.before` (BLOCK via throw) and `tool.execute.after` (WARN via output append). Only new edit/write content is scanned; test/example/bench paths are exempt. Bash-command rules go in `permission.bash` of `~/.config/opencode/opencode.jsonc`.
+**Architecture:** Two self-contained, zero-dependency JS plugins in
+`~/.config/opencode/plugins/` (auto-discovered by opencode). Each exports a pure
+`scan*()` function (unit-testable with `node:test`) plus a default plugin export
+wiring `tool.execute.before` (BLOCK via throw) and `tool.execute.after` (WARN
+via output append). Only new edit/write content is scanned; test/example/bench
+paths are exempt. Bash-command rules go in `permission.bash` of
+`~/.config/opencode/opencode.jsonc`.
 
-**Tech Stack:** Node.js (v26, built-in `node:test`), plain JS, opencode plugin hooks. No npm dependencies.
+**Tech Stack:** Node.js (v26, built-in `node:test`), plain JS, opencode plugin
+hooks. No npm dependencies.
 
 **Spec:** `docs/superpowers/specs/2026-10-12-opencode-guards-design.md`
 
 **Important environment facts:**
-- `~/.config/opencode/` is NOT a git repository — plugin tasks have no commit steps. Only the plan/spec docs in this repo are committed.
-- opencode loads config and plugins once at startup; a restart is required before scratch-session verification.
-- The plugins dir `~/.config/opencode/plugins/` already contains `herdr-agent-state.js` (do not touch).
+
+- `~/.config/opencode/` is NOT a git repository — plugin tasks have no commit
+  steps. Only the plan/spec docs in this repo are committed.
+- opencode loads config and plugins once at startup; a restart is required
+  before scratch-session verification.
+- The plugins dir `~/.config/opencode/plugins/` already contains
+  `herdr-agent-state.js` (do not touch).
 
 ---
 
-### Task 1: rust-guard plugin (scan + hooks + tests)
+## Task 1: rust-guard plugin (scan + hooks + tests)
 
 **Files:**
+
 - Create: `~/.config/opencode/plugins/rust-guard.js`
 - Test: `~/.config/opencode/guard-tests/rust-guard.test.mjs`
-
 - [ ] **Step 1: Write the failing tests**
 
 Create `~/.config/opencode/guard-tests/rust-guard.test.mjs`:
@@ -208,16 +224,18 @@ Expected: no output (exit 0)
 
 - [ ] **Step 6: Confirm no commit is needed**
 
-The plugins directory is not a git repository. Verify with `git -C ~/.config/opencode status` (expected: fatal, not a repository). No commit step for plugin files.
+The plugins directory is not a git repository. Verify with
+`git -C ~/.config/opencode status` (expected: fatal, not a repository). No
+commit step for plugin files.
 
 ---
 
 ### Task 2: py-guard plugin (scan + hooks + tests)
 
 **Files:**
+
 - Create: `~/.config/opencode/plugins/py-guard.js`
 - Test: `~/.config/opencode/guard-tests/py-guard.test.mjs`
-
 - [ ] **Step 1: Write the failing tests**
 
 Create `~/.config/opencode/guard-tests/py-guard.test.mjs`:
@@ -355,16 +373,23 @@ Expected: no output (exit 0)
 ### Task 3: bash permission rules in global opencode config
 
 **Files:**
-- Modify: `~/.config/opencode/opencode.jsonc` (inside the existing `permission.bash` object)
+
+- Modify: `~/.config/opencode/opencode.jsonc` (inside the existing
+  `permission.bash` object)
 
 - [ ] **Step 1: Read the current bash permission block**
 
-Run: `sed -n '/"permission"/,/"lsp"/p' ~/.config/opencode/opencode.jsonc`
-Note the exact last entry of the `bash` object (currently `"git restore *": "ask",`) so the new entries are inserted inside the object without disturbing existing rules. **Insertion order matters** — opencode evaluates the LAST matching rule; these new patterns do not overlap any existing git patterns, so appending at the end of the `bash` object is safe.
+Run: `sed -n '/"permission"/,/"lsp"/p' ~/.config/opencode/opencode.jsonc` Note
+the exact last entry of the `bash` object (currently `"git restore *": "ask",`)
+so the new entries are inserted inside the object without disturbing existing
+rules. **Insertion order matters** — opencode evaluates the LAST matching rule;
+these new patterns do not overlap any existing git patterns, so appending at the
+end of the `bash` object is safe.
 
 - [ ] **Step 2: Insert the three new rules**
 
-In `~/.config/opencode/opencode.jsonc`, inside `permission.bash`, immediately after the `"git restore *": "ask",` line, insert:
+In `~/.config/opencode/opencode.jsonc`, inside `permission.bash`, immediately
+after the `"git restore *": "ask",` line, insert:
 
 ```jsonc
     "cargo build --features python*": "deny",
@@ -376,7 +401,8 @@ Preserve all surrounding entries, comments, and commas exactly as they are.
 
 - [ ] **Step 3: Validate the config still parses**
 
-Run: `node -e "const fs=require('fs');const s=fs.readFileSync(process.env.HOME+'/.config/opencode/opencode.jsonc','utf8');const stripped=s.replace(/\/\/.*$/gm,'');JSON.parse(stripped);console.log('ok')"`
+Run:
+`node -e "const fs=require('fs');const s=fs.readFileSync(process.env.HOME+'/.config/opencode/opencode.jsonc','utf8');const stripped=s.replace(/\/\/.*$/gm,'');JSON.parse(stripped);console.log('ok')"`
 Expected: prints `ok`
 
 ---
@@ -392,22 +418,30 @@ Expected: all tests pass, 0 failures (both suites)
 
 - [ ] **Step 2: Confirm plugin files pass syntax check**
 
-Run: `node --check ~/.config/opencode/plugins/rust-guard.js && node --check ~/.config/opencode/plugins/py-guard.js && echo ok`
+Run:
+`node --check ~/.config/opencode/plugins/rust-guard.js && node --check ~/.config/opencode/plugins/py-guard.js && echo ok`
 Expected: prints `ok`
 
 - [ ] **Step 3: Restart opencode and run scratch checks**
 
-Tell the user to quit and restart opencode (config/plugins load once at startup). Then in a scratch session, verify:
-1. Ask the agent to edit a temp `.rs` file in `/tmp` adding `foo.unwrap()` → expect the edit rejected with `[rust-guard] no-unwrap ...` in the error.
-2. Ask the agent to add `foo.expect()` to a temp `.rs` file → edit succeeds, tool output ends with `[rust-guard] expect-text ...`.
-3. Ask the agent to run `cargo build --features python` → expect permission denial.
-4. Ask the agent to run `cargo bench -- --test` → expect an `ask` permission prompt.
+Tell the user to quit and restart opencode (config/plugins load once at
+startup). Then in a scratch session, verify:
+
+1. Ask the agent to edit a temp `.rs` file in `/tmp` adding `foo.unwrap()` →
+   expect the edit rejected with `[rust-guard] no-unwrap ...` in the error.
+2. Ask the agent to add `foo.expect()` to a temp `.rs` file → edit succeeds,
+   tool output ends with `[rust-guard] expect-text ...`.
+3. Ask the agent to run `cargo build --features python` → expect permission
+   denial.
+4. Ask the agent to run `cargo bench -- --test` → expect an `ask` permission
+   prompt.
 
 ---
 
 ### Task 5: commit the plan/spec docs in this repo
 
 **Files:**
+
 - Commit: `docs/superpowers/plans/2026-10-12-opencode-guards.md` (this file)
 
 - [ ] **Step 1: Commit the plan document**
@@ -417,4 +451,5 @@ git add docs/superpowers/plans/2026-10-12-opencode-guards.md
 git commit -m "docs: implementation plan for opencode guard plugins"
 ```
 
-Expected: commit succeeds (hk pre-commit hooks run on the markdown file; all must pass).
+Expected: commit succeeds (hk pre-commit hooks run on the markdown file; all
+must pass).

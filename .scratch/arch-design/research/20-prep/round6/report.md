@@ -54,7 +54,8 @@ filter on the existing files.
 
 ## 5. Outcome
 
-Folded into [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md)
+Folded into
+[ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md)
 (agent guardrail): placement workflows, CLI write commands, per-folder
 instruction snippets, the rejected list. MCP-server guards:
 [addendum I](./I-mcp-server-guards.md).

@@ -1,14 +1,15 @@
 # D2 — Source-Local Test Audit, Part 2 (src core)
 
-Read-only audit. Scope: `src/index/**`, `src/query/**`, `src/template/**`, `src/schema/**`,
-`src/note/**`, and the remaining top-level `src/*.rs` not owned by peers
-(`date, duration, field, task, tag, lexer, path, position, hash, yaml, strsim,
-delimiter, dirtree, dirs, env_vars`). Excluded (peer scope): `src/cli/**`,
-`src/config/**`, `src/dialog/**`, `src/file*`.
+Read-only audit. Scope: `src/index/**`, `src/query/**`, `src/template/**`,
+`src/schema/**`, `src/note/**`, and the remaining top-level `src/*.rs` not owned
+by peers
+(`date, duration, field, task, tag, lexer, path, position, hash, yaml, strsim, delimiter, dirtree, dirs, env_vars`).
+Excluded (peer scope): `src/cli/**`, `src/config/**`, `src/dialog/**`,
+`src/file*`.
 
-Method: static only (Read/Grep/Glob). Every claim below cites
-`path::test_name`, the traced call path it executes, and the observable it asserts.
-No file outside `.scratch/audit/D2-src-core.md` was modified.
+Method: static only (Read/Grep/Glob). Every claim below cites `path::test_name`,
+the traced call path it executes, and the observable it asserts. No file outside
+`.scratch/audit/D2-src-core.md` was modified.
 
 **In-scope test inventory: 1,951 `#[test]`/`#[rstest]` attributes**
 (index 188, query 319, template 399, schema 317, note 337, standalone 391).
@@ -122,15 +123,19 @@ Class codes used below:
 
 ### 2.1 REPLACE — ~74 tempdirs whose path is provably ignored (class 4, high confidence)
 
-The helper `rows_for_files` is defined **three times** with an unused first parameter:
+The helper `rows_for_files` is defined **three times** with an unused first
+parameter:
 
-- `src/query/mod.rs:111` — `pub(super) fn rows_for_files(_temp: &Path, files: &[(&str,&str)])`
-  → body is `crate::build_test_index(files)` (in-memory, zero disk I/O, per `src/lib.rs:523`).
+- `src/query/mod.rs:111` —
+  `pub(super) fn rows_for_files(_temp: &Path, files: &[(&str,&str)])` → body is
+  `crate::build_test_index(files)` (in-memory, zero disk I/O, per
+  `src/lib.rs:523`).
 - `src/query/sort.rs:502` — byte-identical local copy.
 - `src/query/grammar/filter.rs:492` — byte-identical local copy.
 
-`rows_for(temp, content)` and `rows_of_three(temp)` (results.rs:1225) forward the same
-ignored path. Measured over `#[test]` bodies (rstest cases not included):
+`rows_for(temp, content)` and `rows_of_three(temp)` (results.rs:1225) forward
+the same ignored path. Measured over `#[test]` bodies (rstest cases not
+included):
 
 | file | tempdir tests | tests with **no** real I/O (tempdir dead) |
 |---|---:|---:|
@@ -139,39 +144,49 @@ ignored path. Measured over `#[test]` bodies (rstest cases not included):
 | `src/query/sort.rs` | 7 | **7** |
 
 **Executes / asserts (representative):**
-- `src/query/results.rs::tests::limit::keeps_at_most_n_leading_records` — creates
-  `tempfile::tempdir()`, passes `temp.path()` to `rows_of_three` → `rows_for_files` (ignored) →
-  `build_test_index` → `QueryService::run(pages)` → `QuerySet::limit(2)`; asserts `rows.len() == 2`.
-- `src/query/sort.rs::tests::sort::orders_ascending_by_default` — same chain; asserts name order.
-- `src/query/grammar/filter.rs::tests::filter::keeps_only_matching_records` (8 `#[case]`s,
-  filter.rs:617) — each case creates `tempfile::tempdir()`, passes `temp.path()` to the local
-  `rated_rows` (filter.rs:502) → local `rows_for_files` (ignored) → `build_test_index` →
-  `QueryService::run(pages)` → `QuerySet::filter(expr)`; asserts `names(&filtered) == expected`.
+
+- `src/query/results.rs::tests::limit::keeps_at_most_n_leading_records` —
+  creates `tempfile::tempdir()`, passes `temp.path()` to `rows_of_three` →
+  `rows_for_files` (ignored) → `build_test_index` → `QueryService::run(pages)` →
+  `QuerySet::limit(2)`; asserts `rows.len() == 2`.
+- `src/query/sort.rs::tests::sort::orders_ascending_by_default` — same chain;
+  asserts name order.
+- `src/query/grammar/filter.rs::tests::filter::keeps_only_matching_records` (8
+  `#[case]`s, filter.rs:617) — each case creates `tempfile::tempdir()`, passes
+  `temp.path()` to the local `rated_rows` (filter.rs:502) → local
+  `rows_for_files` (ignored) → `build_test_index` → `QueryService::run(pages)` →
+  `QuerySet::filter(expr)`; asserts `names(&filtered) == expected`.
   **The tempdir is created and destroyed 8× per run and never touched.**
 
-**Action:** REPLACE the `&Path` parameter with none and delete `tempfile::tempdir()` at these
-call sites. No behavior change; removes a false "these tests are filesystem-backed" signal and
-~74 directory create/remove cycles per run. This is a cleanup, not a move — the tests stay.
+**Action:** REPLACE the `&Path` parameter with none and delete
+`tempfile::tempdir()` at these call sites. No behavior change; removes a false
+"these tests are filesystem-backed" signal and ~74 directory create/remove
+cycles per run. This is a cleanup, not a move — the tests stay.
 
 **Do not mistake this for duplication of anything:** these exercise `QuerySet`
-transforms directly, which is exactly what `tests/integration/index_query.rs` (doc: *"Unit
-coverage inside `src/query/` exercises crate-internal transforms"*) delegates to them.
+transforms directly, which is exactly what `tests/integration/index_query.rs`
+(doc: *"Unit coverage inside `src/query/` exercises crate-internal transforms"*)
+delegates to them.
 
 ### 2.2 DELETE — exact duplicate of an external test (class 3 → duplication)
 
-**`src/schema/service.rs::tests::descendants::returns_a_transitive_descendant_through_an_intermediate_schema`** (line ~831)
+**`src/schema/service.rs::tests::descendants::returns_a_transitive_descendant_through_an_intermediate_schema`**
+(line ~831)
 
-- **Executes:** `fs::write` three TOML files (`thing` = `""`, `book` = `extends=["thing"]`,
-  `sci_fi` = `extends=["book"]`) into a tempdir → `resolve_dir(dir)` = `SchemaService::load_verbose(dir)`
-  → `service.descendants_of("thing")` → collects `schema.name()`.
+- **Executes:** `fs::write` three TOML files (`thing` = `""`, `book` =
+  `extends=["thing"]`, `sci_fi` = `extends=["book"]`) into a tempdir →
+  `resolve_dir(dir)` = `SchemaService::load_verbose(dir)` →
+  `service.descendants_of("thing")` → collects `schema.name()`.
 - **Asserts:** `names == vec!["book", "sci_fi"]`.
-- **Duplicate:** `tests/integration/schema_field_resolution.rs::descendants_of_returns_transitive_extenders`
+- **Duplicate:**
+  `tests/integration/schema_field_resolution.rs::descendants_of_returns_transitive_extenders`
   — writes the *same three TOMLs* via `TestProject::write_schema`, constructs
-  `SchemaService::new(&project.root().join(".traces/schemas"))`, calls `descendants_of("thing")`,
-  and errors unless `names == ["book", "sci_fi"]`.
+  `SchemaService::new(&project.root().join(".traces/schemas"))`, calls
+  `descendants_of("thing")`, and errors unless `names == ["book", "sci_fi"]`.
 - **Why the code path is identical:** `src/schema/service.rs:62-64` —
   `pub fn new(directory) -> Result<Self,_> { Ok(Self::load_verbose(directory)?.service) }`.
-  The only difference is the fixture writer (`fs::write` vs `TestProject::write_schema`).
+  The only difference is the fixture writer (`fs::write` vs
+  `TestProject::write_schema`).
 - **Verdict: DELETE the src twin.** Same fixture, same method, same observable.
 
 **Not duplicates (verified, do NOT delete):**
@@ -187,9 +202,9 @@ coverage inside `src/query/` exercises crate-internal transforms"*) delegates to
 
 ### 2.3 NARROW — fs used where in-memory suffices (class 4)
 
-These write only `.md` fixtures (verified: no `.txt`/`.png`/non-note paths) and then build an
-index through `IndexerService::for_tests(..).build()`, i.e. a directory scan, to test code that
-never inspects scan results:
+These write only `.md` fixtures (verified: no `.txt`/`.png`/non-note paths) and
+then build an index through `IndexerService::for_tests(..).build()`, i.e. a
+directory scan, to test code that never inspects scan results:
 
 | test | executes | asserts | narrower fixture |
 |---|---|---|---|
@@ -199,70 +214,89 @@ never inspects scan results:
 | `src/query/plan.rs` (4 of 8 tests build from disk) | real files → scan → plan apply | ordering/fusion observables | same |
 | `src/query/format.rs` — 5 of its 11 tests, via the `rows_for_tasks` helper (format.rs:356) | writes `todo.md` → scan → `QueryBuilder::tasks` | rendered formatter output | same |
 
-**Justification for narrowing (not moving):** the defect each of these can detect is in plan
-fusion / ordering / formatting. A scan-layer regression would be caught by `src/index/service.rs`
-(scan tests). Narrowing removes an unrelated failure mode (tempdir/permissions) from pure
-ordering assertions and cuts ~12 directory scans per run.
+**Justification for narrowing (not moving):** the defect each of these can
+detect is in plan fusion / ordering / formatting. A scan-layer regression would
+be caught by `src/index/service.rs` (scan tests). Narrowing removes an unrelated
+failure mode (tempdir/permissions) from pure ordering assertions and cuts ~12
+directory scans per run.
 
 **Reviewed and NOT narrowed (fs justified):**
-- `src/index/entry.rs::tests::position_lookup::{note_returns_none_for_a_non_markdown_file,
-  non_markdown_file_can_carry_inlinks}` — needs a non-`Note` `FileMeta`;
-  `WorkspaceIndex::for_test` (`src/index/entry.rs:53-76`) only ever constructs
-  `FileMeta::note_with_size_for_test`, so it cannot express a `.png`/`.txt` entry. Scan required.
-- `src/index/delta.rs::tests::file_delta::returns_deleted_file_when_non_note_is_removed` — same
-  reason (needs `image.png` `FileMeta`); only `treats_identical_unsorted_inputs_as_unchanged` is
-  theoretically in-memory-representable (low value, leave it).
-- `src/query/service.rs::tests::query::returns_all_files_in_sorted_order` — asserts `.txt`
-  inclusion in page rows; requires a real scan.
+
+- `src/index/entry.rs::tests::position_lookup::{note_returns_none_for_a_non_markdown_file, non_markdown_file_can_carry_inlinks}`
+  — needs a non-`Note` `FileMeta`; `WorkspaceIndex::for_test`
+  (`src/index/entry.rs:53-76`) only ever constructs
+  `FileMeta::note_with_size_for_test`, so it cannot express a `.png`/`.txt`
+  entry. Scan required.
+- `src/index/delta.rs::tests::file_delta::returns_deleted_file_when_non_note_is_removed`
+  — same reason (needs `image.png` `FileMeta`); only
+  `treats_identical_unsorted_inputs_as_unchanged` is theoretically
+  in-memory-representable (low value, leave it).
+- `src/query/service.rs::tests::query::returns_all_files_in_sorted_order` —
+  asserts `.txt` inclusion in page rows; requires a real scan.
 
 ### 2.4 KEPT — the heaviest boundary suites (explicitly *not* moved)
 
-`src/index/service.rs` (55) and `src/index/store.rs` (34) are the largest fs/redb suites.
-Both are class 2, not class 3:
+`src/index/service.rs` (55) and `src/index/store.rs` (34) are the largest
+fs/redb suites. Both are class 2, not class 3:
 
-- The persisted seam (`build` → `persist` → `load`, `refresh` → `persist` → fresh `load`) is
-  *entirely inside `IndexerService`* — `scan_file_metadata`, `parse_notes`, `apply_reconciled`,
-  `IndexStore::{open,apply_rebuild,apply_incremental}` are that module's own collaborators.
-  Moving these outward would not detect any additional defect: `tests/integration/
-  index_persistence_roundtrip.rs` already covers the same seam through the `pub` signatures and
-  deliberately asserts a *subset* of observables (its own doc, lines 18-23, says so).
-- `src/index/store.rs` redb codec tests (`persists_files_as_postcard_bytes_not_toml_text`,
+- The persisted seam (`build` → `persist` → `load`, `refresh` → `persist` →
+  fresh `load`) is *entirely inside `IndexerService`* — `scan_file_metadata`,
+  `parse_notes`, `apply_reconciled`,
+  `IndexStore::{open,apply_rebuild,apply_incremental}` are that module's own
+  collaborators. Moving these outward would not detect any additional defect:
+  `tests/integration/ index_persistence_roundtrip.rs` already covers the same
+  seam through the `pub` signatures and deliberately asserts a *subset* of
+  observables (its own doc, lines 18-23, says so).
+- `src/index/store.rs` redb codec tests
+  (`persists_files_as_postcard_bytes_not_toml_text`,
   `recovers_by_rebuilding_when_the_files_table_has_the_old_str_key_schema`,
-  `refresh_fails_open_when_a_previous_notes_row_is_corrupted`) are private-table-layout tests;
-  outward placement would require publishing `IndexStore`.
-- **Corruption coverage is not duplicated:** the file-level corruption test was already promoted
-  to `tests/integration/index_persistence_roundtrip.rs::refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted`
-  (its doc, lines 300-307, says "Promoted from `src/index/service.rs`") and the src twin no
-  longer exists — grepping `src/index/**` for corruption/`0xFF` returns only row-level fixtures
-  in `store.rs:1806,2527,2608` and `codec.rs:178`. **No residual duplicate.**
-- **Stale cross-reference:** `tests/integration/index_persistence_roundtrip.rs:2,21` still claims
-  the promoted test lives in `src/index/mod.rs::persist_then_load_recovers_the_same_records_and_notes`.
-  `src/index/mod.rs` (67 lines) has **zero** tests — only a `PermissionsGuard` fixture (lines 44-67).
-  The surviving equivalent is `src/index/service.rs::round_trips_entries`. Worth fixing so a
-  future auditor doesn't delete the wrong thing.
+  `refresh_fails_open_when_a_previous_notes_row_is_corrupted`) are
+  private-table-layout tests; outward placement would require publishing
+  `IndexStore`.
+- **Corruption coverage is not duplicated:** the file-level corruption test was
+  already promoted to
+  `tests/integration/index_persistence_roundtrip.rs::refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted`
+  (its doc, lines 300-307, says "Promoted from `src/index/service.rs`") and the
+  src twin no longer exists — grepping `src/index/**` for corruption/`0xFF`
+  returns only row-level fixtures in `store.rs:1806,2527,2608` and
+  `codec.rs:178`. **No residual duplicate.**
+- **Stale cross-reference:**
+  `tests/integration/index_persistence_roundtrip.rs:2,21` still claims the
+  promoted test lives in
+  `src/index/mod.rs::persist_then_load_recovers_the_same_records_and_notes`.
+  `src/index/mod.rs` (67 lines) has **zero** tests — only a `PermissionsGuard`
+  fixture (lines 44-67). The surviving equivalent is
+  `src/index/service.rs::round_trips_entries`. Worth fixing so a future auditor
+  doesn't delete the wrong thing.
 
 ### 2.5 ADD (borderline MOVE) — one outward gap
 
 **`src/template/engine/schema.rs::tests::<file_source>::file_field_refreshes_between_renders`**
 (line ~723)
 
-- **Executes:** writes `.traces/schemas/book.toml` with a `type = "file"` field → `full_env` (registers
-  `QueryOps::page` over `IndexerService::for_tests(root)` + `SchemaOps`) → `render_str`
-  `query.from(schema.get('book').field('cover'))` → write `covers/first.md` → render → write
-  `covers/second.md` → render again on the **same** `Environment`.
-- **Asserts:** `"covers/first.md"` then `"covers/first.md,covers/second.md"` (index refreshed between renders).
-- **Why it's borderline class 3:** it composes schema decoding + index scan/refresh + query source
-  resolution + minijinja rendering — four components — and nothing in `tests/integration/`
-  covers this composition (`template_render.rs::renders_a_file_sourced_select_field_in_template_rendering`
-  uses `schema.get(...).field(...)` directly, not `query.from(...)`, and renders once).
-- **Additional defect an outward location would detect:** `TemplateService` holds one long-lived
-  `TemplateEngine` (`src/template/service.rs:65`, reused by `render_template` at line 263).
-  Two consecutive `render_to_file` calls with a note added in between would catch a stale-index /
-  wrong-`cached_index`-scope bug *in the public wiring*, which this test cannot see because it
-  builds its own `Environment`.
-- **Recommendation:** ADD an outward test rather than MOVE — the in-crate test is the only
-  coverage of `full_env`/`SchemaOps`+`QueryOps` co-registration, and moving it would drop that.
-  Low priority.
+- **Executes:** writes `.traces/schemas/book.toml` with a `type = "file"` field
+  → `full_env` (registers `QueryOps::page` over
+  `IndexerService::for_tests(root)` + `SchemaOps`) → `render_str`
+  `query.from(schema.get('book').field('cover'))` → write `covers/first.md` →
+  render → write `covers/second.md` → render again on the **same**
+  `Environment`.
+- **Asserts:** `"covers/first.md"` then `"covers/first.md,covers/second.md"`
+  (index refreshed between renders).
+- **Why it's borderline class 3:** it composes schema decoding + index
+  scan/refresh + query source resolution + minijinja rendering — four components
+  — and nothing in `tests/integration/` covers this composition
+  (`template_render.rs::renders_a_file_sourced_select_field_in_template_rendering`
+  uses `schema.get(...).field(...)` directly, not `query.from(...)`, and renders
+  once).
+- **Additional defect an outward location would detect:** `TemplateService`
+  holds one long-lived `TemplateEngine` (`src/template/service.rs:65`, reused by
+  `render_template` at line 263). Two consecutive `render_to_file` calls with a
+  note added in between would catch a stale-index / wrong-`cached_index`-scope
+  bug *in the public wiring*, which this test cannot see because it builds its
+  own `Environment`.
+- **Recommendation:** ADD an outward test rather than MOVE — the in-crate test
+  is the only coverage of `full_env`/`SchemaOps`+`QueryOps` co-registration, and
+  moving it would drop that. Low priority.
 
 ---
 
@@ -281,30 +315,37 @@ Both are class 2, not class 3:
 ### (b) Process spawning / cwd mutation
 
 - **cwd is never mutated in scope.** `env::set_var("…current_dir…")` — the only
-  `set_current_dir` call sites are `src/cli/cwd.rs:85,114` (peer scope), guarded by
-  `CWD_TEST_LOCK` + `CwdGuard`.
-- **One in-scope test *reads and asserts on the process cwd*:** `src/index/entry.rs::tests::for_test::creates_no_files_on_disk`.
-  Executes `crate::cli::CwdGuard::same_dir()` (takes the global `CWD_TEST_LOCK`, `src/cli/cwd.rs:98-99`),
-  snapshots `std::fs::read_dir(".")`, builds `WorkspaceIndex::for_test`, then asserts
-  `!Path::new("ephemeral_test_note.md").exists()`, `!Path::new(".traces/index.redb").exists()`,
-  and `before == after`. It is the **only non-`src/cli` module importing `CwdGuard`** — a
-  cross-module coupling to peer scope: if that guard/lock is renamed or removed, this index test
-  breaks. The assertions are also cwd-relative rather than fixture-relative (there is no fixture
-  root), so they hold only because the test process starts in the crate root.
-- **One in-scope test spawns a process:** `src/path.rs::tests::<safe_path>::parse_rejects_a_candidate_escaping_through_an_existing_junction`
-  (`#[cfg(windows)]`, line ~592) runs `Command::new("cmd").args(["/C","mklink","/J", …])` and
-  asserts `output.status.success()`. Not executed on this `darwin` host; platform-gated, acceptable,
-  but it is the only child process in my scope.
-- **No test writes outside a tempdir** in scope: no `env::temp_dir()`, no `home_dir()`,
-  no `CARGO_MANIFEST_DIR`-relative writes (the sole `CARGO_MANIFEST_DIR` use is the read-only
-  `HOME` static in `src/dirs.rs:82`, §3(d)).
+  `set_current_dir` call sites are `src/cli/cwd.rs:85,114` (peer scope), guarded
+  by `CWD_TEST_LOCK` + `CwdGuard`.
+- **One in-scope test *reads and asserts on the process cwd*:**
+  `src/index/entry.rs::tests::for_test::creates_no_files_on_disk`. Executes
+  `crate::cli::CwdGuard::same_dir()` (takes the global `CWD_TEST_LOCK`,
+  `src/cli/cwd.rs:98-99`), snapshots `std::fs::read_dir(".")`, builds
+  `WorkspaceIndex::for_test`, then asserts
+  `!Path::new("ephemeral_test_note.md").exists()`,
+  `!Path::new(".traces/index.redb").exists()`, and `before == after`. It is the
+  **only non-`src/cli` module importing `CwdGuard`** — a cross-module coupling
+  to peer scope: if that guard/lock is renamed or removed, this index test
+  breaks. The assertions are also cwd-relative rather than fixture-relative
+  (there is no fixture root), so they hold only because the test process starts
+  in the crate root.
+- **One in-scope test spawns a process:**
+  `src/path.rs::tests::<safe_path>::parse_rejects_a_candidate_escaping_through_an_existing_junction`
+  (`#[cfg(windows)]`, line ~592) runs
+  `Command::new("cmd").args(["/C","mklink","/J", …])` and asserts
+  `output.status.success()`. Not executed on this `darwin` host; platform-gated,
+  acceptable, but it is the only child process in my scope.
+- **No test writes outside a tempdir** in scope: no `env::temp_dir()`, no
+  `home_dir()`, no `CARGO_MANIFEST_DIR`-relative writes (the sole
+  `CARGO_MANIFEST_DIR` use is the read-only `HOME` static in `src/dirs.rs:82`,
+  §3(d)).
 
 ### (c) Tests that break if the test-utils facade changes (hidden coupling)
 
 Everything in `test_support` (`src/lib.rs:154-163, 182+`) is
-`#[cfg(any(test, feature = "test-utils"))]`, so **in-crate unit tests and external
-`tests/`/`benches` consume the *same* symbols** — a facade signature change breaks both suites
-simultaneously. Measured call sites inside my scope:
+`#[cfg(any(test, feature = "test-utils"))]`, so **in-crate unit tests and
+external `tests/`/`benches` consume the *same* symbols** — a facade signature
+change breaks both suites simultaneously. Measured call sites inside my scope:
 
 | facade / test-gated symbol | in-scope call sites | dependent files |
 |---|---:|---|
@@ -318,34 +359,40 @@ simultaneously. Measured call sites inside my scope:
 | `crate::cli::CwdGuard` | 1 | `src/index/entry.rs::creates_no_files_on_disk` (§3(b)) — peer-scope symbol consumed by my scope |
 | `TzGuard` (process-global `TZ` via `env::set_var`, serialized by a static `Mutex`, `src/lib.rs:686,721-805`) | ~20 | `date.rs`, `note/field.rs`, `template/engine/date.rs`, `query/grammar/filter.rs` — these tests **serialize with each other** under `cargo test`; harmless under `mise test` (nextest runs one process per test) |
 
-**Hidden-coupling hotspots worth flagging:** (1) the 108 `for_tests` call sites — the
-single largest facade dependency; (2) `sync_and_run`, a test-only public method whose sole
-consumer is one unit test (plus benches, not `tests/`); (3) `CwdGuard` reaching out of `src/cli` into `src/index`;
-(4) `template/engine/schema.rs::full_env` derives the project root as
-`directory.parent().and_then(Path::parent)` (line 391-393) — an implicit `.traces/schemas`
-layout assumption that silently resolves to the wrong root (falling back to the schema dir
-itself) if the fixture layout ever changes.
+**Hidden-coupling hotspots worth flagging:** (1) the 108 `for_tests` call sites
+— the single largest facade dependency; (2) `sync_and_run`, a test-only public
+method whose sole consumer is one unit test (plus benches, not `tests/`); (3)
+`CwdGuard` reaching out of `src/cli` into `src/index`; (4)
+`template/engine/schema.rs::full_env` derives the project root as
+`directory.parent().and_then(Path::parent)` (line 391-393) — an implicit
+`.traces/schemas` layout assumption that silently resolves to the wrong root
+(falling back to the schema dir itself) if the fixture layout ever changes.
 
-**Helper-triplication (same smell as `rows_for_files`, §2.1):** the schema-fixture writer exists
-three times — facade `crate::write_schema` (`src/lib.rs:667`, routed through `resolve_safe_path`)
-plus two hand-rolled local copies at `src/schema/service.rs:319` and
-`src/template/engine/query.rs:1807` (`fs::write(dir.join(format!("{name}.toml")))`, no path
-confinement). The local copies shadow the facade, so `src/schema/service.rs`'s 44
-`write_schema(...)` calls are **not** facade-coupled — they merely re-implement it.
-Consolidating on the facade would drop two copies *and* make those tests exercise the real
+**Helper-triplication (same smell as `rows_for_files`, §2.1):** the
+schema-fixture writer exists three times — facade `crate::write_schema`
+(`src/lib.rs:667`, routed through `resolve_safe_path`) plus two hand-rolled
+local copies at `src/schema/service.rs:319` and
+`src/template/engine/query.rs:1807`
+(`fs::write(dir.join(format!("{name}.toml")))`, no path confinement). The local
+copies shadow the facade, so `src/schema/service.rs`'s 44 `write_schema(...)`
+calls are **not** facade-coupled — they merely re-implement it. Consolidating on
+the facade would drop two copies *and* make those tests exercise the real
 `resolve_safe_path` guard.
 
 ### (d) Adjacent finding — unit tests run with different directory config than integration tests
 
 `src/dirs.rs:80-82` defines a **`#[cfg(test)]` branch** of `HOME` =
-`$CARGO_MANIFEST_DIR/test` (a directory that does not exist in the repo). Consequences:
-`CONFIG_HOME`, `STATE_HOME`, `TRACES_STATE_DIR`, `TRACKED_CONFIGS`, `TRUSTED_CONFIGS` all
-resolve differently inside unit tests than they do in `tests/**` (which compile the lib with
-`cfg(test)` off). So the real `#[cfg(all(not(test), unix))]`/`macOS` branches
-(`src/dirs.rs:60-62,91-105,125-141`) are reachable **only** from external tests, and the unit
-test `src/dirs.rs::tests::tracked_and_trusted_roots_are_distinct_siblings` only ever exercises
-the test branch. Not a bug today (fixture helpers pass explicit roots, `fixture_service` at
-`src/lib.rs:577-579`), but it means "unit tests pass" does not imply "directory resolution works".
+`$CARGO_MANIFEST_DIR/test` (a directory that does not exist in the repo).
+Consequences: `CONFIG_HOME`, `STATE_HOME`, `TRACES_STATE_DIR`,
+`TRACKED_CONFIGS`, `TRUSTED_CONFIGS` all resolve differently inside unit tests
+than they do in `tests/**` (which compile the lib with `cfg(test)` off). So the
+real `#[cfg(all(not(test), unix))]`/`macOS` branches
+(`src/dirs.rs:60-62,91-105,125-141`) are reachable **only** from external tests,
+and the unit test
+`src/dirs.rs::tests::tracked_and_trusted_roots_are_distinct_siblings` only ever
+exercises the test branch. Not a bug today (fixture helpers pass explicit roots,
+`fixture_service` at `src/lib.rs:577-579`), but it means "unit tests pass" does
+not imply "directory resolution works".
 
 ---
 

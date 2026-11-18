@@ -59,8 +59,8 @@ Blocks: 12(concurrency), 13(persistence/caching), 14(live-buffer overlay),
 **Sharing strategy**: a single `Arc<WorkspaceIndex>` behind a swap-on-refresh
 cell. (For example `RwLock<Arc<WorkspaceIndex>>` or equivalent; the exact
 primitive is an implementation-spec detail, not decided here.) It is shared
-read-only across concurrent request handlers. This matches the already-grounded seam
-(`QueryService::execute` already expects `Arc<WorkspaceIndex>` at its call
+read-only across concurrent request handlers. This matches the already-grounded
+seam (`QueryService::execute` already expects `Arc<WorkspaceIndex>` at its call
 boundary) and rust-analyzer's Host/Snapshot precedent (ticket 06). An
 actor/message-passing alternative was researched thoroughly (ticket 36, prompted
 by wanting to keep a future MCP server easy to add) and rejected. It provides
@@ -87,8 +87,8 @@ handling, [tool-iwe](../research/tool-iwe.md) Part 2). No concrete non-LSP
 consumer exists yet to justify it for Traces. The decision is unchanged. Real
 future gaps identified: a `traces watch` CLI mode (no daemon/watch mode exists
 today). The other gap is the future MCP server if its clients turn out not to
-offer file-watching capability. Neither is in scope for this ticket; revisit each as a
-distinct ticket if or when either is actually being built.
+offer file-watching capability. Neither is in scope for this ticket; revisit
+each as a distinct ticket if or when either is actually being built.
 
 **Facade**: a thin analysis-host facade wraps `QueryService`/`SchemaService`. It
 owns the `Arc<WorkspaceIndex>` swap point and the cached `SchemaService`, and

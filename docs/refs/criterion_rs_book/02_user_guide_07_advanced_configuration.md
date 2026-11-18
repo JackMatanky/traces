@@ -1,12 +1,13 @@
 # Advanced Configuration
 
-Criterion.rs provides a number of configuration options for more-complex use cases. These options are documented here.
+Criterion.rs provides a number of configuration options for more-complex use
+cases. These options are documented here.
 
 ## Configuring Sample Count & Other Statistical Settings
 
-Criterion.rs allows the user to adjust certain statistical parameters. The most common way to set
-these is using the `BenchmarkGroup` structure - see the documentation for that structure for a list
-of which settings are available.
+Criterion.rs allows the user to adjust certain statistical parameters. The most
+common way to set these is using the `BenchmarkGroup` structure - see the
+documentation for that structure for a list of which settings are available.
 
 ```rust
 use criterion::*;
@@ -28,8 +29,8 @@ criterion_group!(benches, bench);
 criterion_main!(benches);
 ```
 
-It is also possible to change Criterion.rs' default values for these settings, by using the full
-form of the `criterion_group` macro:
+It is also possible to change Criterion.rs' default values for these settings,
+by using the full form of the `criterion_group` macro:
 
 ```rust
 use criterion::*;
@@ -55,9 +56,14 @@ criterion_main!(benches);
 
 ## Throughput Measurements
 
-When benchmarking some types of code it is useful to measure the throughput as well as the iteration time, either in bytes per second or elements per second. Criterion.rs can estimate the throughput of a benchmark, but it needs to know how many bytes or elements each iteration will process.
+When benchmarking some types of code it is useful to measure the throughput as
+well as the iteration time, either in bytes per second or elements per second.
+Criterion.rs can estimate the throughput of a benchmark, but it needs to know
+how many bytes or elements each iteration will process.
 
-Throughput measurements are only supported when using the `BenchmarkGroup` structure; it is not available when using the simpler `bench_function` interface.
+Throughput measurements are only supported when using the `BenchmarkGroup`
+structure; it is not available when using the simpler `bench_function`
+interface.
 
 To measure throughput, use the `throughput` method on `BenchmarkGroup`, like so:
 
@@ -82,7 +88,8 @@ criterion_group!(benches, bench);
 criterion_main!(benches);
 ```
 
-For parameterized benchmarks, you can simply call the throughput function inside a loop:
+For parameterized benchmarks, you can simply call the throughput function inside
+a loop:
 
 ```rust
 use criterion::*;
@@ -114,19 +121,25 @@ criterion_main!(benches);
 
 Setting the throughput causes a throughput estimate to appear in the output:
 
-```
+```text
 alloc                   time:   [5.9846 ms 6.0192 ms 6.0623 ms]
                         thrpt:  [164.95 MiB/s 166.14 MiB/s 167.10 MiB/s]
 ```
 
-You can also request that the throughput measure both elements/s and bytes/s if, for example, you're doing some kind of data processing and
-want to understand both the number of records/s and the total bytes/s achieved. This is achieved by setting `throughput` to `Throughput::ElementsAndBytes`.
+You can also request that the throughput measure both elements/s and bytes/s if,
+for example, you're doing some kind of data processing and want to understand
+both the number of records/s and the total bytes/s achieved. This is achieved by
+setting `throughput` to `Throughput::ElementsAndBytes`.
 
 ## Chart Axis Scaling
 
-By default, Criterion.rs generates plots using a linear-scale axis. When using parameterized benchmarks, it is common for the input sizes to scale exponentially in order to cover a wide range of possible inputs. In this situation, it may be easier to read the resulting plots with a logarithmic axis.
+By default, Criterion.rs generates plots using a linear-scale axis. When using
+parameterized benchmarks, it is common for the input sizes to scale
+exponentially in order to cover a wide range of possible inputs. In this
+situation, it may be easier to read the resulting plots with a logarithmic axis.
 
-As with throughput measurements above, this option is only available when using the `BenchmarkGroup` structure.
+As with throughput measurements above, this option is only available when using
+the `BenchmarkGroup` structure.
 
 ```rust
 use criterion::*;
@@ -158,21 +171,26 @@ PlotConfiguration struct. More may be added in the future.
 
 ## Sampling Mode
 
-By default, Criterion.rs can scale well to handle benchmarks that execute in picoseconds up to
-benchmarks that execute in milliseconds. Benchmarks that take longer will work just fine, but they
-tend to take a long time to run. The only way to deal with this was to reduce the sample count.
+By default, Criterion.rs can scale well to handle benchmarks that execute in
+picoseconds up to benchmarks that execute in milliseconds. Benchmarks that take
+longer will work just fine, but they tend to take a long time to run. The only
+way to deal with this was to reduce the sample count.
 
-In Criterion.rs 0.3.3, a new option was added to change the sampling mode to handle long-running
-benchmarks. The benchmark author can call `BenchmarkGroup::sampling_mode(SamplingMode)` to change
-the sampling mode.
+In Criterion.rs 0.3.3, a new option was added to change the sampling mode to
+handle long-running benchmarks. The benchmark author can call
+`BenchmarkGroup::sampling_mode(SamplingMode)` to change the sampling mode.
 
 Currently three options are available:
-* `SamplingMode::Auto`, which chooses a sampling mode from the other options automatically. This is the default.
-* `SamplingMode::Linear`, the original sampling mode intended for faster benchmarks.
-* `SamplingMode::Flat`, intended for long-running benchmarks.
 
-The Flat sampling mode does change some of the statistical analysis and the charts that are
-generated. It is not recommended to use Flat sampling except where necessary.
+- `SamplingMode::Auto`, which chooses a sampling mode from the other options
+  automatically. This is the default.
+- `SamplingMode::Linear`, the original sampling mode intended for faster
+  benchmarks.
+- `SamplingMode::Flat`, intended for long-running benchmarks.
+
+The Flat sampling mode does change some of the statistical analysis and the
+charts that are generated. It is not recommended to use Flat sampling except
+where necessary.
 
 ```rust
 use criterion::*;

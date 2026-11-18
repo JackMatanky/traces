@@ -30,10 +30,10 @@ Three distinct architectural stances address this reality:
 2. **Remediation & Detection (Feedback Loop):** Allows writes to disk, detects
    violations asynchronously (via CLI check, git hooks, watcher daemon, or on
    read), and delivers structured diagnostics back to the writer.
-3. **In-Band Steering (Scaffolding & Normalisation):** Uses information co-located
-   with the notes (directory instructions, note templates, `$schema` pointers,
-   read-time canonical normalisation) to steer writers away from invalid states
-   or make consumers immune to minor variations.
+3. **In-Band Steering (Scaffolding & Normalisation):** Uses information
+   co-located with the notes (directory instructions, note templates, `$schema`
+   pointers, read-time canonical normalisation) to steer writers away from
+   invalid states or make consumers immune to minor variations.
 
 ---
 
@@ -79,21 +79,21 @@ to survive uncontrolled writers.
   (`[V]` `letta-ai/letta-code` prompt `letta_root_memfs.md`).
 - **Surviving Uncontrolled Writers:** If an agent or script writes directly to
   the working tree, the file on disk is modified. However, the agent's memory
-  subsystem only synchronizes committed state. When the agent attempts to commit,
-  the pre-commit hook rejects invalid files, outputting the error to stderr, which
-  the harness injects into the agent's next turn as feedback.
+  subsystem only synchronizes committed state. When the agent attempts to
+  commit, the pre-commit hook rejects invalid files, outputting the error to
+  stderr, which the harness injects into the agent's next turn as feedback.
 - **Limitation:** Does not prevent disk corruption if git is bypassed or never
   committed (`[V]`).
 
 #### 2. Basic Memory
 
-- **Mechanism:** Local-first Markdown memory system. Entities use YAML frontmatter
-  for token-efficient discovery. Defines "picoschemas" mapped to frontmatter
-  keys, observation categories, and relation links (`[V]`
+- **Mechanism:** Local-first Markdown memory system. Entities use YAML
+  frontmatter for token-efficient discovery. Defines "picoschemas" mapped to
+  frontmatter keys, observation categories, and relation links (`[V]`
   <https://github.com/basicmachines-co/basic-memory>).
-- **Surviving Uncontrolled Writers:** Validation (`bm schema validate`) is strictly
-  advisory and diagnostic. It logs missing required fields or invalid links but
-  never blocks writes (`[V]`).
+- **Surviving Uncontrolled Writers:** Validation (`bm schema validate`) is
+  strictly advisory and diagnostic. It logs missing required fields or invalid
+  links but never blocks writes (`[V]`).
 
 #### 3. Anthropic Memory MCP Server
 
@@ -127,8 +127,8 @@ to survive uncontrolled writers.
   intercept writes made when Obsidian is closed or writes made by CLI tools.
 - **Metadata Enforcer v2 (`omarish`):** Defines Django-style Python models with
   path routing (`ROUTES`). Uses `metadata-enforcer check` and `watch --fix` via
-  the Python `watchdog` library (`[V]` <https://omarish.com/p/metadata-enforcer-v2>).
-  Operates entirely post-write.
+  the Python `watchdog` library (`[V]`
+  <https://omarish.com/p/metadata-enforcer-v2>). Operates entirely post-write.
 
 #### 6. Foam & Zettlr
 
@@ -145,8 +145,8 @@ to survive uncontrolled writers.
   <https://wiki.dendron.so/notes/ZeC74FYVECsf9bpyngVMU/>). Includes a `doctor`
   command family (`dendron doctor --action fixFrontmatter`, `h1ToTitle`,
   `findBrokenLinks`) available via VS Code command palette and CLI.
-- **Surviving Uncontrolled Writers:** Bypassed completely during writes. `doctor`
-  is a batch remediation sweep run manually or in CI.
+- **Surviving Uncontrolled Writers:** Bypassed completely during writes.
+  `doctor` is a batch remediation sweep run manually or in CI.
 
 #### 8. Logseq
 
@@ -184,9 +184,9 @@ to survive uncontrolled writers.
 #### 10. Agent Vault Safety Architectures (Inboxes & Review Queues)
 
 - **Inbox & Quarantine Pattern:** Community agent-vault patterns (e.g.,
-  `obsidian-agent-vault`, `AI Work Review`, `Task Vault`) enforce that autonomous
-  agents only have write access to an `00-Inbox/` or `_quarantine/` directory
-  (`[V]` <https://community.obsidian.md/plugins/ai-work-review>,
+  `obsidian-agent-vault`, `AI Work Review`, `Task Vault`) enforce that
+  autonomous agents only have write access to an `00-Inbox/` or `_quarantine/`
+  directory (`[V]` <https://community.obsidian.md/plugins/ai-work-review>,
   <https://github.com/georgeracu/obsidian-agent-vault>).
 - **Review Queue:** Core vault notes are strictly read-only to agents. Proposed
   additions or edits land in the inbox. A human or an automated promotion script
@@ -215,7 +215,8 @@ configuration.
     `.cursor/rules/*.mdc` files support glob scoping (`globs: "books/**"`),
     loading instructions into context only when matching files are accessed.
   - **Aider / Codex / Windsurf (`[S]`):** Do not automatically discover nested
-    instruction files unless explicitly configured or referenced in root prompts.
+    instruction files unless explicitly configured or referenced in root
+    prompts.
 - **Limits:** Purely advisory. Non-LLM writers (scripts, Obsidian, git) ignore
   them completely. Even LLMs suffer probabilistic drift (`[H]`).
 
@@ -234,9 +235,9 @@ Three embedding approaches were tested:
 
 - **Hypothesis:** Embed schema hints as YAML comments in the frontmatter.
 - **Empirical Test (`[V]`):** Executed a local Bun script parsing a YAML block
-  with comments (`# schema: book`, `# required field`) into a standard JavaScript
-  object, then re-serializing via `YAML.stringify()` (replicating Obsidian's
-  `processFrontMatter`, `gray-matter`, and `js-yaml` behavior).
+  with comments (`# schema: book`, `# required field`) into a standard
+  JavaScript object, then re-serializing via `YAML.stringify()` (replicating
+  Obsidian's `processFrontMatter`, `gray-matter`, and `js-yaml` behavior).
   - *Result:* All comments were completely stripped from the output.
   - *Corroboration:* Obsidian Forum thread 65851 confirms that Obsidian's
     Properties UI and `processFrontMatter` API systematically strip comments,
@@ -304,9 +305,11 @@ Every candidate mechanism is evaluated against the 8 required dimensions:
   read-time; error channel and payload.
 - **(c) Partial-write / atomicity:** Behavior on interrupted or chunked writes.
 - **(d) Platforms:** macOS, Linux, Windows.
-- **(e) Privilege & deployment cost:** Sudo, background daemons, CLI dependencies.
+- **(e) Privilege & deployment cost:** Sudo, background daemons, CLI
+  dependencies.
 - **(f) Bypass routes:** How writers circumvent the mechanism.
-- **(g) Fail stance:** Fail-open vs fail-closed if checker crashes or schema breaks.
+- **(g) Fail stance:** Fail-open vs fail-closed if checker crashes or schema
+  breaks.
 - **(h) Rust fit:** Crates, maintenance status, performance.
 
 ---
@@ -321,15 +324,15 @@ Every candidate mechanism is evaluated against the 8 required dimensions:
   promote <path>`). The promoting actor (agent CLI turn or human) receives
   stdout/stderr with exit code 0 (success) or 1 (schema violation with field
   diff).
-- **(c) Atomicity:** Full atomicity. Promotion uses filesystem rename (`fs::rename`
-  on POSIX is atomic across the same mount). Incomplete writes in `_inbox/`
-  simply fail promotion without corrupting the canonical vault.
+- **(c) Atomicity:** Full atomicity. Promotion uses filesystem rename
+  (`fs::rename` on POSIX is atomic across the same mount). Incomplete writes in
+  `_inbox/` simply fail promotion without corrupting the canonical vault.
 - **(d) Platforms:** 100% cross-platform (macOS, Linux, Windows).
-- **(e) Privilege/Deployment Cost:** Zero privilege required. Pure CLI. No daemon,
-  no kernel extension.
+- **(e) Privilege/Deployment Cost:** Zero privilege required. Pure CLI. No
+  daemon, no kernel extension.
 - **(f) Bypass routes:** An uncontrolled process can write directly to the
-  canonical path if filesystem permissions permit. (Mitigated if canonical folder
-  is marked read-only via `chmod -w` or OS ACLs).
+  canonical path if filesystem permissions permit. (Mitigated if canonical
+  folder is marked read-only via `chmod -w` or OS ACLs).
 - **(g) Failure stance:** **Fail-closed.** If the schema is broken or the
   checker crashes, promotion aborts. The canonical vault remains intact; draft
   remains safely in `_inbox/`.
@@ -340,19 +343,20 @@ Every candidate mechanism is evaluated against the 8 required dimensions:
 
 ### Candidate 2: Tolerant Reader with Canonical Normalisation (The Quartz Pattern)
 
-- **(a) Writes seen:** Sees all completed writes at read time. Transparent to how
-  the file was written.
+- **(a) Writes seen:** Sees all completed writes at read time. Transparent to
+  how the file was written.
 - **(b) Validation & Feedback:** Occurs on `traces query`, `traces read`, or
   index build. Writers do not see feedback at write time. If configured, read
-  commands output advisory notices on stderr or attach warnings to query results.
+  commands output advisory notices on stderr or attach warnings to query
+  results.
 - **(c) Atomicity:** Read-time parsing must handle partially written files
   gracefully. If YAML is truncated or malformed, the parser must report a read
   error rather than crashing.
 - **(d) Platforms:** 100% cross-platform.
 - **(e) Privilege/Deployment Cost:** Zero cost. Internal logic in the `traces`
   binary.
-- **(f) Bypass routes:** N/A (this is a read-side resilience pattern, not a write
-  gate).
+- **(f) Bypass routes:** N/A (this is a read-side resilience pattern, not a
+  write gate).
 - **(g) Failure stance:** **Fail-open (permissive).** Minor irregularities
   (scalar vs list, alias names) are coerced to canonical form. Severe syntax
   errors (unparseable YAML) fail safe by skipping the note from index queries
@@ -366,9 +370,9 @@ Every candidate mechanism is evaluated against the 8 required dimensions:
 
 - **(a) Writes seen:** Preserved across all standard file writes and Obsidian
   Properties updates (`[V]`).
-- **(b) Validation & Feedback:** Feedback delivered whenever any JSON-Schema-aware
-  tool (VS Code YAML, JetBrains, `check-jsonschema`, CLI linter) opens or audits
-  the file. Inline squiggly diagnostics in editors.
+- **(b) Validation & Feedback:** Feedback delivered whenever any
+  JSON-Schema-aware tool (VS Code YAML, JetBrains, `check-jsonschema`, CLI
+  linter) opens or audits the file. Inline squiggly diagnostics in editors.
 - **(c) Atomicity:** Subject to standard editor write atomicity.
 - **(d) Platforms:** 100% cross-platform.
 - **(e) Privilege/Deployment Cost:** Zero privilege. Requires generating static
@@ -392,10 +396,10 @@ Every candidate mechanism is evaluated against the 8 required dimensions:
 - **(b) Validation & Feedback:** Asynchronous (post-write). Feedback cannot be
   reliably delivered to the original writer process without a dedicated IPC
   channel.
-- **(c) Atomicity:** High risk of race conditions. If an editor writes in chunks,
-  the watcher may wake up and read a half-written file. Requires debouncing
-  (`notify-debouncer-mini`). If `--fix` mutates the file, it triggers a second
-  watcher event, risking infinite loops.
+- **(c) Atomicity:** High risk of race conditions. If an editor writes in
+  chunks, the watcher may wake up and read a half-written file. Requires
+  debouncing (`notify-debouncer-mini`). If `--fix` mutates the file, it triggers
+  a second watcher event, risking infinite loops.
 - **(d) Platforms:** macOS, Linux, Windows (supported via `notify` crate).
 - **(e) Privilege/Deployment Cost:** High runtime cost for desktop PKM. Requires
   a long-running daemon process consuming battery and memory.
@@ -439,10 +443,10 @@ sandboxes).
 ### Idea 1: In-Vault Inbox Landing Zone with Atomic CLI Promotion (`traces promote`)
 
 - **The Concept:** A structural staging architecture native to the vault.
-  Agents, external scripts, and capture tools are instructed to write exclusively
-  to an `_inbox/` (or `_quarantine/`) folder. The core notes directory is treated
-  as canonical and protected. To move a note into the main vault, the agent or
-  user runs:
+  Agents, external scripts, and capture tools are instructed to write
+  exclusively to an `_inbox/` (or `_quarantine/`) folder. The core notes
+  directory is treated as canonical and protected. To move a note into the main
+  vault, the agent or user runs:
 
   ```bash
   traces promote _inbox/my-note.md --to books/
@@ -451,8 +455,8 @@ sandboxes).
 - **How It Works:**
   1. `traces promote` reads `_inbox/my-note.md` and validates it against the
      target class (`Book`).
-  2. If valid: atomically moves the file (`fs::rename`) to `books/my-note.md` and
-     indexes it. Exit code 0.
+  2. If valid: atomically moves the file (`fs::rename`) to `books/my-note.md`
+     and indexes it. Exit code 0.
   3. If invalid: aborts the move, leaves `_inbox/my-note.md` untouched, and
      outputs actionable diagnostic errors naming the exact fields and expected
      types on stderr. Exit code 1.
@@ -497,7 +501,8 @@ sandboxes).
 
 ### Idea 3: Durable Frontmatter `$schema` Pointer with Static JSON Schema Export
 
-- **The Concept:** Embed a durable schema reference directly in note frontmatter:
+- **The Concept:** Embed a durable schema reference directly in note
+  frontmatter:
 
   ```yaml
   ---
@@ -528,13 +533,15 @@ sandboxes).
 
 ## 6. Sources and Evidence Citations
 
-1. `[V]` Letta MemFS Documentation: <https://docs.letta.com/concepts/memfs/index.md>.
-   "MemFS projects that repository onto whatever computer the agent is running
-   on, as a real checkout the agent reads and edits with ordinary file tools...
-   Every memory edit is committed to the MemFS git repository." Pre-commit
-   validation confirmed in `letta-ai/letta-code` prompts (`letta_root_memfs.md`).
-2. `[V]` Basic Memory Repository: <https://github.com/basicmachines-co/basic-memory>
-   and NOTE-FORMAT.md. Picoschemas and advisory CLI validation (`bm schema validate`).
+1. `[V]` Letta MemFS Documentation:
+   <https://docs.letta.com/concepts/memfs/index.md>. "MemFS projects that
+   repository onto whatever computer the agent is running on, as a real checkout
+   the agent reads and edits with ordinary file tools... Every memory edit is
+   committed to the MemFS git repository." Pre-commit validation confirmed in
+   `letta-ai/letta-code` prompts (`letta_root_memfs.md`).
+2. `[V]` Basic Memory Repository:
+   <https://github.com/basicmachines-co/basic-memory> and NOTE-FORMAT.md.
+   Picoschemas and advisory CLI validation (`bm schema validate`).
 3. `[V]` Model Context Protocol Memory Server:
    <https://github.com/modelcontextprotocol/servers/tree/main/src/memory>.
    Tool-mediated memory schema definitions.
@@ -554,7 +561,8 @@ sandboxes).
 10. `[V]` Logseq Property Architecture:
     <https://github.com/logseq/logseq/blob/master/libs/guides/db_properties_guide.md>.
     DataScript tolerant parser in file mode; SQLite in DB mode.
-11. `[V]` Zettlr Documentation: <https://docs.zettlr.com>. Pandoc YAML frontmatter.
+11. `[V]` Zettlr Documentation: <https://docs.zettlr.com>. Pandoc YAML
+    frontmatter.
 12. `[V]` Quartz 4/5 Source Code:
     `jackyzha0/quartz` `quartz/plugins/transformers/frontmatter.ts`. Verified
     `coalesceAliases`, `coerceToArray`, and default fallbacks.
@@ -565,14 +573,16 @@ sandboxes).
     <https://gohugo.io/content-management/archetypes/>. Scaffolding templates.
 15. `[V]` Keystatic Documentation: <https://keystatic.com/docs/collections>.
     Zod schema validation in reader and UI.
-16. `[V]` Decap CMS Documentation: <https://decapcms.org/docs/configuration-options/>.
-    `config.yml` collection schemas.
+16. `[V]` Decap CMS Documentation:
+    <https://decapcms.org/docs/configuration-options/>. `config.yml` collection
+    schemas.
 17. `[V]` Community Obsidian Agent Workflows:
     <https://community.obsidian.md/plugins/ai-work-review>,
     <https://github.com/georgeracu/obsidian-agent-vault>. Inbox and review queue
     patterns.
-18. `[V]` Claude Code Memory Documentation: <https://code.claude.com/docs/en/memory.md>.
-    Lazy loading of subdirectory `AGENTS.md` and path-scoped rules.
+18. `[V]` Claude Code Memory Documentation:
+    <https://code.claude.com/docs/en/memory.md>. Lazy loading of subdirectory
+    `AGENTS.md` and path-scoped rules.
 19. `[V]` Obsidian Forum Bug Report 65851:
     <https://forum.obsidian.md/t/yaml-properties-api-processfrontmatter-removes-alters-string-quotes-comments-types-formatting/65851>.
     Confirms Obsidian systematically strips YAML comments and formatting.

@@ -1,10 +1,11 @@
 # Ticket 27 pass 2, design-decision review D3: alternatives against the current code
 
-Method: codegraph_explore over the live tree (`.codegraph/` present at repo root,
-used throughout), plus direct ticket text reads. Scope: the ten provisional
-design decisions in the pass-2 consolidation, each re-checked against what the
-code actually does today, biased toward the smallest change that keeps (or
-deepens) the shared-walk design. All file:line cites are working-tree current.
+Method: codegraph_explore over the live tree (`.codegraph/` present at repo
+root, used throughout), plus direct ticket text reads. Scope: the ten
+provisional design decisions in the pass-2 consolidation, each re-checked
+against what the code actually does today, biased toward the smallest change
+that keeps (or deepens) the shared-walk design. All file:line cites are
+working-tree current.
 
 ---
 
@@ -315,21 +316,35 @@ The single visibility change this whole plan needs is the already-budgeted
 ## 3. Landing order
 
 **Wave 0 (prerequisites, no feature code):**
+
 1. `[lsp]` config section + digest (D7) and 29's capability snapshot reading it.
 2. `LineIndex` three-method extension + `convert` module (D8).
-3. The one `resolve_link` facade method on the analysis host (D3 seam, budgeted by 34).
+3. The one `resolve_link` facade method on the analysis host (D3 seam, budgeted
+   by 34).
 
 **Wave 1 (walk wave; ships BEFORE 11, 14-overlay, and 26):**
+
 4. `DocStructure` walk module with `(uri, version)` cache (D1).
-5. documentSymbol: headings + tasks-as-children, line-granular ranges (D2, D6 machinery).
+
+5. documentSymbol: headings + tasks-as-children, line-granular ranges (D2, D6
+   machinery).
+
 6. foldingRange E-lite (D6).
+
 7. selectionRange S1 trimmed (D10.2).
-8. documentLink: wikilinks, embeds, standard links; exact spans; drop unresolved; `resolveProvider:false` (D3).
+
+8. documentLink: wikilinks, embeds, standard links; exact spans; drop
+   unresolved; `resolveProvider:false` (D3).
+
 9. documentHighlight: same-target matcher over walk spans (D10.1).
+
 10. CodeLens Option C: note-level count from `FileEntry::inlinks()` (D4).
-11. Semantic tokens: T1 legend, two-valued unresolved modifier, `full`-only, refresh via D9 lane (D5 v1).
+
+11. Semantic tokens: T1 legend, two-valued unresolved modifier, `full`-only,
+    refresh via D9 lane (D5 v1).
 
 **Wave 2 (waits on named tickets):**
+
 - Three-valued resolution (token Ambiguous modifier, ambiguous-link first
   -candidate tooltips): 26's tie-reporting candidates facade.
 - Template-ref documentLinks and goto-def: 22's machinery spans + Q20(b)

@@ -1,8 +1,9 @@
 # mutarust — Research Note
 
-Research into [`quality-gates/mutarust`](https://github.com/quality-gates/mutarust)
-for possible use in this repository, compared against the existing
-`cargo-mutants` setup (see [mutation_testing.md](mutation_testing.md)).
+Research into
+[`quality-gates/mutarust`](https://github.com/quality-gates/mutarust) for
+possible use in this repository, compared against the existing `cargo-mutants`
+setup (see [mutation_testing.md](mutation_testing.md)).
 
 Primary sources checked on 2026-09-25: the repo README, `docs/` directory
 (`install.md`, `quickstart.md`, `cli.md`, `config.md`, `ci.md`,
@@ -32,7 +33,8 @@ and release APIs, the crates.io crate API, and — for the comparison —
   - License: MIT ([README](https://github.com/quality-gates/mutarust),
     [GitHub API](https://api.github.com/repos/quality-gates/mutarust)).
   - Version: `0.1.9`, `rust-version = 1.85`, edition 2024, single binary target
-    `mutarust` ([Cargo.toml](https://github.com/quality-gates/mutarust/blob/main/Cargo.toml)).
+    `mutarust`
+    ([Cargo.toml](https://github.com/quality-gates/mutarust/blob/main/Cargo.toml)).
   - Project age: repo created 2026-08-01, first crates.io release 0.1.0 on
     2026-08-03, latest 0.1.9 on 2026-09-20 — 10 releases in ~7 weeks, roughly
     weekly cadence ([crates.io API](https://crates.io/api/v1/crates/mutarust),
@@ -92,13 +94,14 @@ and release APIs, the crates.io crate API, and — for the comparison —
 
 ### 2.3 Parallelism and incremental build reuse
 
-- Runs mutants in parallel: default up to one worker per logical CPU,
-  capped by `--workers`; each worker keeps **one isolated workspace copy and
-  reuses its Cargo target directory across mutants**, so later mutants rebuild
-  only the changed crate; each Cargo build is additionally capped with `-j` so
-  worker count × jobs ≈ CPU count
+- Runs mutants in parallel: default up to one worker per logical CPU, capped by
+  `--workers`; each worker keeps **one isolated workspace copy and reuses its
+  Cargo target directory across mutants**, so later mutants rebuild only the
+  changed crate; each Cargo build is additionally capped with `-j` so worker
+  count × jobs ≈ CPU count
   ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md),
-  confirmed in [release v0.1.2](https://github.com/quality-gates/mutarust/releases/tag/v0.1.2)).
+  confirmed in
+  [release v0.1.2](https://github.com/quality-gates/mutarust/releases/tag/v0.1.2)).
   Shared dependency artifacts are symlinked read-only rather than duplicated
   ([release v0.1.4](https://github.com/quality-gates/mutarust/releases/tag/v0.1.4)).
 - **Timeouts:** fixed **60 s per Cargo test run by default** (`--exec-timeout`
@@ -131,8 +134,8 @@ and release APIs, the crates.io crate API, and — for the comparison —
   `[corrected in §9 review]`
   ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md)).
 - `--test-recursive` passes `--workspace` to Cargo; `--test-flags` adds
-  shell-quoted args (e.g. `--features test-utils`) to every compile/test
-  command ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md)).
+  shell-quoted args (e.g. `--features test-utils`) to every compile/test command
+  ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md)).
 
 ### 2.5 Coverage integration
 
@@ -159,9 +162,11 @@ and release APIs, the crates.io crate API, and — for the comparison —
   ([docs/config.md](https://github.com/quality-gates/mutarust/blob/main/docs/config.md)).
   JSON Schema published at
   [`schema/mutarust.schema.json`](https://github.com/quality-gates/mutarust/blob/main/schema/mutarust.schema.json);
-  starter file [`mutarust.yml.example`](https://github.com/quality-gates/mutarust/blob/main/mutarust.yml.example).
+  starter file
+  [`mutarust.yml.example`](https://github.com/quality-gates/mutarust/blob/main/mutarust.yml.example).
 - CLI flags override config; unknown fields/invalid values fail fast with the
-  config filename in the diagnostic ([docs/config.md](https://github.com/quality-gates/mutarust/blob/main/docs/config.md)).
+  config filename in the diagnostic
+  ([docs/config.md](https://github.com/quality-gates/mutarust/blob/main/docs/config.md)).
 - Source scoping: `exclude_dirs` (path prefixes), `ignore_source_lines`
   (line regexes), `--match REGEXP` (function names), plus in-source
   annotations `// mutator-disable-func|next-line|regexp`
@@ -286,11 +291,12 @@ Caveats:
   `cargo:adrs` in [mise.toml](../../mise.toml)
   ([docs/install.md](https://github.com/quality-gates/mutarust/blob/main/docs/install.md)).
 - The repo has `cargo-binstall = "latest"`, and mise's cargo backend prefers
-  binstall. mutarust publishes **no prebuilt release assets for current
-  versions** (only v0.1.4 has darwin amd64/arm64 tarballs
-  — [releases API](https://api.github.com/repos/quality-gates/mutarust/releases)),
-  so binstall falls back to a source build; expect a couple of minutes for a
-  ~16 kLOC crate plus `syn`.
+  binstall. mutarust publishes
+  **no prebuilt release assets for current versions** (only v0.1.4 has darwin
+  amd64/arm64 tarballs —
+  [releases API](https://api.github.com/repos/quality-gates/mutarust/releases)),
+  so binstall falls back to a source build; expect a couple of minutes for a ~16
+  kLOC crate plus `syn`.
 - **`github:quality-gates/mutarust` is not viable**: the `github:` backend
   needs release assets, and recent releases have none.
 - The custom URL form used for `rust-docs-mcp`
@@ -335,9 +341,9 @@ Caveats:
   locally; mutarust is the same cost class (§3). This repo's CI
   ([.github/workflows/ci.yml](../../.github/workflows/ci.yml)) currently has
   **no mutation job at all** (cargo-mutants runs are local-only), so adopting
-  mutarust would not make CI slower unless a mutation job is added
-  deliberately — and `--git-diff-lines` is the documented way to keep that
-  cheap ([docs/ci.md](https://github.com/quality-gates/mutarust/blob/main/docs/ci.md)).
+  mutarust would not make CI slower unless a mutation job is added deliberately
+  — and `--git-diff-lines` is the documented way to keep that cheap
+  ([docs/ci.md](https://github.com/quality-gates/mutarust/blob/main/docs/ci.md)).
 - **Replace or coexist?** They are redundant in purpose. Running both
   doubles wall-clock for largely overlapping escape signal. Coexistence only
   makes sense as a short A/B pilot, not steady state.
@@ -352,8 +358,9 @@ Risks:
    maintainer ([§1](#1-what-mutarust-is)). Breaking changes between 0.1.x
    releases are plausible (0.1.1 already absorbed a `syn` 2→3 migration).
    Pin the version; keep `lockfile = true`.
-2. **Score-definition drift:** its MSI counts *errored* and *skipped* mutants
-   as non-escapes ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md)),
+2. **Score-definition drift:** its MSI counts *errored* and *skipped* mutants as
+   non-escapes
+   ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md)),
    so thresholds will not be comparable with cargo-mutants' output or the
    definition in [mutation_testing.md](mutation_testing.md).
 3. **No nextest:** the repo standardized on `test_tool = "nextest"` for
@@ -363,7 +370,8 @@ Risks:
    errored on a slow full-suite run unless `--timeout-coefficient` is set
    ([docs/cli.md](https://github.com/quality-gates/mutarust/blob/main/docs/cli.md)).
 5. **Config not auto-discovered** — easy to forget `--config` and silently run
-   with no policy ([docs/config.md](https://github.com/quality-gates/mutarust/blob/main/docs/config.md)).
+   with no policy
+   ([docs/config.md](https://github.com/quality-gates/mutarust/blob/main/docs/config.md)).
 6. **Coverage tool split (resolved):** `--coverage` pulls in
    `cargo-llvm-cov`, the same engine this repo's coverage gates already use —
    no second coverage engine enters `mise.toml`
@@ -400,22 +408,27 @@ mise exec -- mutarust --git-diff-lines --min-msi 60 --logger-github .
 
 ## 7. Primary sources
 
-- Repo README — https://github.com/quality-gates/mutarust
-- CLI reference — https://github.com/quality-gates/mutarust/blob/main/docs/cli.md
-- Configuration — https://github.com/quality-gates/mutarust/blob/main/docs/config.md
-- CI guide — https://github.com/quality-gates/mutarust/blob/main/docs/ci.md
-- Selective CI — https://github.com/quality-gates/mutarust/blob/main/docs/selective-ci.md
-- Install / quick start — https://github.com/quality-gates/mutarust/blob/main/docs/install.md ,
+- Repo README — <https://github.com/quality-gates/mutarust>
+- CLI reference —
+  <https://github.com/quality-gates/mutarust/blob/main/docs/cli.md>
+- Configuration —
+  <https://github.com/quality-gates/mutarust/blob/main/docs/config.md>
+- CI guide — <https://github.com/quality-gates/mutarust/blob/main/docs/ci.md>
+- Selective CI —
+  <https://github.com/quality-gates/mutarust/blob/main/docs/selective-ci.md>
+- Install / quick start —
+  <https://github.com/quality-gates/mutarust/blob/main/docs/install.md> ,
   .../docs/quickstart.md
-- Mutago parity table — https://github.com/quality-gates/mutarust/blob/main/docs/parity.md
+- Mutago parity table —
+  <https://github.com/quality-gates/mutarust/blob/main/docs/parity.md>
 - Mutators / glossary — .../docs/mutators.md , .../docs/glossary.md
-- Manifest — https://github.com/quality-gates/mutarust/blob/main/Cargo.toml
-- Releases — https://api.github.com/repos/quality-gates/mutarust/releases
-- Repo metadata — https://api.github.com/repos/quality-gates/mutarust
-- Crate registry — https://crates.io/api/v1/crates/mutarust
-- cargo-mutants (comparison): https://github.com/sourcefrog/cargo-mutants
+- Manifest — <https://github.com/quality-gates/mutarust/blob/main/Cargo.toml>
+- Releases — <https://api.github.com/repos/quality-gates/mutarust/releases>
+- Repo metadata — <https://api.github.com/repos/quality-gates/mutarust>
+- Crate registry — <https://crates.io/api/v1/crates/mutarust>
+- cargo-mutants (comparison): <https://github.com/sourcefrog/cargo-mutants>
   `book/src/{how-it-works,exit-codes,in-diff,baseline,iterate,nextest,ci}.md`
-- mise cargo backend — https://mise.jdx.dev/dev-tools/backends/cargo.html
+- mise cargo backend — <https://mise.jdx.dev/dev-tools/backends/cargo.html>
 - Local: `docs/refs/mutation_testing.md`, `.cargo/mutants.toml`, `mise.toml`,
   `.mise/tasks/mutants/_default`, `.mise/tasks/mutants/report`, `hk.pkl`,
   `.github/workflows/ci.yml`
@@ -449,16 +462,16 @@ in CI), coexisting with the cargo-mutants setup. Primary sources: upstream
   a matching line is not created).
 - **Command-only (not YAML):** baseline trio `--update-baseline` /
   `--baseline FILE` / `--fail-on-escaped` (exit 4 only on escapes not in the
-  Mutago-compatible `mutarust-baseline.json`), `--blacklist FILE`
-  (checksum skips), `--match REGEXP` (function names), score gates
-  `--min-msi` / `--min-covered-msi`, scoping `--git-diff-lines` +
-  `--git-diff-base REF`, execution `--workers`, `--timeout`/`--exec-timeout`
-  (fixed 60 s default) or `--timeout-coefficient` (**longest single
-  clean-test** duration × factor, min 1 s — not the suite duration;
-  **mutually exclusive with `--timeout`**) `[corrected in §9 review]`, `--test-flags "..."`,
-  `--test-recursive` (passes `--workspace`), `--coverage`/`--per-test`
-  (llvm-cov), inspection `--dry-run` (count only, no tests), `--no-exec`,
-  `--list-files`, `--print-ast`, `--list-mutators`, loggers
+  Mutago-compatible `mutarust-baseline.json`), `--blacklist FILE` (checksum
+  skips), `--match REGEXP` (function names), score gates `--min-msi` /
+  `--min-covered-msi`, scoping `--git-diff-lines` + `--git-diff-base REF`,
+  execution `--workers`, `--timeout`/`--exec-timeout` (fixed 60 s default) or
+  `--timeout-coefficient` (**longest single clean-test** duration × factor, min
+  1 s — not the suite duration; **mutually exclusive with `--timeout`**)
+  `[corrected in §9 review]`, `--test-flags "..."`, `--test-recursive` (passes
+  `--workspace`), `--coverage`/`--per-test` (llvm-cov), inspection `--dry-run`
+  (count only, no tests), `--no-exec`, `--list-files`, `--print-ast`,
+  `--list-mutators`, loggers
   `--logger-summary-json`/`--logger-agentic-json`/`--logger-github`.
 - **Exit codes:** 0 pass, 1 command error, 2 bash completion, 3
   source/config/annotation error, **4 quality-gate failure**
@@ -515,9 +528,9 @@ in CI), coexisting with the cargo-mutants setup. Primary sources: upstream
 
 3. **Task:** `.mise/tasks/mutarust/_default` — sibling of `test/mutants`,
    **extends the same `[task_templates.mutants]`** (1 h timeout, cache off,
-   `outputs = []`) so both mutation tools share budget and never-skip
-   semantics. Names don't collide (`mutants` vs `mutarust`). Mirrors the
-   cargo-mutants task's UX:
+   `outputs = []`) so both mutation tools share budget and never-skip semantics.
+   Names don't collide (`mutants` vs `mutarust`). Mirrors the cargo-mutants
+   task's UX:
 
    ```bash
    #!/bin/bash
@@ -538,11 +551,12 @@ in CI), coexisting with the cargo-mutants setup. Primary sources: upstream
    #USAGE arg "[args]" var=#true help="Extra arguments forwarded to mutarust"
    ```
 
-   Body: `mutarust --config mutarust.yml --test-flags "--features test-utils
-   --all-targets" --timeout-coefficient 5` + `-f`→file / `-m`→`src/<mod>`
-   target / flags / passthrough. **No `depends_post` report task** — unlike
-   cargo-mutants' `mutants.out/missed.txt` pipeline, mutarust writes
-   `report.json` itself (`json_output: true`).
+   Body:
+   `mutarust --config mutarust.yml --test-flags "--features test-utils --all-targets" --timeout-coefficient 5` +
+   `-f`→file / `-m`→`src/<mod>` target / flags / passthrough.
+   **No `depends_post` report task** — unlike cargo-mutants'
+   `mutants.out/missed.txt` pipeline, mutarust writes `report.json` itself
+   (`json_output: true`).
 
 4. **`.gitignore` additions:** `report.json`, `mutarust-report.html`,
    `mutarust-summary.json`, `mutarust-agentic.json`, `mutarust-gitlab.json`.
@@ -644,17 +658,19 @@ terminal's sorted per-mutator table report yield *per operator*
 ([json-outputs.md](mutarust/docs/json-outputs.md)).
 
 **(b) Value here.** Grounded against `src/`:
+
 - **Zero-yield groups for this repo:** no `tokio::select!`/`tokio::spawn`/
   `thread::spawn` anywhere in `src/` (grep: 0), so `select/case-remove`,
   `select/default-remove` and the Tokio arms of `concurrency/goroutine-remove`
   plan nothing → `disable_mutators: ["select/*"]` reduces planning noise at no
-  signal cost (the thread arms of `concurrency/goroutine-remove` may still fire).
-- **High-yield groups:** `expression/error-guard` has ~24 `if …​.is_err()/is_some()`
-  candidates; `conditional/bool-literal` ~69 `= true/false` initializers;
-  `statement/defer-remove` has real `drop(...)` sites (`src/index/store.rs`,
-  `src/query/results.rs`, `src/dirtree.rs`, …); `composite/field-clear` fits
-  the many `Default`-derived config/schema structs (`src/config/model.rs`,
-  `src/schema/*`).
+  signal cost (the thread arms of `concurrency/goroutine-remove` may still
+  fire).
+- **High-yield groups:** `expression/error-guard` has ~24
+  `if …​.is_err()/is_some()` candidates; `conditional/bool-literal` ~69
+  `= true/false` initializers; `statement/defer-remove` has real `drop(...)`
+  sites (`src/index/store.rs`, `src/query/results.rs`, `src/dirtree.rs`, …);
+  `composite/field-clear` fits the many `Default`-derived config/schema structs
+  (`src/config/model.rs`, `src/schema/*`).
 - **Mutator tuning for known-weak areas:** after the first full run, use
   `mutatorStats` to find the weakest operator, then raise signal by *adding*
   operators in a scoped run (`--enable "conditional/*"` on one module) rather
@@ -673,6 +689,7 @@ schema-validating editor will flag correct config (§9.13).
 
 **(a) What it does** ([cli.md](mutarust/docs/cli.md),
 [config.md](mutarust/docs/config.md)):
+
 - `--list-files [TARGET]...` — dry listing of selected production sources;
   absolute, sorted, deduped. No target ⇒ CWD **recursively**; a
   directory/package/workspace target selects its **direct** source files
@@ -728,6 +745,7 @@ tests; annotation errors come back as exit 3 with file+line (actionable).
 
 **(a) What it does** ([cli.md](mutarust/docs/cli.md),
 [glossary.md](mutarust/docs/glossary.md)):
+
 - Baseline file (Mutago-compatible): `{"version": 1, "mutants": [{id, file,
   mutator, line}]}`, default `mutarust-baseline.json`, `--baseline FILE`.
   `--update-baseline` writes the *full current escaped set* and **exits 0
@@ -856,7 +874,8 @@ replacement needs Cargo type-proof are handled conservatively:
 `expression/recover-clear`, `statement/defer-remove`, `select/case-remove`,
 `select/default-remove` are always `Skipped`; `expression/context-nil` and
 `statement/return` run only where a local parameter proves the type, else
-`Skipped` ([cli.md](mutarust/docs/cli.md), [mutators.md](mutarust/docs/mutators.md)).
+`Skipped` ([cli.md](mutarust/docs/cli.md),
+[mutators.md](mutarust/docs/mutators.md)).
 
 **(b/c)** For this repo: `--exec "cargo nextest run --features test-utils
 --all-targets ..."` is legal but buys **serial execution + silently fewer
@@ -929,6 +948,7 @@ eleven fields exactly (`additionalProperties: false`; booleans default
 `false`; scores integer 0–100; list defaults `[]`) and
 [mutarust.yml.example](mutarust/mutarust.yml.example) uses the same set.
 Drift/footguns:
+
 1. **Schema mutator-name pattern forbids `_`** but built-ins
    `arithmetic/assign_invert` and `loop/range_break` contain it — schema-based
    validation rejects valid `enable_mutators`/`disable_mutators` entries

@@ -1,6 +1,8 @@
 # Task Templates
 
-Task templates allow you to define reusable task definitions that can be extended by multiple tasks. This is particularly useful in monorepos or projects with similar task patterns across different components.
+Task templates allow you to define reusable task definitions that can be
+extended by multiple tasks. This is particularly useful in monorepos or projects
+with similar task patterns across different components.
 
 ## Defining Templates
 
@@ -35,7 +37,8 @@ run = "pytest --cov"  # Override run while keeping tools, depends
 
 ## Template Naming
 
-Templates use colon (`:`) separators for namespacing, similar to task naming conventions in monorepos:
+Templates use colon (`:`) separators for namespacing, similar to task naming
+conventions in monorepos:
 
 - `python:build`
 - `python:test`
@@ -98,7 +101,8 @@ depends = ["build"]  # Completely replaces template depends
 
 ## Tera Templating
 
-Templates support Tera templating, rendered with the **using project's context**:
+Templates support Tera templating, rendered with the
+**using project's context**:
 
 ```toml
 [task_templates."python:build"]
@@ -110,14 +114,16 @@ env = { PROJECT = "{{ config_root | basename }}" }
 
 Available variables (same as regular tasks):
 
-- <code v-pre>{{ config_root }}</code> - The project using the template (NOT where template is defined)
+- <code v-pre>{{ config_root }}</code> - The project using the template (NOT
+  where template is defined)
 - <code v-pre>{{ env.VAR }}</code> - Environment variables
 - <code v-pre>{{ cwd }}</code> - Current working directory
 - <code v-pre>{{ vars.* }}</code> - User-defined variables from config
 
 ## Monorepo Usage
 
-Task templates are especially useful in monorepos where multiple packages share similar build patterns:
+Task templates are especially useful in monorepos where multiple packages share
+similar build patterns:
 
 ```toml
 # Root mise.toml
@@ -167,7 +173,10 @@ extends = "python:lint"
 
 The following features are planned for future releases:
 
-- **Global templates**: Define templates in `~/.config/mise/config.toml` for use across all projects
+- **Global templates**: Define templates in `~/.config/mise/config.toml` for use
+  across all projects
 - **Template packages**: Import templates from external sources
-- **Pattern-matching rules**: Auto-apply templates based on file detection (e.g., auto-apply `python:*` templates when `pyproject.toml` exists)
-- **File task templates**: Define templates as standalone script files, similar to [file tasks](/tasks/file-tasks)
+- **Pattern-matching rules**: Auto-apply templates based on file detection
+  (e.g., auto-apply `python:*` templates when `pyproject.toml` exists)
+- **File task templates**: Define templates as standalone script files, similar
+  to [file tasks](/tasks/file-tasks)

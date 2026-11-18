@@ -13,8 +13,8 @@ numbers in the digest files under `docs/digests/`.
    Lesson for 28: C2 — a whole-vault swap gives coherence but a rebuild between
    guards stops readers.
 
-2. **markdown-oxide debounce counter.** [V] Each edit increments `diag_gen`.
-   A delayed task exits when a newer edit changed the counter
+2. **markdown-oxide debounce counter.** [V] Each edit increments `diag_gen`. A
+   delayed task exits when a newer edit changed the counter
    (`docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt:1660-1668,1800-1833`).
    Lesson for 28: C2 — a counter orders work, it does not make a snapshot
    atomic.

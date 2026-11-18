@@ -103,7 +103,8 @@ Checks private inherent methods. It does not report:
 
 - public or restricted-visibility methods
 - trait implementation methods
-- methods called in the same file as `self.run()`, `Type::run()`, or `Self::run()`
+- methods called in the same file as `self.run()`, `Type::run()`, or
+  `Self::run()`
 - methods referenced by a supported bare identifier in the same file
 
 Because analysis is per file, inspect calls from other modules before deleting.

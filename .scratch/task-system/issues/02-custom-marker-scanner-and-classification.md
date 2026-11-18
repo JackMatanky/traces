@@ -79,7 +79,9 @@ check tags.
 - `ItemFrame` — replace `task_status: Option<TaskStatus>` with `classification:
   ItemClassificationState`. Scanner sets this during item-leading text;
   classification happens in `end_item`.
-- `ListItemType::Checkbox` — bare unit variant, no issue-02 code path constructs it (no tag filters yet). The spec reserves extending the variant without breaking the enum
+- `ListItemType::Checkbox` — bare unit variant, no issue-02 code path constructs
+  it (no tag filters yet). The spec reserves extending the variant without
+  breaking the enum
 - `ListItem.is_task()` and `ListItem.is_completed()` — removed; replaced by
   `ListItemType` pattern matching.
 - Completion checks — use `TaskStatusType::completed()` from issue 01 (returns
@@ -149,7 +151,10 @@ Key changes:
   at call site, `has_marker` flag controls internal behavior.
 - `extract_tags` is unconditional — tags exist on all list item types.
 
-> **Note:** This issue classifies all markers as `ListItemType::Task`. Tag-based reclassification into `ListItemType::Checkbox` is issue 03's scope. The `end_item` signature in the worktree takes `&TaskStatusMap`; issue 03 changes it to `(&[Tag], &TaskStatusMap)`.
+> **Note:** This issue classifies all markers as `ListItemType::Task`. Tag-based
+> reclassification into `ListItemType::Checkbox` is issue 03's scope. The
+> `end_item` signature in the worktree takes `&TaskStatusMap`; issue 03 changes
+> it to `(&[Tag], &TaskStatusMap)`.
 
 ## Removed types
 
@@ -351,10 +356,14 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features  # clean
 
 ## Design decisions
 
-- `MarkdownParserInput<'a>` replaces `parse_markdown(path, src)` — see issue 03 for the input struct design
-- `ListItemType::Checkbox` ships as a bare unit variant in this issue; issue 03 adds tag filter matching and constructs it
-- `TaskStatusMap::resolve` centralizes unknown-marker fallback (by-symbol hit, else incomplete Todo preserving the symbol)
-- Parser resolves `TaskStatusMap::default()` via `LazyLock` static — real config threading is issue 03's scope
+- `MarkdownParserInput<'a>` replaces `parse_markdown(path, src)` — see issue 03
+  for the input struct design
+- `ListItemType::Checkbox` ships as a bare unit variant in this issue; issue 03
+  adds tag filter matching and constructs it
+- `TaskStatusMap::resolve` centralizes unknown-marker fallback (by-symbol hit,
+  else incomplete Todo preserving the symbol)
+- Parser resolves `TaskStatusMap::default()` via `LazyLock` static — real config
+  threading is issue 03's scope
 
 ## Out of scope
 

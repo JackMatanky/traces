@@ -1,37 +1,56 @@
 # STE Comment-Mode Checker Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `.agents/skills/ste/scripts/check_ste.py` check and fix ASD-STE100 compliance in code comments (Rust, Python, TS/JS, Go, C) without touching code.
+**Goal:** Make `.agents/skills/ste/scripts/check_ste.py` check and fix
+ASD-STE100 compliance in code comments (Rust, Python, TS/JS, Go, C) without
+touching code.
 
-**Architecture:** A string-aware masker (`mask_to_prose`, in the spec at `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md`) blanks every byte outside comment prose to spaces, preserving length and newline positions. The unchanged Markdown pipeline then checks or fixes the masked text, so real file/line/column fall out by construction, and `fix` can only mutate comment spans. Mode selection is by file extension; stdin requires `--language`.
+**Architecture:** A string-aware masker (`mask_to_prose`, in the spec at
+`docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md`) blanks every
+byte outside comment prose to spaces, preserving length and newline positions.
+The unchanged Markdown pipeline then checks or fixes the masked text, so real
+file/line/column fall out by construction, and `fix` can only mutate comment
+spans. Mode selection is by file extension; stdin requires `--language`.
 
-**Tech Stack:** Python 3.10+, stdlib only (single zero-dependency uv script), pytest.
+**Tech Stack:** Python 3.10+, stdlib only (single zero-dependency uv script),
+pytest.
 
-**Test command (from repo root):** `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q` unless otherwise stated.
+**Test command (from repo root):**
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+unless otherwise stated.
 
-**Stage discipline:** stage only `.agents/skills/ste/**` paths (and docs changed by a task); never stage unrelated worktree files.
+**Stage discipline:** stage only `.agents/skills/ste/**` paths (and docs changed
+by a task); never stage unrelated worktree files.
 
 ---
 
 ## File Structure
 
-- Modify: `.agents/skills/ste/scripts/check_ste.py` (checker/fixer/CLI; masker lives here per single-file convention)
-- Create: `.agents/skills/ste/scripts/tests/test_comments.py` (all comment-mode tests)
+- Modify: `.agents/skills/ste/scripts/check_ste.py` (checker/fixer/CLI; masker
+  lives here per single-file convention)
+- Create: `.agents/skills/ste/scripts/tests/test_comments.py` (all comment-mode
+  tests)
 - Modify: `.agents/skills/ste/SKILL.md` (Verify section, Task 8)
-- Modify: `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md` (one contradiction fix, Task 8)
+- Modify: `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md`
+  (one contradiction fix, Task 8)
 
 ---
 
 ### Task 1: Language registry
 
 **Files:**
-- Modify: `.agents/skills/ste/scripts/check_ste.py` (new section after the `Match` dataclass, before `# 1. configuration loading/validation`)
-- Create: `.agents/skills/ste/scripts/tests/test_comments.py`
 
+- Modify: `.agents/skills/ste/scripts/check_ste.py` (new section after the
+  `Match` dataclass, before `# 1. configuration loading/validation`)
+- Create: `.agents/skills/ste/scripts/tests/test_comments.py`
 - [ ] **Step 1: Write the failing test**
 
-Create `.agents/skills/ste/scripts/tests/test_comments.py` following the importlib convention of `test_check_ste.py`:
+Create `.agents/skills/ste/scripts/tests/test_comments.py` following the
+importlib convention of `test_check_ste.py`:
 
 ```python
 """Tests for comment-mode checking in source files."""
@@ -92,12 +111,15 @@ def test_line_prefix_policies_are_language_specific() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: FAIL with `AttributeError: module 'check_ste' has no attribute 'LANGUAGES'`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: FAIL with
+`AttributeError: module 'check_ste' has no attribute 'LANGUAGES'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `.agents/skills/ste/scripts/check_ste.py`, insert after the `Match` dataclass:
+In `.agents/skills/ste/scripts/check_ste.py`, insert after the `Match`
+dataclass:
 
 ```python
 @dataclass(frozen=True)
@@ -154,7 +176,8 @@ def language_for_suffix(suffix: str) -> str | None:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: PASS (2 passed)
 
 - [ ] **Step 5: Commit**
@@ -169,9 +192,10 @@ git commit -m "feat(ste): add language registry"
 ### Task 2: Rust masker (strings, chars, raw strings, nested blocks, layout invariants)
 
 **Files:**
-- Modify: `.agents/skills/ste/scripts/check_ste.py` (new `mask_to_prose` after the phrase helpers, before `# 4. rule registry/implementations`)
-- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 
+- Modify: `.agents/skills/ste/scripts/check_ste.py` (new `mask_to_prose` after
+  the phrase helpers, before `# 4. rule registry/implementations`)
+- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -235,12 +259,15 @@ def test_rust_unterminated_raw_string_blanks_remainder() -> None:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: FAIL with `AttributeError: ... no attribute 'mask_to_prose'`
 
 - [ ] **Step 3: Write minimal implementation**
 
-In `.agents/skills/ste/scripts/check_ste.py`, insert after `markdown_non_prose_ranges` (keep the section numbering comments and add a new numbered section `# 3b. language-aware comment masking`):
+In `.agents/skills/ste/scripts/check_ste.py`, insert after
+`markdown_non_prose_ranges` (keep the section numbering comments and add a new
+numbered section `# 3b. language-aware comment masking`):
 
 ```python
 _COMMENT = "comment"
@@ -379,7 +406,10 @@ def mask_to_prose(text: str, language: Language) -> str:
     return "".join(out)
 ```
 
-For this first task the regex and prefix helpers are small stubs the later tasks expand (the registry ensures `regex_start_prev` only applies to `ts`; `mask_line_prefixes` is Task 6). For Task 2 provide these two helpers immediately after `line_comment_end`:
+For this first task the regex and prefix helpers are small stubs the later tasks
+expand (the registry ensures `regex_start_prev` only applies to `ts`;
+`mask_line_prefixes` is Task 6). For Task 2 provide these two helpers
+immediately after `line_comment_end`:
 
 ```python
 def _regex_end(text: str, start: int) -> int | None:
@@ -394,11 +424,13 @@ def mask_line_prefixes(
     return None
 ```
 
-Note: in Task 2, `_regex_end` always returns None, so the `ts` branch is inert until Task 4.
+Note: in Task 2, `_regex_end` always returns None, so the `ts` branch is inert
+until Task 4.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: PASS (5 passed)
 
 - [ ] **Step 5: Run the full existing suite**
@@ -418,9 +450,9 @@ git commit -m "feat(ste): add rust comment masker"
 ### Task 3: Python masker (docstrings are prose, unterminated strings blank)
 
 **Files:**
+
 - Modify: `.agents/skills/ste/scripts/check_ste.py`
 - Test: `.agents/skills/ste/scripts/tests/test_comments.py`
-
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -462,16 +494,27 @@ def test_python_hash_inside_string_is_not_comment() -> None:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: new tests FAIL (docstrings currently already kept by the Task 2 implementation; `url =` assertion and f-string assertions fail, and the unterminated docstring test fails because the `语言.docstring` branch exists). Verify actual results; the code changes in Step 3 must make exactly these pass without regressing Task 2.
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: new tests FAIL (docstrings currently already kept by the Task 2
+implementation; `url =` assertion and f-string assertions fail, and the
+unterminated docstring test fails because the `语言.docstring` branch exists).
+Verify actual results; the code changes in Step 3 must make exactly these pass
+without regressing Task 2.
 
 - [ ] **Step 3: Implementation check**
 
-The Task 2 implementation already covers the Python path (docstring branch, `'#'` line comment via `language.line_comments`, plain string escape walk). If all three tests pass without changes, continue to Task 4; otherwise fix `mask_to_prose` to satisfy them with the smallest possible change. The f-string case relies on the existing order (prefix char `f` blanks as code, the quote walk then blanks the string).
+The Task 2 implementation already covers the Python path (docstring branch,
+`'#'` line comment via `language.line_comments`, plain string escape walk). If
+all three tests pass without changes, continue to Task 4; otherwise fix
+`mask_to_prose` to satisfy them with the smallest possible change. The f-string
+case relies on the existing order (prefix char `f` blanks as code, the quote
+walk then blanks the string).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: PASS (8 passed)
 
 - [ ] **Step 5: Commit (only if implementation changed)**
@@ -481,16 +524,18 @@ git add .agents/skills/ste/scripts/check_ste.py .agents/skills/ste/scripts/tests
 git commit -m "test(ste): cover python comment masking"
 ```
 
-If no implementation change was needed, do not create an empty commit; skip to Task 4 and commit the tests with the Task 4 batch (state this explicitly in the task report).
+If no implementation change was needed, do not create an empty commit; skip to
+Task 4 and commit the tests with the Task 4 batch (state this explicitly in the
+task report).
 
 ---
 
 ### Task 4: TS/JS masker (template literals, regex guard)
 
 **Files:**
+
 - Modify: `.agents/skills/ste/scripts/check_ste.py` (implement `_regex_end`)
 - Test: `.agents/skills/ste/scripts/tests/test_comments.py`
-
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -525,8 +570,10 @@ def test_ts_unterminated_regex_candidate_falls_through() -> None:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: at least the template-literal and regex-line assertions FAIL (the third comment disappears because regex mode swallowed it).
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: at least the template-literal and regex-line assertions FAIL (the
+third comment disappears because regex mode swallowed it).
 
 - [ ] **Step 3: Implement `_regex_end`**
 
@@ -558,12 +605,18 @@ def _regex_end(text: str, start: int) -> int | None:
     return None
 ```
 
-The `mask_to_prose` guard already reads `language.regex_start_prev`; the scanner must also track the previous non-blank code character. Add a `prev_nonblank` variable initialized to `""` before the loop and maintained:
+The `mask_to_prose` guard already reads `language.regex_start_prev`; the scanner
+must also track the previous non-blank code character. Add a `prev_nonblank`
+variable initialized to `""` before the loop and maintained:
 
-- in the plain quote branch, after `blank(i, j + 1)`: `prev_nonblank = '"' if char == '"' else "'"`
+- in the plain quote branch, after `blank(i, j + 1)`:
+  `prev_nonblank = '"' if char == '"' else "'"`
 - in the template branch, after `blank(i, j + 1)`: `prev_nonblank = "`"`
-- in the code branch (final else), after `char` falls through: `if char != " ": prev_nonblank = char`
-- in the `_regex_end` guard, change the condition to `re.match(rf"[{re.escape(language.regex_start_prev)}]", prev_nonblank)` and, after `blank(i, candidate)`: `prev_nonblank = "/"`
+- in the code branch (final else), after `char` falls through:
+  `if char != " ": prev_nonblank = char`
+- in the `_regex_end` guard, change the condition to
+  `re.match(rf"[{re.escape(language.regex_start_prev)}]", prev_nonblank)` and,
+  after `blank(i, candidate)`: `prev_nonblank = "/"`
 
 The guarded check replacing the size-1 set membership is:
 
@@ -578,11 +631,13 @@ The guarded check replacing the size-1 set membership is:
             ):
 ```
 
-Use the variable name consistently: define `prev_nonblank` once and reference it everywhere (the plan text renamed `prev`; use `prev_nonblank`).
+Use the variable name consistently: define `prev_nonblank` once and reference it
+everywhere (the plan text renamed `prev`; use `prev_nonblank`).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: PASS (11 passed)
 
 - [ ] **Step 5: Commit**
@@ -597,9 +652,10 @@ git commit -m "feat(ste): add ts comment masker guard"
 ### Task 5: Go and C maskers
 
 **Files:**
-- Modify: `.agents/skills/ste/scripts/check_ste.py` (none required beyond Task 4; this task verifies table-driven behavior)
-- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 
+- Modify: `.agents/skills/ste/scripts/check_ste.py` (none required beyond Task
+  4; this task verifies table-driven behavior)
+- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -641,7 +697,9 @@ def test_c_line_comment_continues_after_backslash() -> None:
     assert "continued comment: utilize it" in masked
 ```
 
-(The C splice test uses a non-backslash body first for a readable test; the splice rule itself is covered by `line_comment_end`, so extend this test directly:)
+(The C splice test uses a non-backslash body first for a readable test; the
+splice rule itself is covered by `line_comment_end`, so extend this test
+directly:)
 
 ```python
 def test_c_line_comment_backslash_splice_masks_next_line() -> None:
@@ -653,8 +711,11 @@ def test_c_line_comment_backslash_splice_masks_next_line() -> None:
 
 - [ ] **Step 2: Run tests to verify they fail or pass**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: all PASS without changes (Task 2/4 already handles these paths; this task locks the Go and C tables). If any assertion fails, fix the masker minimally.
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: all PASS without changes (Task 2/4 already handles these paths; this
+task locks the Go and C tables). If any assertion fails, fix the masker
+minimally.
 
 - [ ] **Step 3: Commit**
 
@@ -668,9 +729,10 @@ git commit -m "test(ste): cover go and c comment masking"
 ### Task 6: Per-line doc/continuation prefix blanking
 
 **Files:**
-- Modify: `.agents/skills/ste/scripts/check_ste.py` (implement `mask_line_prefixes`)
-- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 
+- Modify: `.agents/skills/ste/scripts/check_ste.py` (implement
+  `mask_line_prefixes`)
+- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -705,8 +767,10 @@ def test_docstring_interior_is_never_glyph_cleaned() -> None:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: at least the first and second tests FAIL (glyph residue `/` and `*` still present).
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: at least the first and second tests FAIL (glyph residue `/` and `*`
+still present).
 
 - [ ] **Step 3: Implement `mask_line_prefixes`**
 
@@ -745,7 +809,8 @@ def mask_line_prefixes(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: PASS (all tests so far, 15+ passed)
 
 - [ ] **Step 5: Commit**
@@ -760,9 +825,9 @@ git commit -m "feat(ste): blank doc prefix residue"
 ### Task 7: CLI integration for `check` (mode by extension, stdin `--language`)
 
 **Files:**
+
 - Modify: `.agents/skills/ste/scripts/check_ste.py` (`parser()`, `main()`)
 - Test: `.agents/skills/ste/scripts/tests/test_comments.py`
-
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -835,7 +900,8 @@ def test_check_stdin_language_and_misuse(
     )
 ```
 
-The last assertion above is intentionally awkward; replace it with the exact misbehavior test:
+The last assertion above is intentionally awkward; replace it with the exact
+misbehavior test:
 
 ```python
 def test_language_only_with_stdin_returns_two(
@@ -854,8 +920,10 @@ Use this final version for that test instead of the draft block.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: the new CLI tests FAIL (`--language` is not an accepted argument; source files still check in Markdown mode).
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: the new CLI tests FAIL (`--language` is not an accepted argument;
+source files still check in Markdown mode).
 
 - [ ] **Step 3: Implement CLI wiring**
 
@@ -869,7 +937,9 @@ In `parser()`, extend the `check` subparser:
     )
 ```
 
-In `main()`, implement the check flow. Fix the stdin issue (the script currently reads stdin after config load; hold that behavior) and replace the plain-file check path:
+In `main()`, implement the check flow. Fix the stdin issue (the script currently
+reads stdin after config load; hold that behavior) and replace the plain-file
+check path:
 
 ```python
         if args.command == "check":
@@ -914,13 +984,15 @@ Keep the existing render/exit logic that follows unchanged.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
 Expected: PASS (all tests, ~19 passed)
 
 - [ ] **Step 5: Run the full existing suite**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests -q`
-Expected: all pass (no regressions: Markdown stdin check, `--compare`, `dict`, `render-dict`, fixture tests)
+Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests -q` Expected:
+all pass (no regressions: Markdown stdin check, `--compare`, `dict`,
+`render-dict`, fixture tests)
 
 - [ ] **Step 6: Commit**
 
@@ -934,11 +1006,13 @@ git commit -m "feat(ste): check comments by file type"
 ### Task 8: `fix` integration, docs, and spec amendment
 
 **Files:**
-- Modify: `.agents/skills/ste/scripts/check_ste.py` (segment helper, `fix_comments`, `fix` flow)
-- Modify: `.agents/skills/ste/SKILL.md` (Verify)
-- Modify: `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md` (contradiction fix)
-- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 
+- Modify: `.agents/skills/ste/scripts/check_ste.py` (segment helper,
+  `fix_comments`, `fix` flow)
+- Modify: `.agents/skills/ste/SKILL.md` (Verify)
+- Modify: `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md`
+  (contradiction fix)
+- Test: `.agents/skills/ste/scripts/tests/test_comments.py`
 - [ ] **Step 1: Write the failing tests**
 
 Append to `test_comments.py`:
@@ -983,12 +1057,16 @@ def test_fix_markdown_suffix_behavior_unchanged(tmp_path: Path) -> None:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
-Expected: the two source-file fix tests FAIL (current fixer would treat the whole file as prose; `prior to` inside the string literal might get rewritten).
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests/test_comments.py -q`
+Expected: the two source-file fix tests FAIL (current fixer would treat the
+whole file as prose; `prior to` inside the string literal might get rewritten).
 
-- [ ] **Step 3: Implement the prose-segment helper, `fix_comments`, and the `fix` flow**
+- [ ] **Step 3: Implement the prose-segment helper, `fix_comments`, and the
+      `fix` flow**
 
-First refactor `replace_auto` to share segment logic (`# 5. safe fixer` section):
+First refactor `replace_auto` to share segment logic (`# 5. safe fixer`
+section):
 
 ```python
 def prose_segments(text: str) -> list[tuple[str, int]]:
@@ -1060,8 +1138,9 @@ Keep the rest of the fix branch (write/diff output) unchanged.
 
 - [ ] **Step 4: Run tests to verify they pass and no regressions**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests -q`
-Expected: all pass (including the existing fixer tests, which verify `replace_auto` keeps backtick and fence protection after the refactor).
+Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests -q` Expected:
+all pass (including the existing fixer tests, which verify `replace_auto` keeps
+backtick and fence protection after the refactor).
 
 - [ ] **Step 5: Update SKILL.md Verify section**
 
@@ -1074,7 +1153,9 @@ In `.agents/skills/ste/SKILL.md`, extend the `## Verify` list:
 
 - [ ] **Step 6: Amend the spec contradiction**
 
-In `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md`, replace the sentence `Unknown extension for comment checking: exit 2 with the supported list.`:
+In `docs/superpowers/specs/2026-11-02-ste-comment-checking-design.md`, replace
+the sentence
+`Unknown extension for comment checking: exit 2 with the supported list.`:
 
 ```markdown
 Unknown file extensions fall back to Markdown mode per automatic mode selection; explicit stdin `--language` values are argparse-restricted and reject unknown language names (exit 2).
@@ -1085,7 +1166,8 @@ Unknown file extensions fall back to Markdown mode per automatic mode selection;
 Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests -q`
 Expected: all pass.
 
-Run: `ruff check .agents/skills/ste/scripts/ && ruff format --check .agents/skills/ste/scripts/ && python3 .agents/skills/ste/scripts/check_ste.py render-dict --check`
+Run:
+`ruff check .agents/skills/ste/scripts/ && ruff format --check .agents/skills/ste/scripts/ && python3 .agents/skills/ste/scripts/check_ste.py render-dict --check`
 Expected: clean.
 
 - [ ] **Step 8: Commit**
@@ -1103,7 +1185,8 @@ git commit -m "feat(ste): fix comments in source files"
 
 - [ ] **Step 1: Run everything**
 
-Run: `uv run --with pytest pytest .agents/skills/ste/scripts/tests -q && ruff check .agents/skills/ste/scripts/ && ruff format --check .agents/skills/ste/scripts/ && python3 .agents/skills/ste/scripts/check_ste.py render-dict --check && git diff --check`
+Run:
+`uv run --with pytest pytest .agents/skills/ste/scripts/tests -q && ruff check .agents/skills/ste/scripts/ && ruff format --check .agents/skills/ste/scripts/ && python3 .agents/skills/ste/scripts/check_ste.py render-dict --check && git diff --check`
 Expected: all clean.
 
 - [ ] **Step 2: Report**
@@ -1114,6 +1197,15 @@ Post results; no commit (nothing changed).
 
 ## Self-Review (completed while writing)
 
-1. **Spec coverage:** mode selection (Task 7), mask semantics incl. docstring/glyph/regex/splice/nesting/undermination decisions (Tasks 2-6), CLI `--language` stdin flow and misuse (Task 7), fix semantics with positive and negative controls (Task 8), SKILL.md docs plus spec amendment (Task 8), per language (Tasks 2-5), per-line prefix residue (Task 6). Unknown-extension exit 2 conflict resolved in Task 8 with the spec amendment.
-2. **Placeholders:** none; Task 3 may be a no-code-change step (allowed and stated).
-3. **Type consistency:** `language_for_suffix`, `LANGUAGES`, `mask_to_prose`, `_regex_end`, `mask_line_prefixes`, `prose_segments`, `fix_comments` names agree across tasks; `Language` fields match between Task 1 definition and Task 2 usage.
+1. **Spec coverage:** mode selection (Task 7), mask semantics incl.
+   docstring/glyph/regex/splice/nesting/undermination decisions (Tasks 2-6), CLI
+   `--language` stdin flow and misuse (Task 7), fix semantics with positive and
+   negative controls (Task 8), SKILL.md docs plus spec amendment (Task 8), per
+   language (Tasks 2-5), per-line prefix residue (Task 6). Unknown-extension
+   exit 2 conflict resolved in Task 8 with the spec amendment.
+2. **Placeholders:** none; Task 3 may be a no-code-change step (allowed and
+   stated).
+3. **Type consistency:** `language_for_suffix`, `LANGUAGES`, `mask_to_prose`,
+   `_regex_end`, `mask_line_prefixes`, `prose_segments`, `fix_comments` names
+   agree across tasks; `Language` fields match between Task 1 definition and
+   Task 2 usage.

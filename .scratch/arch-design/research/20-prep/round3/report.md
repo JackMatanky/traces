@@ -6,11 +6,13 @@ files are in this directory (`A-` to `FG-`; copied from the untracked
 by the orchestrator, [S] come from a scout and were not re-read, [P] proposals,
 [H] hypotheses.
 
-Status: input to [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md),
+Status: input to
+[ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md),
 which supersedes this file where they differ: `traces check` takes `--before`
-and `--after` (not a git baseline), the delta key is `(field, code,
-hash(value))` without the element index, `step` is checked, severities belong to
-ticket 32 (not scout E), and the author's vault is one example, not evidence.
+and `--after` (not a git baseline), the delta key is
+`(field, code, hash(value))` without the element index, `step` is checked,
+severities belong to ticket 32 (not scout E), and the author's vault is one
+example, not evidence.
 
 ## 1. What changed since brief revision 2
 

@@ -126,11 +126,11 @@ HITL, grilling. Do not answer for the user.
   proof.
 - (c) **Die rule.** State what makes a test redundant. Reconcile it with the
   overlap allowance of ticket 07. State the burden of proof for each layer. Say
-  how a session re-checks a "twin" claim from the audits before it deletes. State
-  whether a mutation run on the module is part of the proof for a unit test
-  (`mise run test:mutants -m <module>`). Ticket 12 sets the mutation posture: no
-  threshold, a review of each new survivor. Decide who checks the mutation
-  record, because CI has none.
+  how a session re-checks a "twin" claim from the audits before it deletes.
+  State whether a mutation run on the module is part of the proof for a unit
+  test (`mise run test:mutants -m <module>`). Ticket 12 sets the mutation
+  posture: no threshold, a review of each new survivor. Decide who checks the
+  mutation record, because CI has none.
 - (d) **Coverage preservation.** At no point does the suite prove less than
   before. Decide these items:
   - The check, at guarantee level and not by test count. Use ticket 12's
@@ -153,12 +153,12 @@ HITL, grilling. Do not answer for the user.
   - 1 test on a condemned seam
 
   Decide the action for each class and its owner. Decide whether these actions
-  belong to the adoption slices or to a separate hygiene change outside this map.
-  State whether a move from e2e keeps one e2e smoke test.
+  belong to the adoption slices or to a separate hygiene change outside this
+  map. State whether a move from e2e keeps one e2e smoke test.
 - (g) **Headers, pins and inherited duties.** Decide these items:
   - The fate of the `//! Proves` and `Defect class:` headers of existing tests.
-    Ticket 11 gives scenarios no `Defect class:` tag. Research/05 (G9) found that
-    the taxonomy is undocumented and drifts. The ledger has a defect-class
+    Ticket 11 gives scenarios no `Defect class:` tag. Research/05 (G9) found
+    that the taxonomy is undocumented and drifts. The ledger has a defect-class
     column. Decide where its values come from.
   - The same-size mtime canary: relabel it as a known limitation, or retire it.
   - The two sort tests named `..._ascending_by_default`: the rename. A rename

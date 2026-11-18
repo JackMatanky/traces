@@ -331,9 +331,9 @@ This Answer records the rules, including the corrections from the final review.
 ### Decisions recorded in the grilling session (2026-11-14 and 2026-11-15)
 
 The maintainer confirmed the initial decisions after two red-team rounds and
-three audits. The final review (2026-11-16) then settled each choice it reopened.
-The project is pre-release. The `.redb` layout is Free and the
-code wipes it at will. Ticket 16 freezes stdout payload shapes, exit codes and
+three audits. The final review (2026-11-16) then settled each choice it
+reopened. The project is pre-release. The `.redb` layout is Free and the code
+wipes it at will. Ticket 16 freezes stdout payload shapes, exit codes and
 template and query capabilities. The change table at the end of this Answer
 records each change that touches that envelope.
 

@@ -1,6 +1,7 @@
 # Decision Conflicts and Open Issues (28-36)
 
-This document maps decisions Q1-Q15 to open tickets 28-37, analyzing conflicts and alternatives.
+This document maps decisions Q1-Q15 to open tickets 28-37, analyzing conflicts
+and alternatives.
 
 ## Ticket Analysis Tables
 
@@ -65,17 +66,26 @@ This document maps decisions Q1-Q15 to open tickets 28-37, analyzing conflicts a
 The CLI crate holds `ConfigService` and `HostInputs` composition.
 
 - **Pros**: Simple integration, mimics current behavior.
-- **Cons**: CLI is bloated; Core cannot be used without CLI-owned configuration logic; complicates crate splitting (ticket 33).
+- **Cons**: CLI is bloated; Core cannot be used without CLI-owned configuration
+  logic; complicates crate splitting (ticket 33).
 
 ### Alternative 2: Core-Hosted Service (Recommended)
 
-Core (or a new `ServiceHost` crate) owns `ConfigService` and `HostInputs` composition.
+Core (or a new `ServiceHost` crate) owns `ConfigService` and `HostInputs`
+composition.
 
-- **Pros**: Clean separation of concerns; CLI is thin, only argument parsing and output presentation; Core/Core-lib can be reused for MCP/LSP/other consumers.
-- **Cons**: Requires extracting composition logic and formalizing the boundary; slightly more complex initial wiring.
+- **Pros**: Clean separation of concerns; CLI is thin, only argument parsing and
+  output presentation; Core/Core-lib can be reused for MCP/LSP/other consumers.
+- **Cons**: Requires extracting composition logic and formalizing the boundary;
+  slightly more complex initial wiring.
 
 ## Summary
 
-This audit of tickets 28-37 reveals several architectural gaps and conflicts, notably regarding crate topology (32), composition ownership (30), and path confinement (29). Implementing the Core-Hosted Service architecture (Alternative 2) is critical to satisfying the crate-split requirements and reducing CLI bloat. All decisions must be reconciled against the specification, ensuring ADR-0004 and the visibility rule are upheld.
+This audit of tickets 28-37 reveals several architectural gaps and conflicts,
+notably regarding crate topology (32), composition ownership (30), and path
+confinement (29). Implementing the Core-Hosted Service architecture (Alternative
+2) is critical to satisfying the crate-split requirements and reducing CLI
+bloat. All decisions must be reconciled against the specification, ensuring
+ADR-0004 and the visibility rule are upheld.
 
 Path: `.scratch/arch-design/research/22-prep/n2b-conflicts-open-28-36.md`

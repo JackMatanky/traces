@@ -10,15 +10,13 @@ Where does service composition live and what is the remit of the CLI? Service
 composition includes config load, trust, schema load, index refresh/persist,
 query execution and template service.
 
-This ticket has three parts. Each listed item is one decision.
-Answer the parts in this order: A, then C, then B. [P]
-Use [ticket 36's decision-record
-rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
-Keep decision evidence separate from implementation gates.
-Settle the structural host contracts before ticket 35 places them.
-Separate runtime tuning from module ownership. Keep Part B unless the user
-approves a scope change.
-Ticket 17 commits the LSP. Part B is not optional.
+This ticket has three parts. Each listed item is one decision. Answer the parts
+in this order: A, then C, then B. [P] Use
+[ticket 36's decision-record rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
+Keep decision evidence separate from implementation gates. Settle the structural
+host contracts before ticket 35 places them. Separate runtime tuning from module
+ownership. Keep Part B unless the user approves a scope change. Ticket 17
+commits the LSP. Part B is not optional.
 
 ### Part A: composition, scaffolding, source normalization, the CLI remit
 

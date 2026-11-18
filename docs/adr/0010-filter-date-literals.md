@@ -48,4 +48,5 @@ literals is also a query-build error, so shapes the lexer does not claim
 ### Confirmation
 
 Unit tests in `src/query/grammar/filter.rs` and
-`filters_pages_using_unquoted_iso_date_literals` in `tests/integration/query.rs`.
+`filters_pages_using_unquoted_iso_date_literals` in
+`tests/integration/query.rs`.

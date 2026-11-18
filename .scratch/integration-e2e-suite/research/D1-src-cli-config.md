@@ -1,8 +1,9 @@
 # D1 — Source-local test audit, part 1 (read-only)
 
-**Scope**: `src/cli/**`, `src/config/**`, `src/dialog/**`, `src/dirs.rs`, `src/env_vars.rs`,
-`src/lib.rs`, `src/main.rs`, `src/file.rs`, `src/file_tracker.rs`, `src/file_class_expander.rs`.
-**Out of scope**: `tests/**` (referenced only as duplication/overlap evidence), `src/index/**`,
+**Scope**: `src/cli/**`, `src/config/**`, `src/dialog/**`, `src/dirs.rs`,
+`src/env_vars.rs`, `src/lib.rs`, `src/main.rs`, `src/file.rs`,
+`src/file_tracker.rs`, `src/file_class_expander.rs`. **Out of scope**:
+`tests/**` (referenced only as duplication/overlap evidence), `src/index/**`,
 `src/query/**`, `src/template/**`, `src/schema/**`, `src/note/**`.
 
 **Method**: per-file `#[test]`/`#[rstest]` census + broad-scope signal grep
@@ -18,13 +19,14 @@ then full reads of every flagged test module. Classification keys:
 | 5 | fs use incidental, could be in-memory → **KEEP BUT NARROW** |
 | 6 | Invokes other tests' helpers / the test facade internally → coupling note |
 
-**Census (file → `#[test]` count; `+r` = `#[rstest]`)**:
-service 69 · cli/mod 44+r · cli/error 40+r · file_tracker 34 · cli/task 34+2r · config/discovery 23 ·
-dialog/preset 20 · cli/template 19 · cli/table 18 · cli/list 18 · config/model 16 · cli/trust 15 ·
-file 14+1r · config/file 14 · lib 12 · dialog/terminal 10 · config/builder 8 · dialog/error 7 ·
-cli/completions 7 · cli/untrust 6 · cli/index 5 · main 4 · cli/tracked 4 · cli/cwd 3 · env_vars 2 ·
-dialog/mod 2 · file_class_expander 1 · dirs 1 · config/trust 1 · cli/init 1 · config/{raw,mod,error} 0.
-≈452 attribute-level tests in scope.
+**Census (file → `#[test]` count; `+r` = `#[rstest]`)**: service 69 · cli/mod
+44+r · cli/error 40+r · file_tracker 34 · cli/task 34+2r · config/discovery 23 ·
+dialog/preset 20 · cli/template 19 · cli/table 18 · cli/list 18 · config/model
+16 · cli/trust 15 · file 14+1r · config/file 14 · lib 12 · dialog/terminal 10 ·
+config/builder 8 · dialog/error 7 · cli/completions 7 · cli/untrust 6 ·
+cli/index 5 · main 4 · cli/tracked 4 · cli/cwd 3 · env_vars 2 · dialog/mod 2 ·
+file_class_expander 1 · dirs 1 · config/trust 1 · cli/init 1 ·
+config/{raw,mod,error} 0. ≈452 attribute-level tests in scope.
 
 ---
 
@@ -32,9 +34,10 @@ dialog/mod 2 · file_class_expander 1 · dirs 1 · config/trust 1 · cli/init 1 
 
 ### 1a. "src/cli/mod.rs contains broad end-to-end workflow tests invoking `Cli::run` in-process" — **ACCEPTED (partially)**
 
-Confirmed. `src/cli/mod.rs` has 45 test fns in 7 modules; **exactly 9 fns drive the full
-`Cli::try_parse_from(..).run(&service, provider)` dispatch in-process** (no process spawn, no
-stdout capture — the module doc at `src/cli/mod.rs:1075-1082` states stdout is not captured):
+Confirmed. `src/cli/mod.rs` has 45 test fns in 7 modules; **exactly 9 fns drive
+the full `Cli::try_parse_from(..).run(&service, provider)` dispatch in-process**
+(no process spawn, no stdout capture — the module doc at
+`src/cli/mod.rs:1075-1082` states stdout is not captured):
 
 | test | traced call path |
 |---|---|
@@ -48,27 +51,31 @@ stdout capture — the module doc at `src/cli/mod.rs:1075-1082` states stdout is
 | `src/cli/mod.rs::run::user_cancelled_during_template_picker_returns_aborted` (1481) | `Cli::run` with `fixtures::CancellingSelect` → `CommandOutcome::Aborted(Cancelled)` |
 | `src/cli/mod.rs::current_dir_and_config::cli_index_fails_before_indexing_when_task_status_uses_prohibited_delimiter` (1536) | writes `config.toml`, `project.trust()`, `CwdGuard::enter` → `Cli::run` (`index`) → nested `CliError::ConfigLoad{..TaskError::ProhibitedStatusSymbol}` + `miette::Report` + asserts `index.redb` absent |
 
-**Correction to the prior claim**: only 2 of these live in a module literally named
-`dispatch_end_to_end`; the other 7 are in `query_workflows`, `run`, and `current_dir_and_config`.
-Two `query_workflows` tests (`template_query_ops_render_identically_to_the_equivalent_file_index_query`
-at 1304 and `derived_inlinks_are_queryable_from_page_queries_and_templates` at 1341) do **not**
-touch `Cli::run` at all — they are cross-component (template engine × query × index) tests that
-happen to sit in a CLI file.
+**Correction to the prior claim**: only 2 of these live in a module literally
+named `dispatch_end_to_end`; the other 7 are in `query_workflows`, `run`, and
+`current_dir_and_config`. Two `query_workflows` tests
+(`template_query_ops_render_identically_to_the_equivalent_file_index_query` at
+1304 and `derived_inlinks_are_queryable_from_page_queries_and_templates` at
+1341) do **not** touch `Cli::run` at all — they are cross-component (template
+engine × query × index) tests that happen to sit in a CLI file.
 
 ### 1b. "An in-crate test mutates cwd without holding `CWD_TEST_LOCK`" — **REJECTED**
 
-`grep -rn 'set_current_dir' src/` returns only `src/cli/cwd.rs:85` (inside `CwdGuard::enter`) and
-`src/cli/cwd.rs:114` (inside `impl Drop for CwdGuard`). Both run while the `CWD_TEST_LOCK`
-`MutexGuard` captured at `src/cli/cwd.rs:81-83` is still alive (the guard struct holds `_lock` and
-`Drop` runs before field drops). Every `CwdGuard::enter` call site in `src/` (46 refs) is test code.
-Every in-crate test whose code path reaches `current_dir()` (`src/cli/mod.rs:226` → `Cwd::new` →
-`src/cli/cwd.rs:32`) first takes the guard: `init`, `list`, `table`, `task`, `template`, `index`,
-`completions` (`--list-templates`), `trust` (no-path), `untrust` (no-path).
-Tests that read cwd *without* changing it use `CwdGuard::same_dir()` (`src/cli/cwd.rs:98`, used by
-`src/index/entry.rs:358`) or `locked_cwd()` (`src/cli/cwd.rs:125`, used by
-`src/cli/cwd.rs::new_returns_a_non_empty_path` / `into_inner_returns_the_same_path`).
-`src/cli/mod.rs::run::no_command_returns_no_command_error` legitimately needs no guard: the
-`None => None` arm returns `CliError::NoCommand` before any cwd read.
+`grep -rn 'set_current_dir' src/` returns only `src/cli/cwd.rs:85` (inside
+`CwdGuard::enter`) and `src/cli/cwd.rs:114` (inside `impl Drop for CwdGuard`).
+Both run while the `CWD_TEST_LOCK` `MutexGuard` captured at
+`src/cli/cwd.rs:81-83` is still alive (the guard struct holds `_lock` and `Drop`
+runs before field drops). Every `CwdGuard::enter` call site in `src/` (46 refs)
+is test code. Every in-crate test whose code path reaches `current_dir()`
+(`src/cli/mod.rs:226` → `Cwd::new` → `src/cli/cwd.rs:32`) first takes the guard:
+`init`, `list`, `table`, `task`, `template`, `index`, `completions`
+(`--list-templates`), `trust` (no-path), `untrust` (no-path). Tests that read
+cwd *without* changing it use `CwdGuard::same_dir()` (`src/cli/cwd.rs:98`, used
+by `src/index/entry.rs:358`) or `locked_cwd()` (`src/cli/cwd.rs:125`, used by
+`src/cli/cwd.rs::new_returns_a_non_empty_path` /
+`into_inner_returns_the_same_path`).
+`src/cli/mod.rs::run::no_command_returns_no_command_error` legitimately needs no
+guard: the `None => None` arm returns `CliError::NoCommand` before any cwd read.
 **Verdict: the locking discipline holds.**
 
 ---
@@ -152,10 +159,11 @@ Tests that read cwd *without* changing it use `CwdGuard::same_dir()` (`src/cli/c
 
 ### 2.7 `src/config/service.rs` (69)
 
-Harness: `Fixture { temp, tracked_root, trust_store, service: ConfigService::at(..) }`
-(`src/config/service.rs:598-647`) and a second 3-tempdir `Fixture` for the `builder` subtree
-(`:1329-1398`). Both isolate every store under `tempfile` — **no test uses `ConfigService::new()`
-except the one named below**.
+Harness:
+`Fixture { temp, tracked_root, trust_store, service: ConfigService::at(..) }`
+(`src/config/service.rs:598-647`) and a second 3-tempdir `Fixture` for the
+`builder` subtree (`:1329-1398`). Both isolate every store under `tempfile` —
+**no test uses `ConfigService::new()` except the one named below**.
 
 | path::test (module → count) | executes | asserts | class | action |
 |---|---|---|---|---|
@@ -217,78 +225,107 @@ except the one named below**.
 ## 3. Narrative for MOVE / REPLACE / DELETE / FIX candidates
 
 ### 3.1 KEEP (explicit non-recommendation): `dispatch_end_to_end::*`
-Although it is the broadest in-process workflow in the crate, `all_three_invocation_forms_produce_identical_output`
-is the **only** test anywhere that proves `traces template -i daily`, `traces tmpl -i daily`, and
-`traces -i daily` converge on one behavior end-to-end (`grep -rn '"tmpl"' tests/` → 0 hits;
-`tests/e2e/golden_path.rs` exercises only `template -i report --dry-run`).
-Moving it outward buys stdout/exit-code observation it does not assert, and costs the cheap
-3-form equivalence check. **Do not move on directory-convention grounds.**
+
+Although it is the broadest in-process workflow in the crate,
+`all_three_invocation_forms_produce_identical_output` is the **only** test
+anywhere that proves `traces template -i daily`, `traces tmpl -i daily`, and
+`traces -i daily` converge on one behavior end-to-end
+(`grep -rn '"tmpl"' tests/` → 0 hits; `tests/e2e/golden_path.rs` exercises only
+`template -i report --dry-run`). Moving it outward buys stdout/exit-code
+observation it does not assert, and costs the cheap 3-form equivalence check.
+**Do not move on directory-convention grounds.**
 
 ### 3.2 FIX ASSERTION — `src/cli/mod.rs::query_workflows::table_reflects_a_note_edit_made_between_two_cli_invocations_with_no_explicit_index_command`
-- **Executes**: `Cli::run`(`table`) → `fs::write(books/dune.md, rating:2)` → `Cli::run`(`table`) →
-  `IndexerService::for_tests(&project).refresh_store()` → `QueryService::run_from_store(..).table(..)`.
-- **Asserts**: rendered table contains `| 2 ` and not `| 9 `.
-- **Problem**: `refresh_store` (`src/index/service.rs:226-245`) *itself* re-scans and applies the
-  delta when `prepare_pass` reports `RefreshState::Stale`. The assertion therefore holds **even if
-  both `Cli::run` invocations did nothing** — the test's own final `refresh_store()` performs the
-  refresh it claims to be observing (the `expect` message at `:1284` — "store already current after
-  the second cli call" — is not what is being checked).
+
+- **Executes**: `Cli::run`(`table`) → `fs::write(books/dune.md, rating:2)` →
+  `Cli::run`(`table`) → `IndexerService::for_tests(&project).refresh_store()` →
+  `QueryService::run_from_store(..).table(..)`.
+- **Asserts**: rendered table contains `| 2` and not `| 9 `.
+- **Problem**: `refresh_store` (`src/index/service.rs:226-245`) *itself*
+  re-scans and applies the delta when `prepare_pass` reports
+  `RefreshState::Stale`. The assertion therefore holds
+  **even if both `Cli::run` invocations did nothing** — the test's own final
+  `refresh_store()` performs the refresh it claims to be observing (the `expect`
+  message at `:1284` — "store already current after the second cli call" — is
+  not what is being checked).
 - **Additional defect an outward location would detect**: exactly this.
-  `tests/e2e/dispatch.rs::list_persists_the_file_index_without_an_explicit_index_command` proves the
-  analogous claim correctly by asserting `.traces/index.redb` exists after a lone `list`.
+  `tests/e2e/dispatch.rs::list_persists_the_file_index_without_an_explicit_index_command`
+  proves the analogous claim correctly by asserting `.traces/index.redb` exists
+  after a lone `list`.
 - **Action**: keep it in-crate but change the observation seam — replace
-  `IndexerService::for_tests(&project).refresh_store()` with a non-refreshing read
-  (`project.indexer().load()`, the seam `src/cli/index.rs` tests already use) and assert on that
-  store; then the two `Cli::run` calls become load-bearing. Alternatively DELETE and add an e2e
-  assertion on `.traces/index.redb` row content after an edit.
+  `IndexerService::for_tests(&project).refresh_store()` with a non-refreshing
+  read (`project.indexer().load()`, the seam `src/cli/index.rs` tests already
+  use) and assert on that store; then the two `Cli::run` calls become
+  load-bearing. Alternatively DELETE and add an e2e assertion on
+  `.traces/index.redb` row content after an edit.
 
 ### 3.3 DELETE/REPLACE — `src/cli/mod.rs::query_workflows::indexing_then_page_and_task_queries_observe_the_same_project_state`
-- **Executes**: seeds `TestProject` with 2 notes + 1 task + 1 wikilink, then `Cli::run` for
-  `index`, `list --from #book --sort rating`, `table --column file.name --column rating`, `task`.
+
+- **Executes**: seeds `TestProject` with 2 notes + 1 task + 1 wikilink, then
+  `Cli::run` for `index`, `list --from #book --sort rating`,
+  `table --column file.name --column rating`, `task`.
 - **Asserts**: only `assert_eq!(outcome, CommandOutcome::Completed)` four times
-  (`:1170, :1178, :1207, :1222`). The three follow-up `QueryService` pipelines are bound to
-  `let _list` / `let _table` / `let _tasks` (`:1184, :1213, :1228`) — **never asserted**, so the
-  "observe the same project state" in the test name is not checked.
-- **Duplicate**: `tests/e2e/golden_path.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`
-  runs the same four commands through a spawned binary **and** asserts their stdout
-  (`"- notes/golden.md\n"`, table contains `golden`/`8`, `"- [ ] buy milk"`). The in-crate version is
-  a strictly weaker copy: it detects only "one of these four dispatch paths returns `Err`/panics",
-  which the e2e test detects too (non-zero exit).
-- **Action**: DELETE, or give it a reason to exist by converting the `let _` bindings into
-  `assert_eq!` against expected rows (which would then justify keeping it as a cross-command
-  state-consistency test the e2e chain cannot express, because e2e cannot compare `list` vs `table`
-  vs `task` renderings against one fixture cheaply).
+  (`:1170, :1178, :1207, :1222`). The three follow-up `QueryService` pipelines
+  are bound to `let _list` / `let _table` / `let _tasks` (`:1184, :1213, :1228`)
+  — **never asserted**, so the "observe the same project state" in the test name
+  is not checked.
+- **Duplicate**:
+  `tests/e2e/golden_path.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`
+  runs the same four commands through a spawned binary **and** asserts their
+  stdout (`"- notes/golden.md\n"`, table contains `golden`/`8`,
+  `"- [ ] buy milk"`). The in-crate version is a strictly weaker copy: it
+  detects only "one of these four dispatch paths returns `Err`/panics", which
+  the e2e test detects too (non-zero exit).
+- **Action**: DELETE, or give it a reason to exist by converting the `let _`
+  bindings into `assert_eq!` against expected rows (which would then justify
+  keeping it as a cross-command state-consistency test the e2e chain cannot
+  express, because e2e cannot compare `list` vs `table` vs `task` renderings
+  against one fixture cheaply).
 
 ### 3.4 MOVE — `src/cli/mod.rs::query_workflows::template_query_ops_render_identically_to_the_equivalent_file_index_query`
-- **Executes**: `seed_book_project` → `IndexerService::for_tests(...).persist(build())` →
-  `render_query_template` (`TemplateService::render_to_file(DryRun)`) → `QueryService::run` →
+
+- **Executes**: `seed_book_project` →
+  `IndexerService::for_tests(...).persist(build())` → `render_query_template`
+  (`TemplateService::render_to_file(DryRun)`) → `QueryService::run` →
   `.table(...)`; asserts `rendered == expected`.
-- **No CLI is involved** (`Cli`/`Cli::run` never called; no `CwdGuard`), yet it sits in
-  `src/cli/mod.rs` and reaches private seams `IndexerService::for_tests` and `Config::test_default`.
+- **No CLI is involved** (`Cli`/`Cli::run` never called; no `CwdGuard`), yet it
+  sits in `src/cli/mod.rs` and reaches private seams `IndexerService::for_tests`
+  and `Config::test_default`.
 - **Target seam**: `tests/integration/template_render.rs` (next to
   `renders_a_query_over_real_indexed_notes_and_writes_the_result`) or, better,
   `tests/integration/index_query.rs`.
-- **Justification (failure-boundary)**: as written it bypasses the crate's public surface, so it
-  stays green if the `test-utils` re-exports (`src/lib.rs:149-162`) or the `TemplateService`/
-  `QueryService` public wrappers break — the exact gap `tests/integration/config_lifecycle.rs:16-22`
-  documents as its own reason to exist. Moving it converts a private-parity check into a
-  public-API parity check and puts it with the other template↔query comparisons.
+- **Justification (failure-boundary)**: as written it bypasses the crate's
+  public surface, so it stays green if the `test-utils` re-exports
+  (`src/lib.rs:149-162`) or the `TemplateService`/ `QueryService` public
+  wrappers break — the exact gap `tests/integration/config_lifecycle.rs:16-22`
+  documents as its own reason to exist. Moving it converts a private-parity
+  check into a public-API parity check and puts it with the other template↔query
+  comparisons.
 
 ### 3.5 KEEP BUT NARROW — `src/cli/mod.rs::query_workflows::unknown_field_path_and_unparsable_filter_surface_actionable_cli_diagnostics`
-- **Executes**: `Cli::run`(`list --sort file.nam`) and `Cli::run`(`list --where "not a valid expression")`.
-- **Asserts**: structured variant `CliError::Query{source: Builder(FieldPath(e))}` with
-  `e.suggestion == Some("file.name")`; `bad_field.code() == "traces::cli::query::failed"`;
+
+- **Executes**: `Cli::run`(`list --sort file.nam`) and
+  `Cli::run`(`list --where "not a valid expression")`.
+- **Asserts**: structured variant
+  `CliError::Query{source: Builder(FieldPath(e))}` with
+  `e.suggestion == Some("file.name")`;
+  `bad_field.code() == "traces::cli::query::failed"`;
   `bad_field.help().is_some()`; `Builder(Syntax(_))`.
-- **Overlap**: `tests/e2e/dispatch.rs::unknown_sort_field_reports_a_did_you_mean_suggestion`
-  asserts the *same* code string on real stderr plus the rendered `"did you mean `file.name`?"`, and
-  `tests/e2e/dispatch.rs::invalid_filter_expression_reports_its_location_and_repair` covers the
-  filter half. The `.code()`/`.help().is_some()` assertions are strictly weaker duplicates of the
-  e2e rendering checks (the code appears verbatim in stderr).
-- **Action**: retain the structured `matches!` assertions (variant + suggestion, which e2e cannot
-  express); drop `.code()`/`.help()` duplication or leave it — either is defensible. Not a move
-  candidate: the structured-variant assertion has no outward home.
+- **Overlap**:
+  `tests/e2e/dispatch.rs::unknown_sort_field_reports_a_did_you_mean_suggestion`
+  asserts the *same* code string on real stderr plus the rendered
+  `"did you mean `file.name`?"`, and
+  `tests/e2e/dispatch.rs::invalid_filter_expression_reports_its_location_and_repair`
+  covers the filter half. The `.code()`/`.help().is_some()` assertions are
+  strictly weaker duplicates of the e2e rendering checks (the code appears
+  verbatim in stderr).
+- **Action**: retain the structured `matches!` assertions (variant + suggestion,
+  which e2e cannot express); drop `.code()`/`.help()` duplication or leave it —
+  either is defensible. Not a move candidate: the structured-variant assertion
+  has no outward home.
 
 ### 3.6 DELETE/RENAME — assertion-gap smoke tests
+
 | path::test | executes | asserts | verdict |
 |---|---|---|---|
 | `src/cli/task.rs::run::omits_summary_stderr_when_run_with_count` (`:843`) | `Task::run` with `count: true` | **`Ok` only** — the name's claim ("omits summary stderr") is never observed; `run` prints via `println!`/`eprintln!` which in-crate tests cannot capture | **DELETE or rename to `..._succeeds_with_count`**. The property is already proven outward by `tests/e2e/dispatch.rs:388-391` (`assert_eq!(count.stdout, "3\n"); assert_eq!(count.stderr, "")`) |
@@ -297,86 +334,112 @@ Moving it outward buys stdout/exit-code observation it does not assert, and cost
 | `src/cli/task.rs::run::runs_successfully_for_a_trusted_project_root` (`:816`) | `Task::run` | `Ok` | Same: duplicate of `tests/e2e/dispatch.rs::task_prints_a_checkbox_line_per_task`. **DELETE** |
 | `src/cli/completions::dispatch::generates_shell_script_and_returns_ok` (`:153`) | `Completions::run(shell:Some)` | `Ok` | Duplicate of `tests/e2e/dispatch.rs::{bash,zsh,fish}_shell_prints_a_completion_script`. **NARROW**: assert `Completions::script(shell)` output (already covered by `completions::script::*`) or delete |
 
-**Do not delete the negative twins** (`fails_when_project_root_is_not_trusted` in `table`, `task`,
-`template`, `index`, `completions::template_names`): each asserts a distinct command's own
-`load_config` gate with a concrete `CliError::ConfigLoad{Build}` + diagnostic `code()`, and only the
-`list` variant has an e2e twin (`tests/e2e/dispatch.rs::untrusted_root_fails_with_the_config_build_diagnostic`).
+**Do not delete the negative twins** (`fails_when_project_root_is_not_trusted`
+in `table`, `task`, `template`, `index`, `completions::template_names`): each
+asserts a distinct command's own `load_config` gate with a concrete
+`CliError::ConfigLoad{Build}` + diagnostic `code()`, and only the `list` variant
+has an e2e twin
+(`tests/e2e/dispatch.rs::untrusted_root_fails_with_the_config_build_diagnostic`).
 
 ### 3.7 RENAME (name/behaviour mismatch) — `src/cli/template.rs::schema::writes_a_schema_backed_template_through_cli_dispatch`
+
 The name says "through CLI dispatch", but the body calls
-`Template::new(PathBuf::from("daily")).run(&service, preset_provider())` directly — `Cli::run` /
-`Cli::try_parse_from` are never used (contrast `src/cli/mod.rs:1416`, which does use them). The test
-itself is a legitimate component test (KEEP); only the name over-claims. It is also the broadest
-fixture in `src/cli` (schema TOML + cover note + journal note + template), overlapping in *shape*
-with `tests/integration/template_render.rs::renders_a_query_over_real_indexed_notes_and_writes_the_result`
-but covering schema/`tasks.from()` parity that no `tests/` file covers — so KEEP, rename to
-`..._through_the_template_command`.
+`Template::new(PathBuf::from("daily")).run(&service, preset_provider())`
+directly — `Cli::run` / `Cli::try_parse_from` are never used (contrast
+`src/cli/mod.rs:1416`, which does use them). The test itself is a legitimate
+component test (KEEP); only the name over-claims. It is also the broadest
+fixture in `src/cli` (schema TOML + cover note + journal note + template),
+overlapping in *shape* with
+`tests/integration/template_render.rs::renders_a_query_over_real_indexed_notes_and_writes_the_result`
+but covering schema/`tasks.from()` parity that no `tests/` file covers — so
+KEEP, rename to `..._through_the_template_command`.
 
 ### 3.8 NARROW — `src/config/service.rs::constructor::new_creates_os_backed_stores`
-- **Executes**: `ConfigService::new()` twice (resolves `dirs::TRACKED_CONFIGS`/`TRUSTED_CONFIGS`).
-- **Asserts**: `format!("{:?}", service1) == format!("{:?}", service2)` — two identical constructor
-  calls produce identical `Debug`. This passes for *any* constructor, including one that wired the
-  wrong roots; the test name's claim ("creates **OS-backed** stores") is never checked.
-- **Action**: assert the Debug output equals the `dirs::TRACKED_CONFIGS`/`TRUSTED_CONFIGS` roots (or
-  that the two stores differ from `ConfigService::at(temp)` roots). Note it is also the only test in
-  the file that touches process-global state directories rather than `Fixture`'s tempdirs — under
-  `cfg(test)` `HOME` is redirected to `$CARGO_MANIFEST_DIR/test` (`src/dirs.rs:80-82`), so it writes
-  nothing, but the redirection is what makes it safe (see §5).
+
+- **Executes**: `ConfigService::new()` twice (resolves
+  `dirs::TRACKED_CONFIGS`/`TRUSTED_CONFIGS`).
+- **Asserts**: `format!("{:?}", service1) == format!("{:?}", service2)` — two
+  identical constructor calls produce identical `Debug`. This passes for *any*
+  constructor, including one that wired the wrong roots; the test name's claim
+  ("creates **OS-backed** stores") is never checked.
+- **Action**: assert the Debug output equals the
+  `dirs::TRACKED_CONFIGS`/`TRUSTED_CONFIGS` roots (or that the two stores differ
+  from `ConfigService::at(temp)` roots). Note it is also the only test in the
+  file that touches process-global state directories rather than `Fixture`'s
+  tempdirs — under `cfg(test)` `HOME` is redirected to
+  `$CARGO_MANIFEST_DIR/test` (`src/dirs.rs:80-82`), so it writes nothing, but
+  the redirection is what makes it safe (see §5).
 
 ### 3.9 DELETE (duplicate) — `src/lib.rs::test_support::tests::project::manages_trust_and_untrust_lifecycle`
-- **Executes/Asserts**: `TestProject::untrusted(proj)` → `.trust()` → `.untrust()` → `removed == 1`.
-- **Duplicate**: `tests/integration/config_lifecycle.rs::test_project_manages_trust_and_untrust_lifecycle`
-  does `TestProject::trusted(proj)` → assert `.traces/config.toml` is a file → `.untrust()` →
-  `removed == 1`. Same subject (the `TestProject` trust helpers), same assertion, one state apart.
-  The external copy is the more valuable one (it runs against the `test-utils` feature build, i.e.
-  catches a broken re-export), and `tests/integration/config_lifecycle.rs::trust_then_untrust_round_trips_through_the_public_service_surface`
+
+- **Executes/Asserts**: `TestProject::untrusted(proj)` → `.trust()` →
+  `.untrust()` → `removed == 1`.
+- **Duplicate**:
+  `tests/integration/config_lifecycle.rs::test_project_manages_trust_and_untrust_lifecycle`
+  does `TestProject::trusted(proj)` → assert `.traces/config.toml` is a file →
+  `.untrust()` → `removed == 1`. Same subject (the `TestProject` trust helpers),
+  same assertion, one state apart. The external copy is the more valuable one
+  (it runs against the `test-utils` feature build, i.e. catches a broken
+  re-export), and
+  `tests/integration/config_lifecycle.rs::trust_then_untrust_round_trips_through_the_public_service_surface`
   already states that rationale.
-- **Action**: delete the in-crate copy, or narrow it to the case the external one does *not* cover
-  (the `untrusted → trust` direction plus `trust_status` becoming `Trusted`).
+- **Action**: delete the in-crate copy, or narrow it to the case the external
+  one does *not* cover (the `untrusted → trust` direction plus `trust_status`
+  becoming `Trusted`).
 
 ---
 
 ## 4. Coupling notes (classification 6)
 
-- **The test facade is used heavily from inside `src/`**: `TestProject` 53 refs, `for_tests` 117,
-  `Config::test_default` 25, `CwdGuard` 73, `fixture_service` 24, `from_content_for_test` 15,
-  `create_trusted_project` 5, `build_test_index` 10. All are `#[cfg(any(test, feature = "test-utils"))]`
-  seams (`src/lib.rs:154-162`). Consequence: `cargo test --lib` exercises a **cfg-different build**
-  of the crate (see §5, first bullet) — the unit suite and the shipped binary do not compile the same
-  `dirs.rs`/`lib.rs` code.
-- **Tests of the test infrastructure live in `src/lib.rs`** (`mod test_support::tests`, 9 fns:
-  `path_safety`, `service`, `project`, `memory`). They validate fixture behaviour, not product
-  behaviour — legitimate, but they are the natural home of the §3.9 duplicate.
-- **Test-only constructor helpers are themselves unit-tested**: `config/model.rs::frontmatter_for_test`
-  (2 fns) and `schemas_for_test` (1 fn) assert test seams rather than production paths. Harmless,
-  but they will not fail if production `TryFrom<Raw..>` paths regress.
-- **Fixture duplication**: three near-identical `CancellingDialogProvider`/`CancellingSelect`
-  implementations — `src/cli/init.rs:134-177`, `src/cli/template.rs:284-334` (identical bodies), and
-  `src/cli/mod.rs:525-562` (a select-only variant). Candidates for hoisting into `test_support`
-  next to `PresetDialogProvider` builders, which would remove 3 sources of drift.
-- **No in-crate test imports anything from `tests/`** (impossible in Rust) — coupling is one-way
-  through the facade, as expected.
+- **The test facade is used heavily from inside `src/`**: `TestProject` 53 refs,
+  `for_tests` 117, `Config::test_default` 25, `CwdGuard` 73, `fixture_service`
+  24, `from_content_for_test` 15, `create_trusted_project` 5, `build_test_index`
+  10. All are `#[cfg(any(test, feature = "test-utils"))]` seams
+  (`src/lib.rs:154-162`). Consequence: `cargo test --lib` exercises a
+  **cfg-different build** of the crate (see §5, first bullet) — the unit suite
+  and the shipped binary do not compile the same `dirs.rs`/`lib.rs` code.
+- **Tests of the test infrastructure live in `src/lib.rs`**
+  (`mod test_support::tests`, 9 fns: `path_safety`, `service`, `project`,
+  `memory`). They validate fixture behaviour, not product behaviour —
+  legitimate, but they are the natural home of the §3.9 duplicate.
+- **Test-only constructor helpers are themselves unit-tested**:
+  `config/model.rs::frontmatter_for_test` (2 fns) and `schemas_for_test` (1 fn)
+  assert test seams rather than production paths. Harmless, but they will not
+  fail if production `TryFrom<Raw..>` paths regress.
+- **Fixture duplication**: three near-identical
+  `CancellingDialogProvider`/`CancellingSelect` implementations —
+  `src/cli/init.rs:134-177`, `src/cli/template.rs:284-334` (identical bodies),
+  and `src/cli/mod.rs:525-562` (a select-only variant). Candidates for hoisting
+  into `test_support` next to `PresetDialogProvider` builders, which would
+  remove 3 sources of drift.
+- **No in-crate test imports anything from `tests/`** (impossible in Rust) —
+  coupling is one-way through the facade, as expected.
 
 ---
 
 ## 5. Isolation hazards found while auditing (not move candidates)
 
 1. **`$XDG_CONFIG_HOME` is not neutralized for unit tests, `$HOME` is.**
-   `src/dirs.rs:80-82` replaces `HOME` with `$CARGO_MANIFEST_DIR/test` under `cfg(test)`, but
-   `CONFIG_HOME` (`src/dirs.rs:91-105`) reads `XDG_CONFIG_HOME` unconditionally. Every
-   `service.load(cwd)` call in the unit suite goes through `ConfigService::discover` →
-   `DiscoveryScope::Full` (`src/config/service.rs:206-214`) → `full()` → `global_from_default_path()`
-   (`src/config/discovery.rs:310-330` → `:414-424`), which reads the developer's **real**
-   `$XDG_CONFIG_HOME/traces/config.toml`. Affected: `config/service.rs::load::*`,
-   `config/discovery.rs::engine::run_full_returns_kind_anchor_and_nearest_local`, and every
-   `X::run` test in `src/cli/**` that reaches `load_config`. `tests/e2e/support.rs:192` isolates
-   `XDG_CONFIG_HOME` for spawned processes; the in-crate suite has no equivalent guard. A real,
-   malformed global config makes these tests fail; a real, valid one silently merges user settings
-   into test configs. (Mitigation pattern already in-repo: `TzGuard`/`TZ_LOCK` in `src/lib.rs:739+`.)
-2. **`TRACES_STATE_DIR` is likewise ambient** for the one test that resolves process-global stores
+   `src/dirs.rs:80-82` replaces `HOME` with `$CARGO_MANIFEST_DIR/test` under
+   `cfg(test)`, but `CONFIG_HOME` (`src/dirs.rs:91-105`) reads `XDG_CONFIG_HOME`
+   unconditionally. Every `service.load(cwd)` call in the unit suite goes
+   through `ConfigService::discover` → `DiscoveryScope::Full`
+   (`src/config/service.rs:206-214`) → `full()` → `global_from_default_path()`
+   (`src/config/discovery.rs:310-330` → `:414-424`), which reads the developer's
+   **real** `$XDG_CONFIG_HOME/traces/config.toml`. Affected:
+   `config/service.rs::load::*`,
+   `config/discovery.rs::engine::run_full_returns_kind_anchor_and_nearest_local`,
+   and every `X::run` test in `src/cli/**` that reaches `load_config`.
+   `tests/e2e/support.rs:192` isolates `XDG_CONFIG_HOME` for spawned processes;
+   the in-crate suite has no equivalent guard. A real, malformed global config
+   makes these tests fail; a real, valid one silently merges user settings into
+   test configs. (Mitigation pattern already in-repo: `TzGuard`/`TZ_LOCK` in
+   `src/lib.rs:739+`.)
+2. **`TRACES_STATE_DIR` is likewise ambient** for the one test that resolves
+   process-global stores
    (`config/service.rs::constructor::new_creates_os_backed_stores`).
-3. **`src/dialog/terminal.rs::skip_if_tty`** makes 10 tests silently pass (early `return`) whenever
-   stdin is a TTY — a green run does not prove they executed.
+3. **`src/dialog/terminal.rs::skip_if_tty`** makes 10 tests silently pass (early
+   `return`) whenever stdin is a TTY — a green run does not prove they executed.
 
 ---
 
@@ -391,9 +454,11 @@ but covering schema/`tasks.from()` parity that no `tests/` file covers — so KE
 | **RENAME** | 2 | `template.rs::schema::writes_a_schema_backed_template_through_cli_dispatch` (§3.7) · `task.rs::run::omits_summary_stderr_when_run_with_count` (if kept) |
 | **KEEP** | everything else | including all `dispatch_end_to_end`, `parse`, `render`, `argv`, `display`, `config::*`, `file_tracker`, `dialog`, `main`, `file` tests |
 
-**Net**: ≈452 in-scope tests; ≈10 actionable (≈2%), of which only **1** is a genuine
-cross-component workflow (`MOVE`) and **1** has an assertion that does not verify its own claim
-(`FIX`). The prior review's "broad end-to-end in `src/cli/mod.rs`" claim is **real but narrow**:
-9 of 45 tests drive `Cli::run` in-process, 6 of those assert only `CommandOutcome`/error variants
-(the parts e2e cannot express), and none of them captures stdout — so they are dispatch/diagnostic
-tests, not e2e duplicates, with the two exceptions called out in §3.2 and §3.3.
+**Net**: ≈452 in-scope tests; ≈10 actionable (≈2%), of which only **1** is a
+genuine cross-component workflow (`MOVE`) and **1** has an assertion that does
+not verify its own claim (`FIX`). The prior review's "broad end-to-end in
+`src/cli/mod.rs`" claim is **real but narrow**: 9 of 45 tests drive `Cli::run`
+in-process, 6 of those assert only `CommandOutcome`/error variants (the parts
+e2e cannot express), and none of them captures stdout — so they are
+dispatch/diagnostic tests, not e2e duplicates, with the two exceptions called
+out in §3.2 and §3.3.

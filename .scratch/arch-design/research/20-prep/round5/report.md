@@ -131,6 +131,7 @@ configured to deny native writes."
 
 ## 6. Outcome
 
-Folded into [ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md)
+Folded into
+[ticket 20's Answer](../../../issues/20-schema-note-typing-and-validation.md)
 (agent guardrail): hooks withdrawn as a design basis, tiered channels, MCP gate
 strength rule, rejected mechanisms.

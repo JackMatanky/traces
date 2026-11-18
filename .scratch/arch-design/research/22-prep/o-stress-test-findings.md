@@ -1,8 +1,19 @@
 # Stress test of the ticket 22 candidate decisions (m-decision-candidates.md)
 
-Naming note (after the STE review): the Answer names the admission function `ConfigService::admit`, not `check`, because `traces check` and `check_note` (ticket 20) use "check". It names the init functions `plan` and `apply`, not `validate`, because the map reserves "validate" for schema validation. Older files in this folder (`m-decision-candidates.md`, `brief.md`, `l-attack-config-lifecycle.md`) still use the old names.
+Naming note (after the STE review): the Answer names the admission function
+`ConfigService::admit`, not `check`, because `traces check` and `check_note`
+(ticket 20) use "check". It names the init functions `plan` and `apply`, not
+`validate`, because the map reserves "validate" for schema validation. Older
+files in this folder (`m-decision-candidates.md`, `brief.md`,
+`l-attack-config-lifecycle.md`) still use the old names.
 
-Reliability note: the round of parallel agents n1-n6 mostly returned thin or wrong output (provider quota errors, one ran in under a minute). `n1`, `n2b`, `n5`, `n6` contain invented file names or no citations and MUST NOT be used. `n3` and `n4` are thin but their few concrete points are re-verified below. Everything in this file was checked by the lead against source or tickets, with citations. Earlier, better-quality attacks: `j` (stores), `k` (index policy), `l` (lifecycle).
+Reliability note: the round of parallel agents n1-n6 mostly returned thin or
+wrong output (provider quota errors, one ran in under a minute). `n1`, `n2b`,
+`n5`, `n6` contain invented file names or no citations and MUST NOT be used.
+`n3` and `n4` are thin but their few concrete points are re-verified below.
+Everything in this file was checked by the lead against source or tickets, with
+citations. Earlier, better-quality attacks: `j` (stores), `k` (index policy),
+`l` (lifecycle).
 
 ## Verified facts that change the decisions
 
@@ -22,13 +33,28 @@ Reliability note: the round of parallel agents n1-n6 mostly returned thin or wro
 
 ## Amendments to the candidate decisions
 
-- **Q8:** 22 decides ownership and direction only: `index` owns `IndexPolicy`; `IndexerService` never sees `Config`; `config` exports no digests. Ticket 25 keeps content, granularity (per-axis vs whole rebuild), parser/format version, racy timestamps. The period-policy field exists only if parsed periods are persisted (F2). Keep one `syn` scan for the `..` hazard on the single destructure.
-- **Q10:** `check` verifies the Config's bound root and local path (no re-discovery), re-runs trust and content verification, and reports changed global bytes. Discovery of a nearer config is a new workspace, decided by the host.
-- **Q12:** one rule: a relative value in any host path variable is an error naming the variable. Replaces the "XDG relative ignored" clause.
-- **Handoff wording:** 22 decides logical owner and module graph; 32 decides crate and `pub`; 30 decides composition (including building `IndexPolicy` once for CLI index and template engine, F7) and dialog threading; 29 must not assume a base for relative env overrides (F5).
+- **Q8:** 22 decides ownership and direction only: `index` owns `IndexPolicy`;
+  `IndexerService` never sees `Config`; `config` exports no digests. Ticket 25
+  keeps content, granularity (per-axis vs whole rebuild), parser/format version,
+  racy timestamps. The period-policy field exists only if parsed periods are
+  persisted (F2). Keep one `syn` scan for the `..` hazard on the single
+  destructure.
+- **Q10:** `check` verifies the Config's bound root and local path (no
+  re-discovery), re-runs trust and content verification, and reports changed
+  global bytes. Discovery of a nearer config is a new workspace, decided by the
+  host.
+- **Q12:** one rule: a relative value in any host path variable is an error
+  naming the variable. Replaces the "XDG relative ignored" clause.
+- **Handoff wording:** 22 decides logical owner and module graph; 32 decides
+  crate and `pub`; 30 decides composition (including building `IndexPolicy` once
+  for CLI index and template engine, F7) and dialog threading; 29 must not
+  assume a base for relative env overrides (F5).
 
 ## Not stress-tested well (open risks)
 
-- Q7 trust-after-init predicate: the attack agent failed twice; only my own reasoning exists (atomic `create_dir`, host applies policy, warn on trust failure). Needs one more adversarial pass or the human's explicit acceptance.
+- Q7 trust-after-init predicate: the attack agent failed twice; only my own
+  reasoning exists (atomic `create_dir`, host applies policy, warn on trust
+  failure). Needs one more adversarial pass or the human's explicit acceptance.
 - Typestate with a store-level `verify`: no compile-checked sketch exists yet.
-- A cargo/uv/mise/direnv comparison for self-created config trust has not been done by any agent.
+- A cargo/uv/mise/direnv comparison for self-created config trust has not been
+  done by any agent.

@@ -1,59 +1,82 @@
 Status: implemented
 
-**Date**: 2026-09-01
-**Implemented in**: `251a215`..`c525563`, branch `task-system/04-position-and-depth-tracker`
-(worktree `.worktrees/04-position-and-depth-tracker/`, not yet merged to `main`)
+**Date**: 2026-09-01 **Implemented in**: `251a215`..`c525563`, branch
+`task-system/04-position-and-depth-tracker` (worktree
+`.worktrees/04-position-and-depth-tracker/`, not yet merged to `main`)
 
 # 04 — LineIndex
 
-**What to build:** A byte-to-line tracker utility with `SourceLine` and `BytePos` newtypes. The tracker precomputes line starts from source text and converts byte offsets to source line numbers. The newtypes prevent byte/line confusion at compile time.
+**What to build:** A byte-to-line tracker utility with `SourceLine` and
+`BytePos` newtypes. The tracker precomputes line starts from source text and
+converts byte offsets to source line numbers. The newtypes prevent byte/line
+confusion at compile time.
 
 **Blocked by:** None — can start immediately (parallel with 01).
 
-**Note:** Issue 01 integrated a `LineTracker` struct into the parser. This issue extracts that into a public `LineIndex` module, adds `SourceLine(u32)` and `BytePos(usize)` newtypes per grilling session Q24/Q59, and updates the parser to use them. The `LineTracker` implementation moves here; the parser imports `LineIndex`.
+**Note:** Issue 01 integrated a `LineTracker` struct into the parser. This issue
+extracts that into a public `LineIndex` module, adds `SourceLine(u32)` and
+`BytePos(usize)` newtypes per grilling session Q24/Q59, and updates the parser
+to use them. The `LineTracker` implementation moves here; the parser imports
+`LineIndex`.
 
 ## Current behavior
 
-`LineTracker` is a private struct in `src/note/parser.rs:362-394` with `line_starts: Vec<usize>`, `new(source)`, and `line_for(offset) -> usize`. `ListItem` stores `line: usize` and `parent_line: Option<usize>`. There is no type distinction between byte offsets and line numbers — both are raw `usize`.
+`LineTracker` is a private struct in `src/note/parser.rs:362-394` with
+`line_starts: Vec<usize>`, `new(source)`, and `line_for(offset) -> usize`.
+`ListItem` stores `line: usize` and `parent_line: Option<usize>`. There is no
+type distinction between byte offsets and line numbers — both are raw `usize`.
 
 ## Desired behavior
 
 `LineIndex` is a public utility module with:
+
 - `SourceLine(u32)` newtype for 1-indexed line numbers (grilling Q24, Q59)
 - `BytePos(usize)` newtype for byte offsets
 - `LineIndex` struct with `line_starts: Vec<usize>`
 - Conversion methods returning `SourceLine` instead of raw `usize`
 
-The parser uses `BytePos` when reading byte offsets from pulldown-cmark and `SourceLine` when storing line numbers on `ListItem`. The type system prevents passing a byte offset where a line number is expected.
+The parser uses `BytePos` when reading byte offsets from pulldown-cmark and
+`SourceLine` when storing line numbers on `ListItem`. The type system prevents
+passing a byte offset where a line number is expected.
 
 ## Key interfaces
 
-- `SourceLine(u32)` — newtype, 1-indexed line number. Implements `From<SourceLine> for u32`, `Display`, `PartialOrd`, `Ord`, `Eq`, `Hash`, `Copy`, `Clone`
-- `BytePos(usize)` — newtype for byte offsets. Implements `From<usize> for BytePos`, `From<BytePos> for usize`, `Copy`, `Clone`
+- `SourceLine(u32)` — newtype, 1-indexed line number. Implements
+  `From<SourceLine> for u32`, `Display`, `PartialOrd`, `Ord`, `Eq`, `Hash`,
+  `Copy`, `Clone`
+- `BytePos(usize)` — newtype for byte offsets. Implements
+  `From<usize> for BytePos`, `From<BytePos> for usize`, `Copy`, `Clone`
 - `LineIndex` struct — `line_starts: Vec<usize>` field
 - `LineIndex::new(source: &str) -> Self` — precomputes line start byte offsets
-- `LineIndex::byte_to_line(&self, offset: BytePos) -> SourceLine` — converts byte offset to 1-indexed line via `partition_point`
-- Edge cases: `BytePos(0)` → `SourceLine(1)`, offset at line boundary → correct line, empty source → `SourceLine(1)`, offset beyond source length → last line
+- `LineIndex::byte_to_line(&self, offset: BytePos) -> SourceLine` — converts
+  byte offset to 1-indexed line via `partition_point`
+- Edge cases: `BytePos(0)` → `SourceLine(1)`, offset at line boundary → correct
+  line, empty source → `SourceLine(1)`, offset beyond source length → last line
 
 ## Acceptance criteria
 
-- [x] `SourceLine(u32)` newtype with `From`, `Into`, `Display`, `PartialOrd`, `Ord`, `Eq`, `Hash`, `Copy`, `Clone`
-- [x] `BytePos(usize)` newtype with `From<usize>`, `From<BytePos> for usize`, `Copy`, `Clone`
+- [x] `SourceLine(u32)` newtype with `From`, `Into`, `Display`, `PartialOrd`,
+      `Ord`, `Eq`, `Hash`, `Copy`, `Clone`
+- [x] `BytePos(usize)` newtype with `From<usize>`, `From<BytePos> for usize`,
+      `Copy`, `Clone`
 - [x] `LineIndex` struct with `line_starts: Vec<usize>` field
 - [x] `LineIndex::new(source: &str) -> Self` precomputes line starts
-- [x] `LineIndex::byte_to_line(offset: BytePos) -> SourceLine` uses `partition_point`
+- [x] `LineIndex::byte_to_line(offset: BytePos) -> SourceLine` uses
+      `partition_point`
 - [x] Edge case: `BytePos(0)` → `SourceLine(1)`
 - [x] Edge case: offset at line boundary returns that line (not next)
 - [x] Edge case: empty source → `SourceLine(1)`
 - [x] Edge case: offset beyond source length → last line
 - [x] Unit test: single-line source, any offset returns `SourceLine(1)`
-- [x] Unit test: multi-line source, offsets at line starts return correct `SourceLine` values
+- [x] Unit test: multi-line source, offsets at line starts return correct
+      `SourceLine` values
 - [x] Unit test: empty lines counted as separate lines
 - [x] Unit test: offset at exact line boundary returns that line
 - [x] Unit test: offset beyond source length returns last line
 - [x] Unit test: empty source returns `SourceLine(1)`
 - [x] Parser updated to use `BytePos` and `SourceLine` instead of raw `usize`
-- [x] `ListItem.line` and `ListItem.parent_line` use `SourceLine` instead of `usize`
+- [x] `ListItem.line` and `ListItem.parent_line` use `SourceLine` instead of
+      `usize`
 - [x] `cargo test` passes, `cargo clippy` clean
 
 ## Implementation notes
@@ -90,13 +113,13 @@ without depending on `note::`.
    `ParserContext::handle_event`/`start_item` carry `BytePos` (not raw
    `usize`) through to `LineIndex::byte_to_line`, matching the issue's "the
    parser uses `BytePos` when reading byte offsets from pulldown-cmark".
-2. **`SourceLine` default sentinel stays `SourceLine::new(0)`.** `ListItem::new`/
-   `with_children` default to `ListItemPosition::default()` (`depth: 0`,
-   `line: SourceLine::new(0)`, `parent: None`) until `with_position` is
-   called — unchanged sentinel semantics from the prior `line: usize = 0`,
-   just typed and bundled. `0` is never produced by `byte_to_line` itself
-   (`partition_point` over a non-empty `line_starts` always yields `>= 1`);
-   it is only the pre-parse "unset" marker.
+2. **`SourceLine` default sentinel stays `SourceLine::new(0)`.**
+   `ListItem::new`/ `with_children` default to `ListItemPosition::default()`
+   (`depth: 0`, `line: SourceLine::new(0)`, `parent: None`) until
+   `with_position` is called — unchanged sentinel semantics from the prior
+   `line: usize = 0`, just typed and bundled. `0` is never produced by
+   `byte_to_line` itself (`partition_point` over a non-empty `line_starts`
+   always yields `>= 1`); it is only the pre-parse "unset" marker.
 3. **`u32::try_from(line).unwrap_or(u32::MAX)`** narrows the `partition_point`
    `usize` result to `SourceLine`'s `u32`, matching the existing
    `DenseIndex::saturating_u32` idiom in `src/schema/graph/adjacency.rs`
@@ -152,11 +175,11 @@ without depending on `note::`.
    recursively when scanning non-matching prose blocks, causing stack overflow
    on 10KB+ documents. Emitting `Ignored` tokens explicitly allows the iterator
    loop to consume non-token bytes iteratively without stack recursion.
-10. **Granular benchmark suite added to `benches/note_parsing.rs`.**
-    Added 7 targeted benchmarks: `prose_floor` (1k/10k/100k prose baseline),
-    isolated `dense_wikilinks` vs `dense_tasks` workloads, `list_item_scaling`
-    (10–5000 items, `Throughput::Elements`), `nesting_depth` (200 items at depths
-    1–50), `line_density` (50KB doc at line lengths 10–1000 bytes), and
+10. **Granular benchmark suite added to `benches/note_parsing.rs`.** Added 7
+    targeted benchmarks: `prose_floor` (1k/10k/100k prose baseline), isolated
+    `dense_wikilinks` vs `dense_tasks` workloads, `list_item_scaling` (10–5000
+    items, `Throughput::Elements`), `nesting_depth` (200 items at depths 1–50),
+    `line_density` (50KB doc at line lengths 10–1000 bytes), and
     `frontmatter_field_scaling` (5–200 YAML fields). Baseline saved as
     `position-refactor` via `mise run bench -r position-refactor` and comparable
     via `critcmp position-refactor`.

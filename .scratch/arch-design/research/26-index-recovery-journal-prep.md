@@ -70,10 +70,11 @@ Check all index-affecting changes again before the measurements.
   results against a fresh parse. A journal must obey this rule. The BDD case
   "Deleting the index store preserves query results" pins one consequence. See
   `tests/features/index/index-store.feature:17-25`.
-- [V] [What is the index read model?](../issues/24-index-read-model-and-query-execution.md)
+- [V]
+  [What is the index read model?](../issues/24-index-read-model-and-query-execution.md)
   keeps `Durability::None` and says that the store is a rebuildable cache. It
-  keeps durability and locking inside the adapter (rule 5). It chose `None`.
-  It did not compare the total cost of open, commit and drop with `Immediate`.
+  keeps durability and locking inside the adapter (rule 5). It chose `None`. It
+  did not compare the total cost of open, commit and drop with `Immediate`.
 - [V] [Does the landed freshness model
   stand?](../issues/25-index-freshness-and-invalidation.md) decouples this
   ticket. It says a crash leaves a no-op refresh of the uncommitted files. It
@@ -112,10 +113,10 @@ at any point leaves the previous durable state.
 [V] A stop before a durable commit leaves the last durable state.
 The next open can need repair. A journal cannot remove the redb repair.
 
-[H] The journal window starts after durable publication, not after the
-`None` commit. In the current CLI, `None` leaves the store open during the query.
-At 20,000 notes, the shim shows a store open of 67 to 81 ms.
-At 50,000 notes, it shows 152 to 198 ms. See D5.
+[H] The journal window starts after durable publication, not after the `None`
+commit. In the current CLI, `None` leaves the store open during the query. At
+20,000 notes, the shim shows a store open of 67 to 81 ms. At 50,000 notes, it
+shows 152 to 198 ms. See D5.
 
 An `Immediate` commit shortens the window after the commit.
 
@@ -364,11 +365,10 @@ Do not label a case viable because an upper bound on `B` exceeds `O`.
 The ticket rejects a case only when a measured upper bound on `B` does not
 exceed a measured lower bound on `O`.
 
-[H] A stop before journal publication has no replay benefit.
-Path timings differ. At the same elapsed stop time, a rival can already be durable.
-In that phase, a journal cannot claim saved redo work.
-Measure the window for each path from the same start point.
-The stop-time distribution remains unknown.
+[H] A stop before journal publication has no replay benefit. Path timings
+differ. At the same elapsed stop time, a rival can already be durable. In that
+phase, a journal cannot claim saved redo work. Measure the window for each path
+from the same start point. The stop-time distribution remains unknown.
 
 [P] Stage the matrix. Measure representative edits and rebuilds, then
 expand near an observed crossover. Do not add a file-count switch to
@@ -431,13 +431,13 @@ code.
 
 ## G. Precedents
 
-[V] Git: [the `core.fsync`
-setting](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corefsync)
+[V] Git:
+[the `core.fsync` setting](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corefsync)
 defaults to `committed,-loose-object`. This list does not include `index`,
 `commit-graph` or `pack-metadata`. Add the `derived-metadata` group by hand to
-harden them. Git says that items which are not hardened may be lost after an unclean
-system shutdown. The default `core.fsyncMethod` on macOS is `writeout-only`.
-Git avoids a full cache flush on macOS by default.
+harden them. Git says that items which are not hardened may be lost after an
+unclean system shutdown. The default `core.fsyncMethod` on macOS is
+`writeout-only`. Git avoids a full cache flush on macOS by default.
 
 [V] SQLite: [Atomic Commit in
 SQLite](https://www.sqlite.org/atomiccommit.html) syncs the rollback journal
@@ -452,19 +452,19 @@ old pages. A redo journal for a rebuildable cache has no such precedent in
 this research. The cache tools in research 05 (Cargo, Ruff, rustc, rumdl) treat
 a damaged cache as a miss.
 
-[V] Pillai and others, [All File Systems Are Not Created
-Equal](https://www.usenix.org/conference/osdi14/technical-sessions/presentation/pillai),
+[V] Pillai and others,
+[All File Systems Are Not Created Equal](https://www.usenix.org/conference/osdi14/technical-sessions/presentation/pillai),
 found 60 crash vulnerabilities in 11 widely used systems. The systems include
 SQLite, LMDB, Git and Mercurial. The correctness of an update protocol depends
 on file system behavior that varies between systems. A hand-written journal
 carries this risk. redb carries it already.
 
-[V] Candea and Fox, [Crash-Only
-Software](https://www.usenix.org/events/hotos03/tech/full_papers/candea/candea_html/index.html),
-say that crash-only programs have one way to stop and one way to start. The
-stop is a crash. The start is recovery. The CLI guide in this repository
-repeats the rule. See `docs/refs/cli_guide.md:807-810,869-870`. The landed
-design fits this rule. A cache that rebuilds on a miss has one recovery path.
+[V] Candea and Fox,
+[Crash-Only Software](https://www.usenix.org/events/hotos03/tech/full_papers/candea/candea_html/index.html),
+say that crash-only programs have one way to stop and one way to start. The stop
+is a crash. The start is recovery. The CLI guide in this repository repeats the
+rule. See `docs/refs/cli_guide.md:807-810,869-870`. The landed design fits this
+rule. A cache that rebuilds on a miss has one recovery path.
 
 [V] Dataview keeps its index cache in IndexedDB on the local device. Its
 author chose it over a synced file because a synced cache would break across
@@ -524,8 +524,8 @@ note. Keep the ticket open until its measurements are complete.
   Expand around cases whose measured cost bounds overlap.
 - Report normal-write cost and the first usable query after a stop.
   Compare redo, `Immediate`, a journal and a conditional rebuild side file.
-- Measure two rebuild payload bounds on the decided task-heavy facets.
-  One carries prepared facets. One carries parsed facts and rebuilds derived data.
+- Measure two rebuild payload bounds on the decided task-heavy facets. One
+  carries prepared facets. One carries parsed facts and rebuilds derived data.
 - Report a conditional eligible-stop rate for each matched phase.
   Measure each window. Do not combine rates without a stop distribution.
 - If a candidate passes the gate, open a follow-on task.

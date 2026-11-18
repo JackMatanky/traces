@@ -1,8 +1,8 @@
 # Research 13: E2E Candidate Table
 
-This document evaluates the 27 end-to-end scenario candidates.
-It applies ticket 07 boundary tiering conditions and ticket 08 classification rules.
-It cross-references each test against the research 10 invariance map.
+This document evaluates the 27 end-to-end scenario candidates. It applies ticket
+07 boundary tiering conditions and ticket 08 classification rules. It
+cross-references each test against the research 10 invariance map.
 
 ## Candidate Evaluation Table
 
@@ -54,8 +54,10 @@ It cross-references each test against the research 10 invariance map.
 
 ## Candidates with No Research 10 Row
 
-- None. Every candidate maps to at least one valid row in `research/10-invariance-map.md`.
+- None. Every candidate maps to at least one valid row in
+  `research/10-invariance-map.md`.
 
 ## Candidates Whose Test No Longer Exists or Changed Name
 
-- None. Source verification confirmed all 27 test functions exist in the test files today.
+- None. Source verification confirmed all 27 test functions exist in the test
+  files today.

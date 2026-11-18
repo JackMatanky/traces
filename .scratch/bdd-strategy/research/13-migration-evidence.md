@@ -114,8 +114,8 @@ Reading for ticket 13:
 Reading for ticket 13:
 
 - A "strengthen" action needs a test of weakness: the assertion passes for the
-  wrong reason. `is_err()` passes for any error. A substring match on miette text
-  breaks ticket 07's channel rule.
+  wrong reason. `is_err()` passes for any error. A substring match on miette
+  text breaks ticket 07's channel rule.
 - Table-driven loops carry conditional logic and failure messages that hide the
   failing row. Convert only key rows (ticket 08 already limits this).
 - No source supports a project-local defect-class list as a quality tool. See

@@ -28,7 +28,8 @@ pub enum ErrorCode { ParseError, InvalidRequest, MethodNotFound, InvalidParams, 
 pub struct ProtocolError(String)
 ```
 
-All types derive `Debug`. `Message`, `Request`, `Notification`, `Response`, `RequestId`, `ResponseError` derive `Serialize`/`Deserialize` and `Clone`.
+All types derive `Debug`. `Message`, `Request`, `Notification`, `Response`,
+`RequestId`, `ResponseError` derive `Serialize`/`Deserialize` and `Clone`.
 
 ### Transport Constructors
 
@@ -118,20 +119,31 @@ impl IoThreads {
 
 ## 2. Dispatch Model
 
-**Synchronous, crossbeam-channel based.** The design philosophy is deliberately minimal: `lsp-server` gives you the raw message channel and expects you to build the dispatch loop yourself.
+**Synchronous, crossbeam-channel based.** The design philosophy is deliberately
+minimal: `lsp-server` gives you the raw message channel and expects you to build
+the dispatch loop yourself.
 
 ### How it works
 
-1. `Connection::stdio()` spawns **two background threads**: one reads from stdin, one writes to stdout. They communicate with the main thread via crossbeam channels.
-2. The main thread receives `Message` values from `connection.receiver` — a `crossbeam_channel::Receiver<Message>`.
-3. You iterate with `for msg in &connection.receiver` (blocking recv) or use `recv_timeout`/`try_recv` for polling.
-4. Each `Message` is one of `Request`, `Notification`, or `Response`. You match and dispatch manually.
+1. `Connection::stdio()` spawns **two background threads**: one reads from
+   stdin, one writes to stdout. They communicate with the main thread via
+   crossbeam channels.
+2. The main thread receives `Message` values from `connection.receiver` — a
+   `crossbeam_channel::Receiver<Message>`.
+3. You iterate with `for msg in &connection.receiver` (blocking recv) or use
+   `recv_timeout`/`try_recv` for polling.
+4. Each `Message` is one of `Request`, `Notification`, or `Response`. You match
+   and dispatch manually.
 
 ### Is it truly synchronous?
 
-**Yes.** No async runtime. No futures. The blocking happens at the channel level. The IO threads handle the async parts (reading frames off stdin, writing frames to stdout), but the API surface is entirely synchronous. You can call `.recv()` and get a `Message` on the current thread.
+**Yes.** No async runtime. No futures. The blocking happens at the channel
+level. The IO threads handle the async parts (reading frames off stdin, writing
+frames to stdout), but the API surface is entirely synchronous. You can call
+`.recv()` and get a `Message` on the current thread.
 
-This is a **deliberate design choice** — rust-analyzer's concurrency model is crossbeam thread pools + atomic cancellation tokens, not Tokio tasks.
+This is a **deliberate design choice** — rust-analyzer's concurrency model is
+crossbeam thread pools + atomic cancellation tokens, not Tokio tasks.
 
 ### Typical dispatch pattern
 
@@ -170,9 +182,13 @@ for msg in &connection.receiver {
 
 **Zero built-in cancellation logic.** It provides the building blocks:
 
-1. **`ErrorCode::RequestCanceled`** (`-32800`) — the standard LSP error code for cancelled requests.
-2. **`Incoming::cancel(&id) -> Option<Response>`** — removes the request from the pending queue and generates an error Response with `RequestCanceled` code.
-3. **`Incoming::complete(&id)`** — removes and returns the user data attached to a request.
+1. **`ErrorCode::RequestCanceled`** (`-32800`) — the standard LSP error code for
+   cancelled requests.
+2. **`Incoming::cancel(&id) -> Option<Response>`** — removes the request from
+   the pending queue and generates an error Response with `RequestCanceled`
+   code.
+3. **`Incoming::complete(&id)`** — removes and returns the user data attached to
+   a request.
 
 ### What you must build yourself
 
@@ -180,20 +196,29 @@ The cancellation *mechanism* is entirely manual:
 
 1. Parse the `$/cancelRequest` notification yourself.
 2. Look up the request ID in your `ReqQueue`.
-3. Signal the background task to stop (via `Arc<AtomicBool>`, a channel, or a custom cancellation token).
+3. Signal the background task to stop (via `Arc<AtomicBool>`, a channel, or a
+   custom cancellation token).
 4. The background task must periodically check the token and abort early.
-5. If the task completes after cancellation, you must check the token before sending the response.
+5. If the task completes after cancellation, you must check the token before
+   sending the response.
 
 ### How rust-analyzer does cancellation
 
 rust-analyzer implements a sophisticated cooperative cancellation model:
 
-- Every incoming request is paired with a cancellation token (typically `Arc<AtomicBool>`).
-- The token is stored in `ReqQueue::Incoming` as user data via `.register(id, token)`.
-- When `$/cancelRequest` arrives, the main loop calls `req_queue.incoming.cancel(&id)`, which returns the `Option<Response>`.
-- Background threads check the token between computation steps (e.g., inside Salsa query loops).
-- If cancelled, the background thread drops the result; the main loop sends the error response.
-- Additionally, rust-analyzer implements **implicit cancellation**: when new requests arrive, older in-flight requests for the same document may be cancelled automatically.
+- Every incoming request is paired with a cancellation token (typically
+  `Arc<AtomicBool>`).
+- The token is stored in `ReqQueue::Incoming` as user data via
+  `.register(id, token)`.
+- When `$/cancelRequest` arrives, the main loop calls
+  `req_queue.incoming.cancel(&id)`, which returns the `Option<Response>`.
+- Background threads check the token between computation steps (e.g., inside
+  Salsa query loops).
+- If cancelled, the background thread drops the result; the main loop sends the
+  error response.
+- Additionally, rust-analyzer implements **implicit cancellation**: when new
+  requests arrive, older in-flight requests for the same document may be
+  cancelled automatically.
 
 ---
 
@@ -201,11 +226,13 @@ rust-analyzer implements a sophisticated cooperative cancellation model:
 
 ### What lsp-server provides
 
-**Nothing built-in.** There is no `ProgressReporter` type, no `$/progress` helper, no token management.
+**Nothing built-in.** There is no `ProgressReporter` type, no `$/progress`
+helper, no token management.
 
 ### How to implement it
 
-You must construct `$/progress` notifications manually and send them through `connection.sender`:
+You must construct `$/progress` notifications manually and send them through
+`connection.sender`:
 
 ```rust
 use lsp_types::ProgressParamsValue;
@@ -262,21 +289,30 @@ Or construct the `ProgressParams` from `lsp-types` and serialize it.
 
 ### What lsp-server handles
 
-1. **Frame-level protocol**: Content-Length headers, JSON-RPC framing — fully handled.
-2. **Message parsing**: Deserializing JSON-RPC into `Request`/`Notification`/`Response` — handled.
+1. **Frame-level protocol**: Content-Length headers, JSON-RPC framing — fully
+   handled.
+2. **Message parsing**: Deserializing JSON-RPC into
+   `Request`/`Notification`/`Response` — handled.
 3. **`initialize`/`initialized` flow**: The `Connection::initialize()` method:
    - Blocks until the client sends `initialize`.
-   - Returns `(RequestId, serde_json::Value)` — the request ID and raw `InitializeParams`.
-   - You respond by calling `initialize_finish(id, capabilities)` which sends the response.
-   - After that, you're expected to wait for `initialized` notification (you handle this yourself).
-4. **`shutdown`/`exit` flow**: `handle_shutdown(&req)` detects the `shutdown` request, sends an empty success response, and returns `Ok(true)`. You then break your loop and wait for `exit`.
+   - Returns `(RequestId, serde_json::Value)` — the request ID and raw
+     `InitializeParams`.
+   - You respond by calling `initialize_finish(id, capabilities)` which sends
+     the response.
+   - After that, you're expected to wait for `initialized` notification (you
+     handle this yourself).
+4. **`shutdown`/`exit` flow**: `handle_shutdown(&req)` detects the `shutdown`
+   request, sends an empty success response, and returns `Ok(true)`. You then
+   break your loop and wait for `exit`.
 
 ### What you implement
 
 - Deserializing `InitializeParams` from the raw `serde_json::Value`.
 - Building and returning `ServerCapabilities`.
-- Handling the `initialized` notification (typically a no-op, but some servers use it to trigger initial diagnostics).
-- Enforcing the LSP lifecycle state machine (no requests before `initialize`, proper shutdown sequence).
+- Handling the `initialized` notification (typically a no-op, but some servers
+  use it to trigger initial diagnostics).
+- Enforcing the LSP lifecycle state machine (no requests before `initialize`,
+  proper shutdown sequence).
 
 ### Two-phase initialization
 
@@ -322,13 +358,18 @@ Compared to `tower-lsp`/`tower-lsp-server`:
 ### What you must build with lsp-server
 
 1. **Request dispatch table/routing** — match on `req.method` string.
-2. **Background task spawning** — `std::thread::spawn`, crossbeam thread pool, or tokio.
-3. **Cancellation tokens** — `Arc<AtomicBool>` or custom, checked in background loops.
+2. **Background task spawning** — `std::thread::spawn`, crossbeam thread pool,
+   or tokio.
+3. **Cancellation tokens** — `Arc<AtomicBool>` or custom, checked in background
+   loops.
 4. **ReqQueue management** — register, complete, cancel manually.
-5. **Client notifications** — construct `Notification::new(...)` and send through channel.
+5. **Client notifications** — construct `Notification::new(...)` and send
+   through channel.
 6. **Progress tokens** — manual `$/progress` message construction.
-7. **VFS / document state** — maintain open document contents from `didOpen`/`didChange`.
-8. **Lifecycle state machine** — enforce initialize-before-requests, shutdown sequence.
+7. **VFS / document state** — maintain open document contents from
+   `didOpen`/`didChange`.
+8. **Lifecycle state machine** — enforce initialize-before-requests, shutdown
+   sequence.
 
 ---
 
@@ -336,10 +377,12 @@ Compared to `tower-lsp`/`tower-lsp-server`:
 
 ### Main loop architecture
 
-rust-analyzer runs a **centralized single-threaded main loop** in `main_loop.rs` that coordinates three event sources via crossbeam `select!`:
+rust-analyzer runs a **centralized single-threaded main loop** in `main_loop.rs`
+that coordinates three event sources via crossbeam `select!`:
 
 1. **LSP messages** from `connection.receiver`
-2. **Background thread completions** from a crossbeam channel (type inference results, diagnostics, etc.)
+2. **Background thread completions** from a crossbeam channel (type inference
+   results, diagnostics, etc.)
 3. **VFS/flycheck events** from file watchers and `cargo check` subprocesses
 
 ```rust
@@ -369,8 +412,10 @@ notif.dispatcher.on::<CancelRequest>(|params| { ... });
 
 ### Background tasks
 
-- Heavy queries (goto definition, completion, code actions) are **offloaded to a thread pool**.
-- The main loop takes an **immutable snapshot** of the Salsa database (`GlobalStateSnapshot`) and passes it to the background thread.
+- Heavy queries (goto definition, completion, code actions) are
+  **offloaded to a thread pool**.
+- The main loop takes an **immutable snapshot** of the Salsa database
+  (`GlobalStateSnapshot`) and passes it to the background thread.
 - Background threads send results back via a crossbeam channel.
 - The main loop processes results and sends LSP responses.
 
@@ -396,7 +441,7 @@ notif.dispatcher.on::<CancelRequest>(|params| { ... });
 
 ### The crossbeam model (what rust-analyzer uses)
 
-```
+```text
 stdin reader thread ──crossbeam──> main loop thread ──crossbeam──> stdout writer thread
                                         │
                                    ┌────┴────┐
@@ -411,9 +456,15 @@ stdin reader thread ──crossbeam──> main loop thread ──crossbeam─�
 
 ### Patterns
 
-1. **Single-threaded main loop** (simple servers): Process messages inline. OK for lightweight servers.
-2. **Thread pool** (rust-analyzer pattern): Spawn `N` worker threads. Each gets a snapshot of state. Results sent back via channel.
-3. **Tokio integration** (if you want): You *can* spawn tokio tasks and bridge to the crossbeam channels, but it's non-standard. The `crossbeam_channel::Receiver` implements `futures::Stream` via the `crossbeam-channel` feature, so you could run `tokio::spawn` to bridge, but it adds complexity.
+1. **Single-threaded main loop** (simple servers): Process messages inline. OK
+   for lightweight servers.
+2. **Thread pool** (rust-analyzer pattern): Spawn `N` worker threads. Each gets
+   a snapshot of state. Results sent back via channel.
+3. **Tokio integration** (if you want): You *can* spawn tokio tasks and bridge
+   to the crossbeam channels, but it's non-standard. The
+   `crossbeam_channel::Receiver` implements `futures::Stream` via the
+   `crossbeam-channel` feature, so you could run `tokio::spawn` to bridge, but
+   it adds complexity.
 
 ### Tradeoffs
 
@@ -429,9 +480,15 @@ stdin reader thread ──crossbeam──> main loop thread ──crossbeam─�
 
 - **Version**: 0.10.0 (latest stable)
 - **Maintainer**: rust-analyzer team (Lukas Wirth / Veykril, + contributors)
-- **Repository**: https://github.com/rust-lang/rust-analyzer/tree/master/lib/lsp-server
-- **Maintenance status**: Actively maintained as part of rust-analyzer's core infrastructure. Updated with rust-analyzer releases.
-- **Dependents**: Widely used in the Rust LSP ecosystem. The exact count on crates.io fluctuates but includes dozens of direct dependents — custom language servers, auto-lsp framework, tree-sitter LSP generators, and educational/example projects. The reverse dependency graph includes hundreds of crates transitively.
+- **Repository**:
+  <https://github.com/rust-lang/rust-analyzer/tree/master/lib/lsp-server>
+- **Maintenance status**: Actively maintained as part of rust-analyzer's core
+  infrastructure. Updated with rust-analyzer releases.
+- **Dependents**: Widely used in the Rust LSP ecosystem. The exact count on
+  crates.io fluctuates but includes dozens of direct dependents — custom
+  language servers, auto-lsp framework, tree-sitter LSP generators, and
+  educational/example projects. The reverse dependency graph includes hundreds
+  of crates transitively.
 
 ---
 
@@ -439,16 +496,25 @@ stdin reader thread ──crossbeam──> main loop thread ──crossbeam─�
 
 ### Production users
 
-1. **rust-analyzer** — The canonical user. Powers Rust support in VS Code, Neovim, Helix, Emacs, Sublime Text, Zed.
-2. **auto-lsp** — Generic framework for generating LSP servers from tree-sitter grammars. Uses `lsp-server` as its transport backend.
-3. **Various custom language servers** — Developers building LSPs for proprietary DSLs, configuration formats, and template languages frequently choose `lsp-server` over `tower-lsp` when they want explicit control.
+1. **rust-analyzer** — The canonical user. Powers Rust support in VS Code,
+   Neovim, Helix, Emacs, Sublime Text, Zed.
+2. **auto-lsp** — Generic framework for generating LSP servers from tree-sitter
+   grammars. Uses `lsp-server` as its transport backend.
+3. **Various custom language servers** — Developers building LSPs for
+   proprietary DSLs, configuration formats, and template languages frequently
+   choose `lsp-server` over `tower-lsp` when they want explicit control.
 
 ### Why they choose lsp-server over tower-lsp
 
-- **Predictability**: No async runtime surprises. No cryptic Tower trait error messages.
-- **Control**: Full visibility into the message loop. Easy to add custom logging, intercept raw payloads.
-- **Performance**: Crossbeam channels are fast. No async overhead for a fundamentally synchronous workload (most LSP operations are CPU-bound, not IO-bound).
-- **Proven**: rust-analyzer's architecture is battle-tested at scale with massive multi-crate workspaces.
+- **Predictability**: No async runtime surprises. No cryptic Tower trait error
+  messages.
+- **Control**: Full visibility into the message loop. Easy to add custom
+  logging, intercept raw payloads.
+- **Performance**: Crossbeam channels are fast. No async overhead for a
+  fundamentally synchronous workload (most LSP operations are CPU-bound, not
+  IO-bound).
+- **Proven**: rust-analyzer's architecture is battle-tested at scale with
+  massive multi-crate workspaces.
 
 ---
 
@@ -467,7 +533,8 @@ stdin reader thread ──crossbeam──> main loop thread ──crossbeam─�
 
 ## References
 
-- Source: https://github.com/rust-lang/rust-analyzer/tree/master/lib/lsp-server
-- Docs: https://docs.rs/lsp-server/0.10.0/lsp_server/
-- Crates.io: https://crates.io/crates/lsp-server
-- LSP spec: https://microsoft.github.io/language-server-protocol/
+- Source:
+  <https://github.com/rust-lang/rust-analyzer/tree/master/lib/lsp-server>
+- Docs: <https://docs.rs/lsp-server/0.10.0/lsp_server/>
+- Crates.io: <https://crates.io/crates/lsp-server>
+- LSP spec: <https://microsoft.github.io/language-server-protocol/>

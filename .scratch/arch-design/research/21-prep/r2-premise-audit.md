@@ -1,69 +1,93 @@
 # Premise audit for ticket 21 (round 2, critical redo)
 
-Audits every upstream claim that [ticket 21](../../issues/21-ambient-environment-and-execution-context.md), its
-inputs, and round-1 prep ([brief](./brief.md), a–g, [b-prior-decisions](./b-prior-decisions.md)) rely on. Each
-premise is (1) quoted with source, (2) classified **R** (ratified: the user's own words exist, cited), **D**
-(derived by an earlier agent; untrusted until verified), or **C** (contradicted by code, a primary source, or a
-later user statement), (3) checked against the current tree or primary source, (4) traced to the round-1
-conclusion that leaned on it, and (5) given a verdict: **KEEP**, **CHALLENGE** (needs the user's ruling in the
-grilling), **WITHDRAW** (false, superseded, or not evidence).
+Audits every upstream claim that
+[ticket 21](../../issues/21-ambient-environment-and-execution-context.md), its
+inputs, and round-1 prep ([brief](./brief.md), a–g,
+[b-prior-decisions](./b-prior-decisions.md)) rely on. Each premise is (1) quoted
+with source, (2) classified **R** (ratified: the user's own words exist, cited),
+**D** (derived by an earlier agent; untrusted until verified), or **C**
+(contradicted by code, a primary source, or a later user statement), (3) checked
+against the current tree or primary source, (4) traced to the round-1 conclusion
+that leaned on it, and (5) given a verdict: **KEEP**, **CHALLENGE** (needs the
+user's ruling in the grilling), **WITHDRAW** (false, superseded, or not
+evidence).
 
-User-quote key (all from `/Users/jack/.omp/agent/sessions/-Documents-41_personal-traces/`; session file, UTC
-timestamp, JSONL row):
+User-quote key (all from
+`/Users/jack/.omp/agent/sessions/-Documents-41_personal-traces/`; session file,
+UTC timestamp, JSONL row):
 
-- **U1** 2026-10-18T22:07 (`...2026-10-18T19-58...`, row 504): "1. I am the only consumer, there is no
-  published release, and no external Rust crate depends on the library 2. Yes. Vault-format parsing is Frozen.
-  Dataview and Templater semantic parity is Free 3. Yes. Result equivalence with a fresh parse is Frozen.
-  Everything about the file's layout, versioning and refresh strategy is Free"
-- **U2** 2026-10-18T22:49 (same, row 574): "we must not reject widening visibility as a rule. the primary rule
-  about visibility should be that we reduce visibility whenever possible and try to limit pub to components
-  that are outward facing"
-- **U3** 2026-10-18T22:46 (same, row 549): "I think I agree with all your suggestions, but q10 must not
-  redesign everything as pub because this will be very hard to change once we move to a workspace layout"
-- **U4** 2026-10-19T08:02 (same, row 586): "2. during this wayfinder, I think we should consider evolving the
-  codebase to a workspace layout, starting with separating out CLI"
-- **U5** 2026-10-19T09:25 (`...2026-10-19T08-17...`, row 74): "1. The LSP is the next big addition to the
-  codebase, but the MCP planning will start shortly. ... 3. performance decisions must target a range of vault
-  sizes ... 500 ... 50000 notes"
-- **U6** 2026-10-19T10:03 (same, row 77): "1. Agreed, account for both LSP and MCP as likely consumers. The
-  idea being that the codebase should be ready and flexible enough to easily enable adding MCP-specific seams
-  and multi-workspace machinery"
-- **U7** 2026-10-19T13:01 (same, row 89): "3. yes", answering the assistant's direct question
-  "**Q3 – Should the core remain synchronous?** ... Do you want that as the default for both LSP and MCP?"
-- **U8** 2026-10-20T12:39 (`...2026-10-20T08-53...`, row 114): "1. I am leaning toward agreeing to all
-  recommendations, but you must stress test the recommendations..."; the recommendations included Q4's option
-  (a) "the civil model" (assistant row 106: "➡️ (a), the civil model. I'm least sure of this one"), whose text
-  contains: "A naive datetime stays a zone-free civil value. A `Date` compares as civil midnight. Only values
-  written with `Z` or an offset are instants. Comparing a civil value to an instant ... takes an explicit zone
+- **U1** 2026-10-18T22:07 (`...2026-10-18T19-58...`, row 504): "1. I am the only
+  consumer, there is no published release, and no external Rust crate depends on
+  the library 2. Yes. Vault-format parsing is Frozen. Dataview and Templater
+  semantic parity is Free 3. Yes. Result equivalence with a fresh parse is
+  Frozen. Everything about the file's layout, versioning and refresh strategy is
+  Free"
+- **U2** 2026-10-18T22:49 (same, row 574): "we must not reject widening
+  visibility as a rule. the primary rule about visibility should be that we
+  reduce visibility whenever possible and try to limit pub to components that
+  are outward facing"
+- **U3** 2026-10-18T22:46 (same, row 549): "I think I agree with all your
+  suggestions, but q10 must not redesign everything as pub because this will be
+  very hard to change once we move to a workspace layout"
+- **U4** 2026-10-19T08:02 (same, row 586): "2. during this wayfinder, I think we
+  should consider evolving the codebase to a workspace layout, starting with
+  separating out CLI"
+- **U5** 2026-10-19T09:25 (`...2026-10-19T08-17...`, row 74): "1. The LSP is the
+  next big addition to the codebase, but the MCP planning will start
+  shortly. ... 3. performance decisions must target a range of vault sizes ...
+  500 ... 50000 notes"
+- **U6** 2026-10-19T10:03 (same, row 77): "1. Agreed, account for both LSP and
+  MCP as likely consumers. The idea being that the codebase should be ready and
+  flexible enough to easily enable adding MCP-specific seams and multi-workspace
+  machinery"
+- **U7** 2026-10-19T13:01 (same, row 89): "3. yes", answering the assistant's
+  direct question "**Q3 – Should the core remain synchronous?** ... Do you want
+  that as the default for both LSP and MCP?"
+- **U8** 2026-10-20T12:39 (`...2026-10-20T08-53...`, row 114): "1. I am leaning
+  toward agreeing to all recommendations, but you must stress test the
+  recommendations..."; the recommendations included Q4's option (a) "the civil
+  model" (assistant row 106: "➡️ (a), the civil model. I'm least sure of this
+  one"), whose text contains: "A naive datetime stays a zone-free civil value. A
+  `Date` compares as civil midnight. Only values written with `Z` or an offset
+  are instants. Comparing a civil value to an instant ... takes an explicit zone
   from the execution context (ticket 21). The cache holds no machine state."
-- **U9** 2026-10-20T16:32 (same, row 179; reinforced row 188 "i agree with the recommendations"): "I agree with
-  the recommendations, but why not extend to integers and floats that are #.0? Also, natural language dates
-  ... will have to be implemented at some point"
-- **U10** 2026-10-20T20:33 (`...2026-10-20T17-35...`, row 360): "there has always been something about
-  file_class_expander.rs that has never felt right to me and I cannot think of any codebase that designs and
-  implements components according to this pattern. It almost seems like a lazy anti-pattern"
-- **U11** 2026-10-20T19:53 (same, row 342): "...without this contradicting ticket 13's general decision to
-  place note write-back out of scope"
-- **U12** 2026-10-20T22:29 (same, row 499): "remember to consider that there is a chance we might move toward
-  a workspace structure with crates, the first of which being the cli crate"
-- **U13** 2026-10-20T22:30 (same, row 503): "if we move to a workspace structure, a composition/command/app
-  layer is a possible design"
-- **U14** 2026-10-20T22:39 (same, row 539): "1. in general, yes. however, once we move to workspace crates,
-  cli will become one consumer of core for the rest, I am leaning toward agreeing", answering the layering
-  recommendation; the assistant's read-back (row 546) added: "Host policy (the `ignore | warn | reject` map per
-  code) lives in the consumers".
-- **U15** 2026-10-21T23:04 (`...2026-10-21T22-07...`, row 110): "1. This seems like you justified a lot during
-  the design phase on failible documentation and decisions, when you should have also challenged those
-  decisions when relevant. it is better to identify a bad decision earlier rather than later 2. why would use
-  cases only be functions with explicit inputs? this seems like an arbitrary or, much worse, a poor design
-  choice I do not recall deciding. in almost every codebase I have ever reviewed, an app layer/composition root
-  is primarily designed with objects and never only functions 3. 'Time is one (now, zone) value per query'
-  seems like it would lead to extreme coupling between temporal/ and query/ 4. so what if CwdGuard is a bigger
-  job? if it is correct, then it should be done"
+- **U9** 2026-10-20T16:32 (same, row 179; reinforced row 188 "i agree with the
+  recommendations"): "I agree with the recommendations, but why not extend to
+  integers and floats that are #.0? Also, natural language dates ... will have
+  to be implemented at some point"
+- **U10** 2026-10-20T20:33 (`...2026-10-20T17-35...`, row 360): "there has
+  always been something about file_class_expander.rs that has never felt right
+  to me and I cannot think of any codebase that designs and implements
+  components according to this pattern. It almost seems like a lazy
+  anti-pattern"
+- **U11** 2026-10-20T19:53 (same, row 342): "...without this contradicting
+  ticket 13's general decision to place note write-back out of scope"
+- **U12** 2026-10-20T22:29 (same, row 499): "remember to consider that there is
+  a chance we might move toward a workspace structure with crates, the first of
+  which being the cli crate"
+- **U13** 2026-10-20T22:30 (same, row 503): "if we move to a workspace
+  structure, a composition/command/app layer is a possible design"
+- **U14** 2026-10-20T22:39 (same, row 539): "1. in general, yes. however, once
+  we move to workspace crates, cli will become one consumer of core for the
+  rest, I am leaning toward agreeing", answering the layering recommendation;
+  the assistant's read-back (row 546) added: "Host policy (the
+  `ignore | warn | reject` map per code) lives in the consumers".
+- **U15** 2026-10-21T23:04 (`...2026-10-21T22-07...`, row 110): "1. This seems
+  like you justified a lot during the design phase on failible documentation and
+  decisions, when you should have also challenged those decisions when relevant.
+  it is better to identify a bad decision earlier rather than later 2. why would
+  use cases only be functions with explicit inputs? this seems like an arbitrary
+  or, much worse, a poor design choice I do not recall deciding. in almost every
+  codebase I have ever reviewed, an app layer/composition root is primarily
+  designed with objects and never only functions 3. 'Time is one (now, zone)
+  value per query' seems like it would lead to extreme coupling between
+  temporal/ and query/ 4. so what if CwdGuard is a bigger job? if it is correct,
+  then it should be done"
 
-Provenance note: a bundle "agreed"/"I agree with the recommendations" counts as R only for items named in the
-recommendation text the user answered; items an assistant slipped into a later summary are D. Row references
-above were read directly from the session JSONL.
+Provenance note: a bundle "agreed"/"I agree with the recommendations" counts as
+R only for items named in the recommendation text the user answered; items an
+assistant slipped into a later summary are D. Row references above were read
+directly from the session JSONL.
 
 ## 1. Premise ledger
 
@@ -132,148 +156,190 @@ above were read directly from the session JSONL.
 
 ## 2. Premises round 1 never examined
 
-Round 1 argued options inside a frame it never stated. For each silent premise: the premise, the **opposite
-design**, and whether the evidence rules the opposite out.
+Round 1 argued options inside a frame it never stated. For each silent premise:
+the premise, the **opposite design**, and whether the evidence rules the
+opposite out.
 
 **N1. "A single process-lifetime host for the CLI means ambient is fine."**
-Opposite: ambient is a defect even for one-shot CLIs, because (a) the unit-test `HOME` resolves differently from
-production (`CARGO_MANIFEST_DIR/test` vs `$HOME`, dirs.rs:81-83 vs :62-63), so the resolution order is
-under-tested in-process; (b) `LazyLock` freeze-on-first-read makes behavior depend on call order, which is
-unobservable in review; (c) guards exist *because* ambient already hurts tests (P56 weakens the guard fix
-itself). Evidence: e2e child isolation (P57) makes ambient *safe* for e2e; nothing makes it *equivalent*.
-Verdict: not ruled out for production behavior; ruled out as "free of test cost". The grilling should ask
-whether under-tested env resolution is a live defect (it is today: the hack masks precedence).
+Opposite: ambient is a defect even for one-shot CLIs, because (a) the unit-test
+`HOME` resolves differently from production (`CARGO_MANIFEST_DIR/test` vs
+`$HOME`, dirs.rs:81-83 vs :62-63), so the resolution order is under-tested
+in-process; (b) `LazyLock` freeze-on-first-read makes behavior depend on call
+order, which is unobservable in review; (c) guards exist *because* ambient
+already hurts tests (P56 weakens the guard fix itself). Evidence: e2e child
+isolation (P57) makes ambient *safe* for e2e; nothing makes it *equivalent*.
+Verdict: not ruled out for production behavior; ruled out as "free of test
+cost". The grilling should ask whether under-tested env resolution is a live
+defect (it is today: the hack masks precedence).
 
-**N2. "The trust gate must stay before parse, so config discovery cannot move."**
-Opposite: only the *ordering* is Frozen (P13); where discovery gets its inputs (env globals vs an explicit
-locator value) is free. A redesign can hand `ConfigLocator` explicit ceilings/global-dir and keep
-discover→hash→trust→parse byte-identical. Evidence: the gate lives in `ConfigService::build`/file typestate,
-independent of `ConfigLocator::from_env` (service.rs:118-136 vs discovery.rs:43-48); ticket 16 froze
-"behaviour", not inputs. Round-1 (b:14-16) used the premise to damp H2. Verdict: the premise as stated is
-false; ordering-only survives.
+**N2. "The trust gate must stay before parse, so config discovery cannot
+move."** Opposite: only the *ordering* is Frozen (P13); where discovery gets its
+inputs (env globals vs an explicit locator value) is free. A redesign can hand
+`ConfigLocator` explicit ceilings/global-dir and keep discover→hash→trust→parse
+byte-identical. Evidence: the gate lives in `ConfigService::build`/file
+typestate, independent of `ConfigLocator::from_env` (service.rs:118-136 vs
+discovery.rs:43-48); ticket 16 froze "behaviour", not inputs. Round-1 (b:14-16)
+used the premise to damp H2. Verdict: the premise as stated is false;
+ordering-only survives.
 
-**N3. "The index must stay project-local."**
-Opposite: a state-dir index keyed by root hash (like the trust store) would let one process serve several
-workspaces and share a cache. Evidence: ticket 16 marks `index.redb` layout/refresh **Free** (P12); nothing
-ratifies the location. Counterevidence: project-local ties cache lifetime to the vault (delete vault, cache
-goes), avoids cross-vault identity collisions, and matches the derived-cache doctrine (Durability::None,
-store.rs:1259-1263). Ownership is 24/25; 21 only needs "index path is a workspace-derived input, not host
-state". Verdict: open; not ruled out either way; do not let 21 silently freeze it.
+**N3. "The index must stay project-local."** Opposite: a state-dir index keyed
+by root hash (like the trust store) would let one process serve several
+workspaces and share a cache. Evidence: ticket 16 marks `index.redb`
+layout/refresh **Free** (P12); nothing ratifies the location. Counterevidence:
+project-local ties cache lifetime to the vault (delete vault, cache goes),
+avoids cross-vault identity collisions, and matches the derived-cache doctrine
+(Durability::None, store.rs:1259-1263). Ownership is 24/25; 21 only needs "index
+path is a workspace-derived input, not host state". Verdict: open; not ruled out
+either way; do not let 21 silently freeze it.
 
-**N4. "Dialog belongs to the host."**
-Opposite: rendering is core and `ui.*` is a Frozen *capability* (ticket 16:42), so the strongest form (core
-never prompts, returns an interaction plan the host executes) is a redesign of the template engine's lazy
-callbacks (ADR-0001), not a context tweak. Evidence rules the strong form *expensive*, not wrong: minijinja
-callbacks invoke the provider mid-render; a plan-returning engine changes the render contract. The weak form
-(host chooses the provider; deliberate headless policy instead of silent `Ok(0)`, P34) is cheap and unratified
-today. Verdict: weak form KEEP-worthy; strong form CHALLENGE (ticket 28's).
+**N4. "Dialog belongs to the host."** Opposite: rendering is core and `ui.*` is
+a Frozen *capability* (ticket 16:42), so the strongest form (core never prompts,
+returns an interaction plan the host executes) is a redesign of the template
+engine's lazy callbacks (ADR-0001), not a context tweak. Evidence rules the
+strong form *expensive*, not wrong: minijinja callbacks invoke the provider
+mid-render; a plan-returning engine changes the render contract. The weak form
+(host chooses the provider; deliberate headless policy instead of silent
+`Ok(0)`, P34) is cheap and unratified today. Verdict: weak form KEEP-worthy;
+strong form CHALLENGE (ticket 28's).
 
-**N5. "Zone is an evaluation input, not an index input": therefore the store holds no zone-derived data.**
-Opposite: materialize per-zone derived columns (e.g. `file.day` per zone, or day-bucket projections) in the
-store so evaluation stays zone-free even faster. Ticket 19 (R, P7-P8) rules out zone-resolved values as the
-*primary* representation ("cache holds no machine state"), but does **not** forbid a derived, keyed,
-rebuildable projection, the same way nominal duration seconds are stored for ordering. Evidence: `cday`/`mday`
-are per-row reads today (query/results.rs:274-298 per survey temporal.md:39); a civil+raw-instant store makes
-them computable per evaluation at row cost. Verdict: the premise is right about identity, unexamined about
-derived caches; the strong form ("no zone-derived store data at all") is an over-claim round 1 repeated. Give
-the strong form to 24/25 explicitly.
+**N5. "Zone is an evaluation input, not an index input": therefore the store
+holds no zone-derived data.** Opposite: materialize per-zone derived columns
+(e.g. `file.day` per zone, or day-bucket projections) in the store so evaluation
+stays zone-free even faster. Ticket 19 (R, P7-P8) rules out zone-resolved values
+as the *primary* representation ("cache holds no machine state"), but does
+**not** forbid a derived, keyed, rebuildable projection, the same way nominal
+duration seconds are stored for ordering. Evidence: `cday`/`mday` are per-row
+reads today (query/results.rs:274-298 per survey temporal.md:39); a
+civil+raw-instant store makes them computable per evaluation at row cost.
+Verdict: the premise is right about identity, unexamined about derived caches;
+the strong form ("no zone-derived store data at all") is an over-claim round 1
+repeated. Give the strong form to 24/25 explicitly.
 
-**N6. "Date compares as civil midnight against civil datetimes."**
-Opposite: whole-day interval (a day equals every instant in that local day), which ticket 19 *also* adopts for
-coarse literals (P9), so the Answer holds two conventions whose interaction (day literal vs `Date`-typed row
-vs civil-midnight equality) was never reconciled, and P9's own ratification is bundle-level. e T4 flagged the
-behavior-change row but treated midnight as settled. Verdict: CHALLENGE both together in the grilling; cheap
-to confirm, expensive to discover after spec.
+**N6. "Date compares as civil midnight against civil datetimes."** Opposite:
+whole-day interval (a day equals every instant in that local day), which ticket
+19 *also* adopts for coarse literals (P9), so the Answer holds two conventions
+whose interaction (day literal vs `Date`-typed row vs civil-midnight equality)
+was never reconciled, and P9's own ratification is bundle-level. e T4 flagged
+the behavior-change row but treated midnight as settled. Verdict: CHALLENGE both
+together in the grilling; cheap to confirm, expensive to discover after spec.
 
-**N7. "Sync core."**
-Opposite: async core for a long-lived LSP with concurrent requests. This one *was* directly asked and answered
-(U7), the only frontier-1 premise with clean ratification. Evidence for the opposite is speculative (MCP
-concurrency). Verdict: KEEP; restate in the grilling as "sync core, async at seams" so the bundle is explicit.
+**N7. "Sync core."** Opposite: async core for a long-lived LSP with concurrent
+requests. This one *was* directly asked and answered (U7), the only frontier-1
+premise with clean ratification. Evidence for the opposite is speculative (MCP
+concurrency). Verdict: KEEP; restate in the grilling as "sync core, async at
+seams" so the bundle is explicit.
 
-**N8. "Schema/trust/clock are independent."**
-Opposite: a configured default zone (e T3-C) makes clock policy a *config* concern, so trust-before-parse and
-reload ordering (22) partly own the zone pipeline; conversely index refresh (25) treats config fingerprint, and
-zone would ride config revision. Ticket 19 hands "default zone" to 21 *and* `DateConfig` coordination to 22/27
-(ticket 19:196-199), so the premise is already half-false by the decisions' own text. Round 1 asserted
-independence (b:41-45) while also planning config-zone handover. Verdict: replace with "schema checks are
-clock-free (R); zone sourcing is a config/trust concern once configurable"; CHALLENGE the blanket wording.
+**N8. "Schema/trust/clock are independent."** Opposite: a configured default
+zone (e T3-C) makes clock policy a *config* concern, so trust-before-parse and
+reload ordering (22) partly own the zone pipeline; conversely index refresh (25)
+treats config fingerprint, and zone would ride config revision. Ticket 19 hands
+"default zone" to 21 *and* `DateConfig` coordination to 22/27 (ticket
+19:196-199), so the premise is already half-false by the decisions' own text.
+Round 1 asserted independence (b:41-45) while also planning config-zone
+handover. Verdict: replace with "schema checks are clock-free (R); zone sourcing
+is a config/trust concern once configurable"; CHALLENGE the blanket wording.
 
-**N9. "Cwd is an input at all."**
-Opposite: every command takes an explicit project path (git's `-C`), and process cwd is only the *default*
-when the flag is absent, or not consulted at all. Evidence: LSP/MCP hosts have no meaningful process cwd; the
-trust command already accepts an optional PATH with cwd fallback (`trust_args(None)`, cli/trust.rs per its
-tests:307-316); flag spellings are Migratable and new flags are additions (P12). Round 1 framed H4 as
-"keep `Cwd` vs capture once", never as "root is an argument". Verdict: not ruled out; arguably the
-*smallest* host input set (one `PathBuf` per invocation); grill it as its own row, decoupled from the
-`CwdGuard` cleanup question.
+**N9. "Cwd is an input at all."** Opposite: every command takes an explicit
+project path (git's `-C`), and process cwd is only the *default* when the flag
+is absent, or not consulted at all. Evidence: LSP/MCP hosts have no meaningful
+process cwd; the trust command already accepts an optional PATH with cwd
+fallback (`trust_args(None)`, cli/trust.rs per its tests:307-316); flag
+spellings are Migratable and new flags are additions (P12). Round 1 framed H4 as
+"keep `Cwd` vs capture once", never as "root is an argument". Verdict: not ruled
+out; arguably the *smallest* host input set (one `PathBuf` per invocation);
+grill it as its own row, decoupled from the `CwdGuard` cleanup question.
 
-**N10. "The CLI is the composition root" (is composition inside `cli/` itself a defect?).**
-Opposite: composition lives in a library entrypoint (core's `run`/builder) and `cli` becomes a thin adapter,
-which is what U12-U14 point toward ("cli will become one consumer of core"). Today's root is
-`src/cli/mod.rs:224-228` plus private orchestration (survey cli.md H1), i.e. composition, scaffolding glue and
-presentation in one module. Round 1 treated "composition root = cli::run" as a neutral fact; under the
-workspace steer it is a *transitional* fact and the seam (who constructs `ConfigService`, the provider, and
-the future host) belongs to 30. Verdict: fact KEEP; ownership CHALLENGE → 30, with the note that 21 should
-define *inputs* so that the future composition site is swappable.
+**N10. "The CLI is the composition root" (is composition inside `cli/` itself a
+defect?).** Opposite: composition lives in a library entrypoint (core's
+`run`/builder) and `cli` becomes a thin adapter, which is what U12-U14 point
+toward ("cli will become one consumer of core"). Today's root is
+`src/cli/mod.rs:224-228` plus private orchestration (survey cli.md H1), i.e.
+composition, scaffolding glue and presentation in one module. Round 1 treated
+"composition root = cli::run" as a neutral fact; under the workspace steer it is
+a *transitional* fact and the seam (who constructs `ConfigService`, the
+provider, and the future host) belongs to 30. Verdict: fact KEEP; ownership
+CHALLENGE → 30, with the note that 21 should define *inputs* so that the future
+composition site is swappable.
 
-**N11. "Tests need process-based isolation."**
-Opposite: in-process parallel tests with explicit inputs, no child processes at all, which is what removing
-ambient state *buys*. The premise as stated is false in both directions: nextest already gives per-test
-processes (P56), so ambient globals are *already* isolated across tests, and the guards serialize only
-within-test threads; conversely e2e needs child processes regardless (the binary is the oracle). The real
-choice is whether *unit* tests may mutate process state (today: only through `CwdGuard`/`ZoneGuard`/HOME-hack,
-each with different semantics). Round 1 argued migration counts (29 tests, 98 sites), a cost framing U15-4
-rejects, instead of asking what isolation is *for*. Verdict: WITHDRAW the premise; grill the purpose
-(determinism? parallelism? parity with production resolution?) per guard.
+**N11. "Tests need process-based isolation."** Opposite: in-process parallel
+tests with explicit inputs, no child processes at all, which is what removing
+ambient state *buys*. The premise as stated is false in both directions: nextest
+already gives per-test processes (P56), so ambient globals are *already*
+isolated across tests, and the guards serialize only within-test threads;
+conversely e2e needs child processes regardless (the binary is the oracle). The
+real choice is whether *unit* tests may mutate process state (today: only
+through `CwdGuard`/`ZoneGuard`/HOME-hack, each with different semantics). Round
+1 argued migration counts (29 tests, 98 sites), a cost framing U15-4 rejects,
+instead of asking what isolation is *for*. Verdict: WITHDRAW the premise; grill
+the purpose (determinism? parallelism? parity with production resolution?) per
+guard.
 
 ## 3. Ranked: the eight premises whose falsity would change the answer most
 
-1. **P22 (functions-only use cases)**: unratified and disputed (U15-2). Its withdrawal re-opens topologies B/E
-   (an app object owning services) versus D's narrow arguments, changes every signature sketch in g, and
-   determines whether 21 may even propose a `Workspace`-style type. Largest single swing.
-2. **P5-P9 (civil values + evaluation-only zone/now cluster)**: if the user reverses to parse-time/config zone
-   (ticket 19 Q4 option b, which the assistant itself called "much cheaper"), the entire temporal frontier
-   (T1-T6, carrier, guardrail tests, T6 cutover) collapses into a much smaller decision. R, but bundle-level;
-   the coupling objection U15-3 targets the carrier, not the rule.
-3. **P16-P17 (LSP committed, MCP likely)**: the D0 flip fact. A CLI-only world makes keep-ambient-plus-guard
-   the cheap sound answer; the committed LSP is what forces explicit acquisition and lifetimes.
-4. **P13 (trust gate Frozen) read narrowly vs broadly**: broad reading ("discovery cannot move", b:14-16)
-   cripples H2; narrow reading (ordering only) frees the locator redesign. Getting the scope wrong flips the
+1. **P22 (functions-only use cases)**: unratified and disputed (U15-2). Its
+   withdrawal re-opens topologies B/E (an app object owning services) versus D's
+   narrow arguments, changes every signature sketch in g, and determines whether
+   21 may even propose a `Workspace`-style type. Largest single swing.
+2. **P5-P9 (civil values + evaluation-only zone/now cluster)**: if the user
+   reverses to parse-time/config zone (ticket 19 Q4 option b, which the
+   assistant itself called "much cheaper"), the entire temporal frontier (T1-T6,
+   carrier, guardrail tests, T6 cutover) collapses into a much smaller decision.
+   R, but bundle-level; the coupling objection U15-3 targets the carrier, not
+   the rule.
+3. **P16-P17 (LSP committed, MCP likely)**: the D0 flip fact. A CLI-only world
+   makes keep-ambient-plus-guard the cheap sound answer; the committed LSP is
+   what forces explicit acquisition and lifetimes.
+4. **P13 (trust gate Frozen) read narrowly vs broadly**: broad reading
+   ("discovery cannot move", b:14-16) cripples H2; narrow reading (ordering
+   only) frees the locator redesign. Getting the scope wrong flips the
    host-input design.
-5. **P1/P37/P44 (`CwdGuard` sound; delete-or-keep)**: with cost excluded (U15-4) and nextest isolation
-   verified (P56), the keep lean loses its two supports; if correctness also favors explicit search start
-   (LSP/MCP need it), H4 flips to capture-and-delete.
-6. **N9 (cwd is an input at all)**: if commands take explicit roots, the host input set shrinks to
-   "one path per invocation", and `Cwd`, the guard, and most of H4 dissolve. Never examined in round 1.
-7. **P27-P28 + U12-U14 (workspace split with CLI as one consumer of core)**: determines where composition and
-   the host aggregate may live, and whether a core-facing context type could ever be `pub` (it should not,
-   per P14). If the user drops the split, a private CLI-side aggregate becomes permanently acceptable.
-8. **P53 (`QuerySet` defers through `OnceLock`)**: quietly disqualifies scoped-override/thread-local designs
-   (topology F, e T1-E/F) and forces the owned-or-carried evaluation-value contract. Any codegraph/source
-   error here would silently re-admit a broken topology. (Verified, so listed last, but it is the premise
-   with the least visible support in round 1's prose.)
+5. **P1/P37/P44 (`CwdGuard` sound; delete-or-keep)**: with cost excluded (U15-4)
+   and nextest isolation verified (P56), the keep lean loses its two supports;
+   if correctness also favors explicit search start (LSP/MCP need it), H4 flips
+   to capture-and-delete.
+6. **N9 (cwd is an input at all)**: if commands take explicit roots, the host
+   input set shrinks to "one path per invocation", and `Cwd`, the guard, and
+   most of H4 dissolve. Never examined in round 1.
+7. **P27-P28 + U12-U14 (workspace split with CLI as one consumer of core)**:
+   determines where composition and the host aggregate may live, and whether a
+   core-facing context type could ever be `pub` (it should not, per P14). If the
+   user drops the split, a private CLI-side aggregate becomes permanently
+   acceptable.
+8. **P53 (`QuerySet` defers through `OnceLock`)**: quietly disqualifies
+   scoped-override/thread-local designs (topology F, e T1-E/F) and forces the
+   owned-or-carried evaluation-value contract. Any codegraph/source error here
+   would silently re-admit a broken topology. (Verified, so listed last, but it
+   is the premise with the least visible support in round 1's prose.)
 
-Runners-up: P45 (Jiff TTL; already withdrew the perf rationale), P9/N6 (interval vs midnight semantics),
-N5 (per-zone store projections).
+Runners-up: P45 (Jiff TTL; already withdrew the perf rationale), P9/N6 (interval
+vs midnight semantics), N5 (per-zone store projections).
 
 ## 4. Corrections to earlier artifacts found by this audit
 
-- [brief](./brief.md) D3: "`IndexerService` holds its ignore set" is wrong as stated: the scan uses the global
-  predicate `crate::env_vars::is_ignored_dir` (index/service.rs:424-426); g:15 says this correctly. No design
-  changes; the E-topology framing ("services already own stable policy") must not cite it.
-- [brief](./brief.md) §1 and ticket 21 Facts: `ZoneGuard` range `mod.rs:58-255` is stale; the guard is
-  thread-local `test_support` at mod.rs:57-203 (`ZONE_OVERRIDE` :198-203). P2.
-- [cli survey](../../survey/cli.md):112 ("Cwd/CwdGuard ... withstands scrutiny") is the *only* upstream of
-  ticket 21's "judged sound", and the map itself lists `CwdGuard` as unverified scout material (map.md:87).
-  The ticket's Facts line contradicted the map's own caveat. P1/P37.
-- [cross-cutting survey](../../survey/cross-cutting.md) H6 (FileClassExpander "blueprint") is overturned
-  (ticket 20; U10), still cited as a pattern in H1's crate-split logic. P38.
-- b-prior-decisions `[V]` tags assert artifact existence, not ratification (P60); every `C`-marked item above
-  was tagged `[V]` there or in the surveys it came from.
-- Ticket 20:302 cites "ADR-0009" for "note must parse without schemas"; neither ADR-0009 file
-  (filter-date-literals, index-refresh; both `proposed`, number duplicated) supports that sentence. P49.
-- New verification with design weight: the canonical runner is nextest, one process per test (P56); round 1
-  never checked it, and it weakens the cross-test rationale for `CWD_TEST_LOCK`/`CwdGuard` before any
-  migration is counted.
+- [brief](./brief.md) D3: "`IndexerService` holds its ignore set" is wrong as
+  stated: the scan uses the global predicate `crate::env_vars::is_ignored_dir`
+  (index/service.rs:424-426); g:15 says this correctly. No design changes; the
+  E-topology framing ("services already own stable policy") must not cite it.
+- [brief](./brief.md) §1 and ticket 21 Facts: `ZoneGuard` range `mod.rs:58-255`
+  is stale; the guard is thread-local `test_support` at mod.rs:57-203
+  (`ZONE_OVERRIDE` :198-203). P2.
+- [cli survey](../../survey/cli.md):112 ("Cwd/CwdGuard ... withstands scrutiny")
+  is the *only* upstream of ticket 21's "judged sound", and the map itself lists
+  `CwdGuard` as unverified scout material (map.md:87). The ticket's Facts line
+  contradicted the map's own caveat. P1/P37.
+- [cross-cutting survey](../../survey/cross-cutting.md) H6 (FileClassExpander
+  "blueprint") is overturned (ticket 20; U10), still cited as a pattern in H1's
+  crate-split logic. P38.
+- b-prior-decisions `[V]` tags assert artifact existence, not ratification
+  (P60); every `C`-marked item above was tagged `[V]` there or in the surveys it
+  came from.
+- Ticket 20:302 cites "ADR-0009" for "note must parse without schemas"; neither
+  ADR-0009 file (filter-date-literals, index-refresh; both `proposed`, number
+  duplicated) supports that sentence. P49.
+- New verification with design weight: the canonical runner is nextest, one
+  process per test (P56); round 1 never checked it, and it weakens the
+  cross-test rationale for `CWD_TEST_LOCK`/`CwdGuard` before any migration is
+  counted.
 
-Nothing in this file is a decision; it is the challenge layer the grilling should resolve question by question.
+Nothing in this file is a decision; it is the challenge layer the grilling
+should resolve question by question.

@@ -1,12 +1,17 @@
 # 27 pass-2 / B6: Semantic tokens (Markdown/wikilink/PKM state coloring)
 
-Research only. No code changed. Independence: did not read `research/27-structural-symbols-editor-intelligence.md` or any `research/27*.md` outside `27-pass2/`. Inputs: `27-pass2/{a1,a2,a3}`, tickets 26/29/33, tool digests, upstream LSP 3.18 spec, client/server sources fetched live.
+Research only. No code changed. Independence: did not read
+`research/27-structural-symbols-editor-intelligence.md` or any `research/27*.md`
+outside `27-pass2/`. Inputs: `27-pass2/{a1,a2,a3}`, tickets 26/29/33, tool
+digests, upstream LSP 3.18 spec, client/server sources fetched live.
 
 Provenance labels used throughout:
 
 - **demand**: required by the LSP API or by an actual client's behavior.
-- **ecosystem**: what peer markdown LSP servers emit (practice, not requirement).
-- **domain**: Traces/PMK-specific need decided by a ticket (resolution state, ambiguity).
+- **ecosystem**: what peer markdown LSP servers emit (practice, not
+  requirement).
+- **domain**: Traces/PMK-specific need decided by a ticket (resolution state,
+  ambiguity).
 
 ---
 
@@ -23,21 +28,58 @@ Provenance labels used throughout:
 | P14: nvim/Zed semantic tokens are additive over tree-sitter | **confirmed, with one exception mode** | nvim `augmentsSyntaxTokens = true` always, extmarks at `vim.hl.priorities.semantic_tokens`. Zed: `augments_syntax_tokens = semantic_tokens.use_tree_sitter()` (`crates/project/src/lsp_store.rs:645-647`) → true for `off`/`combined`, **false for `full`** (in `full` mode grammar coloring is replaced entirely). |
 | P15: `nav::NavContext::highlight` spine exists as source | taken from a2 | Not re-derived here; token emission must walk the same occurrence/`Resolution` data, not a second parser (§5). |
 
-**Net finding**: no target editor can show wikilink/tag/field resolution state today (grammar-blind + tree-sitter-query-blind), and 4 of 6 peer markdown servers ship no tokens at all. Semantic tokens are the *only* LSP surface whose entire purpose here is **state visibility** (navigation is already ticket 26's `documentLink`).
+**Net finding**: no target editor can show wikilink/tag/field resolution state
+today (grammar-blind + tree-sitter-query-blind), and 4 of 6 peer markdown
+servers ship no tokens at all. Semantic tokens are the *only* LSP surface whose
+entire purpose here is **state visibility** (navigation is already ticket 26's
+`documentLink`).
 
 ---
 
 ## 2. Spec facts (LSP 3.18)
 
-`docs/refs/lsp_spec.md:655` is a Jekyll include stub (`{% include_relative language/semanticTokens.md %}`), so all cites are upstream 3.18 (`https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/`, stripped at `/tmp/lsp318.txt`):
+`docs/refs/lsp_spec.md:655` is a Jekyll include stub
+(`{% include_relative language/semanticTokens.md %}`), so all cites are upstream
+3.18
+(`https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/`,
+stripped at `/tmp/lsp318.txt`):
 
-- **Legend** (lines ~14660-14770): `SemanticTokensLegend { tokenTypes: string[], tokenModifiers: string[] }`; "must be provided up-front on registration and capture **all possible** token types and modifiers"; fixed at `initialize`, not per-request. Types = index lookup; modifiers = **bit flags** (value `3` → `[tokenModifiers[0], tokenModifiers[1]]`). `tokenType < 65536`.
-- **Extension is legal** (line 14300): "The protocol defines a set of token types and modifiers but **clients are allowed to extend these and announce the values they support** in the corresponding client capability." → custom types/modifiers are a designed extension point; the client's `tokenTypes` array is an announcement, and (per §3) no fetched client *enforces* it on render.
-- **Encoding**: relative format, 5 ints per token (`deltaLine`, `deltaStart`, `length`, `tokenType`, `tokenModifiers`); `deltaStart`/`length` must use the position encoding negotiated at `initialize` (ticket 26's `convert` module applies unchanged).
-- **`SemanticTokensClientCapabilities`** (~15344-15480): `requests { range, full({delta}) }`, `tokenTypes[]`, `tokenModifiers[]`, `formats[]`, `overlappingTokenSupport?`, `multilineTokenSupport?`, `serverCancelSupport?` (3.17: server may return `ServerCancelled`, client retriggers), `augmentsSyntaxTokens?` (3.17: true = both syntax+semantic color; false = semantic only; **undefined = behavior unspecified**).
-- **Range vs full** (~15886-15888): range exists "to allow for flicker free scrolling and semantic coloring of a minimap" for *range-only* servers; a range-only server "might not render a minimap correctly or might even decide to not show any semantic tokens at all". Full-only is the normal degraded-safe path (markdown-oxide works this way in production). If a client advertises both but the server provides neither-capable-thing, the client may show nothing; advertising must match implementation (ticket 29's discipline).
-- **`workspace/semanticTokens/refresh`** (~15946-15995): server→client; client asks the server to recompute tokens for visible editors; "the client still has the freedom to delay the re-calculation if … an editor is currently not visible"; global, "should be used with absolute care"; response `void`, error = code+message.
-- Spec says nothing about *which* types a server "should" use for a given language: legend content is convention (ecosystem), not normative.
+- **Legend** (lines ~14660-14770):
+  `SemanticTokensLegend { tokenTypes: string[], tokenModifiers: string[] }`;
+  "must be provided up-front on registration and capture **all possible** token
+  types and modifiers"; fixed at `initialize`, not per-request. Types = index
+  lookup; modifiers = **bit flags** (value `3` →
+  `[tokenModifiers[0], tokenModifiers[1]]`). `tokenType < 65536`.
+- **Extension is legal** (line 14300): "The protocol defines a set of token
+  types and modifiers but
+  **clients are allowed to extend these and announce the values they support**
+  in the corresponding client capability." → custom types/modifiers are a
+  designed extension point; the client's `tokenTypes` array is an announcement,
+  and (per §3) no fetched client *enforces* it on render.
+- **Encoding**: relative format, 5 ints per token (`deltaLine`, `deltaStart`,
+  `length`, `tokenType`, `tokenModifiers`); `deltaStart`/`length` must use the
+  position encoding negotiated at `initialize` (ticket 26's `convert` module
+  applies unchanged).
+- **`SemanticTokensClientCapabilities`** (~15344-15480):
+  `requests { range, full({delta}) }`, `tokenTypes[]`, `tokenModifiers[]`,
+  `formats[]`, `overlappingTokenSupport?`, `multilineTokenSupport?`,
+  `serverCancelSupport?` (3.17: server may return `ServerCancelled`, client
+  retriggers), `augmentsSyntaxTokens?` (3.17: true = both syntax+semantic color;
+  false = semantic only; **undefined = behavior unspecified**).
+- **Range vs full** (~15886-15888): range exists "to allow for flicker free
+  scrolling and semantic coloring of a minimap" for *range-only* servers; a
+  range-only server "might not render a minimap correctly or might even decide
+  to not show any semantic tokens at all". Full-only is the normal degraded-safe
+  path (markdown-oxide works this way in production). If a client advertises
+  both but the server provides neither-capable-thing, the client may show
+  nothing; advertising must match implementation (ticket 29's discipline).
+- **`workspace/semanticTokens/refresh`** (~15946-15995): server→client; client
+  asks the server to recompute tokens for visible editors; "the client still has
+  the freedom to delay the re-calculation if … an editor is currently not
+  visible"; global, "should be used with absolute care"; response `void`,
+  error = code+message.
+- Spec says nothing about *which* types a server "should" use for a given
+  language: legend content is convention (ecosystem), not normative.
 
 ---
 
@@ -51,7 +93,12 @@ Provenance labels used throughout:
 | **Helix** |  |  |  | tree-sitter only | **No semantic-token support whatsoever**: full `ClientCapabilities` literal (`helix-lsp/src/client.rs:586+`, both `workspace` and `text_document` blocks) contains **no `semanticTokens` field**; PR #6102 ("Semantic tokens highlighting") closed, never merged; no handling in `helix-lsp/src/{lib,client}.rs` |
 | **coc.nvim** | mirrors VS Code in configs observed | mirrors | (unverified) | mirrors upstream vscode-languageserver protocol; **low confidence, not source-verified** | same as VS Code |
 
-Demand summary: state-coloring is *consumable* in **2/4 targets out of the box** (VS Code themes, Neovim defaults), *possible but unconfigured* in Zed (default off; and in `full` mode `augments=false` means our tokens replace grammar, see §10.6), and *impossible* in Helix. All clients render **by name**, ignoring the announced `tokenTypes` list, so emitting an un-announced custom type degrades to "no color", never to an error.
+Demand summary: state-coloring is *consumable* in **2/4 targets out of the box**
+(VS Code themes, Neovim defaults), *possible but unconfigured* in Zed (default
+off; and in `full` mode `augments=false` means our tokens replace grammar, see
+§10.6), and *impossible* in Helix. All clients render **by name**, ignoring the
+announced `tokenTypes` list, so emitting an un-announced custom type degrades to
+"no color", never to an error.
 
 ---
 
@@ -67,32 +114,88 @@ Demand summary: state-coloring is *consumable* in **2/4 targets out of the box**
 | **zk** | **no** |  |  |  | P11 refuted (§1) |
 | **rust-analyzer** (precedent, not markdown) | **yes** | many standard + **custom** incl. `UnresolvedReference` (`crates/rust-analyzer/src/lsp/semantic_tokens.rs`; PR #4034 origin) | state-as-**custom-type** (`unresolvedReference`) | full+delta (diff via `diff_tokens`), range | `config.rs:415-467`: `nonStandardTokens: bool = true` (when false: `standard_fallback_type` maps or drops, `mods.standard_fallback()` drops non-standard modifiers), `comments_enable` doc: *"In some editors (e.g. vscode) semantic tokens override other highlighting grammars"*; `to_proto.rs:749-807`: **augment-aware filtering**: when the client augments, skip modifier-less syntax-class highlights (Comment/Keyword/String/Operator/…) that would only restate grammar color; **multi-line ranges split into per-line single-line tokens** (:793-801) |
 
-Takeaway: **2 of 6** markdown peers ship tokens; neither encodes three-valued resolution; **no peer uses token modifiers at all** (Marksman and markdown-oxide both ship bitset 0); the state-as-custom-type idea exists only in rust-analyzer. Traces would be the first markdown LSP to color *ambiguity*, for which ticket 26 built an entire taxonomy (`StemTie | HeadingAnchor | PathTie`).
+Takeaway: **2 of 6** markdown peers ship tokens; neither encodes three-valued
+resolution; **no peer uses token modifiers at all** (Marksman and markdown-oxide
+both ship bitset 0); the state-as-custom-type idea exists only in rust-analyzer.
+Traces would be the first markdown LSP to color *ambiguity*, for which ticket 26
+built an entire taxonomy (`StemTie | HeadingAnchor | PathTie`).
 
 ---
 
 ## 5. Traces-specific inputs
 
-- **Nothing exists today**: `grep -ri "semantic_token|SemanticTokens" src/` → zero hits. Greenfield feature; `docs/refs/lsp_spec.md` unusable (stub).
-- **Ticket 26** (`issues/26-...md`): spine `classify` derives `Resolution = Unresolved | Unique(target) | Ambiguous { kind, candidates }`, **the exact three-valued state to color**. Only link-shaped occurrences plus `DailyDate` can be Ambiguous; tags/fields/schema/footnotes are Unique/Unresolved only (negative pin). Token ranges should mirror 26's occurrence ranges (embed `!` stays outside the token, alias side decision, code blocks excluded by AST). Hover budget `<2ms/<1ms` (supersedes 33's hover row) sets the latency class we live in.
-- **Ticket 29**: capability discipline: advertise only what we implement (markdown-oxide's advertised-but-never-set modifiers and iwe's stubbed providers are the named anti-patterns); deliberate non-advertisement precedent (`partialResultProvider`); 29 owns the initialize-time inspection our emission gate reads.
-- **Ticket 33**: **no semantic-tokens row exists**; one is proposed in §8. Anchors available: single-file reparse `<10ms`, structural diff `<1ms`, debounce `100ms` (provisional, 25 owns), document symbols `<10ms/<5ms`, diagnostics warm p95 `≤10ms`. Metadata/occurrences always resident (~2MB @20K) → token emission is index-walk only, no parse.
-- **a1/a2**: occurrence spans + `nav::NavContext::highlight` spine are the intended source; tokens must be a projection of the same walk (one parse-time cost shared with folding/symbols per b2's shared-walk pattern).
+- **Nothing exists today**: `grep -ri "semantic_token|SemanticTokens" src/` →
+  zero hits. Greenfield feature; `docs/refs/lsp_spec.md` unusable (stub).
+- **Ticket 26** (`issues/26-...md`): spine `classify` derives
+  `Resolution = Unresolved | Unique(target) | Ambiguous { kind, candidates }`,
+  **the exact three-valued state to color**. Only link-shaped occurrences plus
+  `DailyDate` can be Ambiguous; tags/fields/schema/footnotes are
+  Unique/Unresolved only (negative pin). Token ranges should mirror 26's
+  occurrence ranges (embed `!` stays outside the token, alias side decision,
+  code blocks excluded by AST). Hover budget `<2ms/<1ms` (supersedes 33's hover
+  row) sets the latency class we live in.
+- **Ticket 29**: capability discipline: advertise only what we implement
+  (markdown-oxide's advertised-but-never-set modifiers and iwe's stubbed
+  providers are the named anti-patterns); deliberate non-advertisement precedent
+  (`partialResultProvider`); 29 owns the initialize-time inspection our emission
+  gate reads.
+- **Ticket 33**: **no semantic-tokens row exists**; one is proposed in §8.
+  Anchors available: single-file reparse `<10ms`, structural diff `<1ms`,
+  debounce `100ms` (provisional, 25 owns), document symbols `<10ms/<5ms`,
+  diagnostics warm p95 `≤10ms`. Metadata/occurrences always resident (~2MB @20K)
+  → token emission is index-walk only, no parse.
+- **a1/a2**: occurrence spans + `nav::NavContext::highlight` spine are the
+  intended source; tokens must be a projection of the same walk (one parse-time
+  cost shared with folding/symbols per b2's shared-walk pattern).
 
 ---
 
 ## 6. Cross-cutting design constraints
 
-1. **Emission gate = client announced `textDocument.semanticTokens` at all** (29): tokens are pull-based, so the gate is mostly declarative: advertise `semanticTokensProvider` in `initialize` only if the client announced; never send unsolicited token payloads; `workspace/.../refresh` only if `refreshSupport`.
-2. **Legend is fixed at registration** (spec §2) covering every kind×state we may ever emit; it cannot extend later per-request; choose the full vocabulary now, gate *emission* per client.
-3. **Emit by name regardless of the client's `tokenTypes` list**: all three capable clients render/ignore by name (verified nvim :728-731 unconditional formatting; Zed server-legend map :670; VS Code themed-by-name, medium confidence). Filtering to the announced list would *delete the feature in VS Code* (its list is standard-only) with zero client-side benefit. Keep rust-analyzer's fallback mapping (`standard_fallback_type` → drop) in the design as a dormant safety valve, not the default path.
-4. **Single-line, non-overlapping tokens**: VS Code advertises both `false`; split per line (RA `to_proto.rs:793-801` pattern) and skip/filter multiline spans server-side (Marksman `isSingleLine` pattern). Wikilinks/tags are line-local in practice; the 10k-line/file cap bounds the worst case.
-5. **Position encoding** rides 26's `convert` module (utf-8-if-offered-else-utf-16); `deltaStart`/`length` are encoding-sensitive.
-6. **No reliance on `ServerCancelled`** (nvim `serverCancelSupport=false`); normal `$/cancelRequest` between tiers/batches is enough.
-7. **Augment-aware restraint** (RA `to_proto.rs:764-779` lesson): don't emit tokens that merely restate what the grammar already colors with no added state (e.g. a plain `[x](y)` with state=resolved in VS Code); that buys churn and double-styling, not information. Emit when we add information: wikilinks/tags/fields/footnotes/daily-dates (grammar-blind) and **any occurrence whose state ≠ resolved**.
-8. **Refresh is genuinely required** (not cargo-cult): creating/deleting note B flips `[[b]]` occurrences in *other* buffers from unresolved↔resolved without any edit to those buffers; clients only re-request on their own edits. Debounced (25's tiers), errors swallowed (25's diagnostics-refresh pattern), only when `refreshSupport`; markdown-oxide does exactly this (source-verified), nvim's `semantic_tokens.lua` comments document the clangd refresh pattern as the sanctioned re-sync mechanism. Spec: client may delay refresh for invisible editors (free backpressure).
-9. **Payload bound**: emission is per-document, O(occurrences in that file), never workspace-wide; bounded by 10k-line cap + per-line occurrence density. No spec-defined payload cap (unlike 26's 5,000-refs cap); pathological many-tags-per-line notes are an open question (§10.7).
-10. **Dynamic registration / delta / range**: static capability only in v1; add-ons are additive later (§7.2).
+1. **Emission gate = client announced `textDocument.semanticTokens` at all**
+   (29): tokens are pull-based, so the gate is mostly declarative: advertise
+   `semanticTokensProvider` in `initialize` only if the client announced; never
+   send unsolicited token payloads; `workspace/.../refresh` only if
+   `refreshSupport`.
+2. **Legend is fixed at registration** (spec §2) covering every kind×state we
+   may ever emit; it cannot extend later per-request; choose the full vocabulary
+   now, gate *emission* per client.
+3. **Emit by name regardless of the client's `tokenTypes` list**: all three
+   capable clients render/ignore by name (verified nvim :728-731 unconditional
+   formatting; Zed server-legend map :670; VS Code themed-by-name, medium
+   confidence). Filtering to the announced list would
+   *delete the feature in VS Code* (its list is standard-only) with zero
+   client-side benefit. Keep rust-analyzer's fallback mapping
+   (`standard_fallback_type` → drop) in the design as a dormant safety valve,
+   not the default path.
+4. **Single-line, non-overlapping tokens**: VS Code advertises both `false`;
+   split per line (RA `to_proto.rs:793-801` pattern) and skip/filter multiline
+   spans server-side (Marksman `isSingleLine` pattern). Wikilinks/tags are
+   line-local in practice; the 10k-line/file cap bounds the worst case.
+5. **Position encoding** rides 26's `convert` module
+   (utf-8-if-offered-else-utf-16); `deltaStart`/`length` are encoding-sensitive.
+6. **No reliance on `ServerCancelled`** (nvim `serverCancelSupport=false`);
+   normal `$/cancelRequest` between tiers/batches is enough.
+7. **Augment-aware restraint** (RA `to_proto.rs:764-779` lesson): don't emit
+   tokens that merely restate what the grammar already colors with no added
+   state (e.g. a plain `[x](y)` with state=resolved in VS Code); that buys churn
+   and double-styling, not information. Emit when we add information:
+   wikilinks/tags/fields/footnotes/daily-dates (grammar-blind) and
+   **any occurrence whose state ≠ resolved**.
+8. **Refresh is genuinely required** (not cargo-cult): creating/deleting note B
+   flips `[[b]]` occurrences in *other* buffers from unresolved↔resolved without
+   any edit to those buffers; clients only re-request on their own edits.
+   Debounced (25's tiers), errors swallowed (25's diagnostics-refresh pattern),
+   only when `refreshSupport`; markdown-oxide does exactly this
+   (source-verified), nvim's `semantic_tokens.lua` comments document the clangd
+   refresh pattern as the sanctioned re-sync mechanism. Spec: client may delay
+   refresh for invisible editors (free backpressure).
+9. **Payload bound**: emission is per-document, O(occurrences in that file),
+   never workspace-wide; bounded by 10k-line cap + per-line occurrence density.
+   No spec-defined payload cap (unlike 26's 5,000-refs cap); pathological
+   many-tags-per-line notes are an open question (§10.7).
+10. **Dynamic registration / delta / range**: static capability only in v1;
+    add-ons are additive later (§7.2).
 
 ---
 
@@ -100,7 +203,9 @@ Takeaway: **2 of 6** markdown peers ship tokens; neither encodes three-valued re
 
 ### 7.1 Legend axis: what carries the state?
 
-Three candidate shapes (kind map below is provisional: links/embeds→`class`, tags→`enumMember`, frontmatter/inline fields→`property`, footnotes/daily-dates→`label`-ish; refine in review):
+Three candidate shapes (kind map below is provisional: links/embeds→`class`,
+tags→`enumMember`, frontmatter/inline fields→`property`,
+footnotes/daily-dates→`label`-ish; refine in review):
 
 | Option | Encoding | Default visibility (VS Code / nvim / Zed) | Pros | Cons |
 |---|---|---|---|---|
@@ -109,7 +214,10 @@ Three candidate shapes (kind map below is provisional: links/embeds→`class`, t
 | **T2 state-as-custom-type (RA-style)** | e.g. `unresolvedReference`, `ambiguousReference`, else kind type | unstyled → grammar color (i.e. invisible state) until user themes, and Zed's default rules file confirms even RA's type isn't styled by default | strongest precedent (RA PR #4034, moxide's `comment`-for-unresolved is the standard-type cousin) | custom type **replaces** the kind type → kind color lost for stateful tokens; N kinds × states = legend sprawl; same "must be themed" cost as T1 with less composition |
 | **T2b state-primary standard types (moxide-style)** | state picks the standard type: unresolved→`comment`, resolved→kind type | **zero-config state visibility** (unresolved renders comment-colored in VS Code/nvim defaults) | the only option that colors state *out of the box* | loses kind color exactly when state matters; `ambiguous` has no good standard carrier; inconsistent semantics per kind; moxide precedent shows it's acceptable in practice |
 
-- **T1 + a T2b-style escape hatch for `unresolved` is the synthesis to evaluate in Phase B**: if VS Code custom-modifier theming fails verification, fall back to mapping `unresolved` onto a standard type (T2b) for un-themed clients rather than losing the signal.
+- **T1 + a T2b-style escape hatch for `unresolved` is the synthesis to evaluate
+  in Phase B**: if VS Code custom-modifier theming fails verification, fall back
+  to mapping `unresolved` onto a standard type (T2b) for un-themed clients
+  rather than losing the signal.
 
 ### 7.2 Transport axis (leanest vs maximally capable)
 
@@ -122,23 +230,43 @@ Three candidate shapes (kind map below is provisional: links/embeds→`class`, t
 | dynamic registration | no | no | static at initialize is fine (29: register iff client announced) |
 | server-cancel reliance | no (nvim can't) | no |  |
 
-Rejected as over-building: per-request legend negotiation (spec forbids), workspace-scope token APIs (don't exist), emitting tokens inside code blocks (26 excludes them), re-parsing on token requests (ride 25's snapshot).
+Rejected as over-building: per-request legend negotiation (spec forbids),
+workspace-scope token APIs (don't exist), emitting tokens inside code blocks (26
+excludes them), re-parsing on token requests (ride 25's snapshot).
 
 ---
 
 ## 8. Recommendation
 
-**Ship T1 with leanest transport.** Standard kind types + `unresolved`/`ambiguous` modifier bits, three-valued straight from 26's `Resolution` (tags/fields/footnotes just never take the `ambiguous` bit), `full: true` only, debounced refresh, grammar-blind occurrences always + any state ≠ resolved, single-line non-overlapping via 26's spans and convert module, static capability gated on client announcement.
+**Ship T1 with leanest transport.** Standard kind types +
+`unresolved`/`ambiguous` modifier bits, three-valued straight from 26's
+`Resolution` (tags/fields/footnotes just never take the `ambiguous` bit),
+`full: true` only, debounced refresh, grammar-blind occurrences always + any
+state ≠ resolved, single-line non-overlapping via 26's spans and convert module,
+static capability gated on client announcement.
 
 Rationale across the three lenses:
 
-- **demand**: the state exists nowhere in any client's grammar/tree-sitter (P8/P9 verified at source), ticket 26 already materializes `Resolution` per occurrence, and navigation is separately solved by `documentLink`, so this feature's *entire* value is state visibility, which T0 would throw away while T1 keeps default kind coloring intact.
-- **ecosystem**: 2/6 peers ship tokens; neither uses modifiers or ambiguity; RA proves the "custom vocabulary + user theming + docs snippet" delivery model survives five years in the flagship editor; markdown-oxide proves refresh-after-vault-change and proves state tokens are wanted independently of diagnostics.
-- **cost**: emission is an occurrence-walk over resident index metadata (no parse), the cheapest interactive class we have; the only cross-buffers cost is refresh, which we debounce and clients may delay.
+- **demand**: the state exists nowhere in any client's grammar/tree-sitter
+  (P8/P9 verified at source), ticket 26 already materializes `Resolution` per
+  occurrence, and navigation is separately solved by `documentLink`, so this
+  feature's *entire* value is state visibility, which T0 would throw away while
+  T1 keeps default kind coloring intact.
+- **ecosystem**: 2/6 peers ship tokens; neither uses modifiers or ambiguity; RA
+  proves the "custom vocabulary + user theming + docs snippet" delivery model
+  survives five years in the flagship editor; markdown-oxide proves
+  refresh-after-vault-change and proves state tokens are wanted independently of
+  diagnostics.
+- **cost**: emission is an occurrence-walk over resident index metadata (no
+  parse), the cheapest interactive class we have; the only cross-buffers cost is
+  refresh, which we debounce and clients may delay.
 
-**What we deliberately do not build (v1)**: delta, range, dynamic registration, server-cancel, tokens for grammar-covered syntax (RA's augment-aware skip), anything for Helix (status quo: no color, navigation via 26's links).
+**What we deliberately do not build (v1)**: delta, range, dynamic registration,
+server-cancel, tokens for grammar-covered syntax (RA's augment-aware skip),
+anything for Helix (status quo: no color, navigation via 26's links).
 
-**Perf rows proposed for ticket 33** (none exist today; anchors = its document-symbols `<10ms/<5ms` row and diagnostics warm `≤10ms`):
+**Perf rows proposed for ticket 33** (none exist today; anchors = its
+document-symbols `<10ms/<5ms` row and diagnostics warm `≤10ms`):
 
 | Operation | p95 target | stretch | Strategy |
 |---|---|---|---|
@@ -161,31 +289,105 @@ Rationale across the three lenses:
 
 ## 9. Open questions / risks
 
-1. **VS Code custom-modifier theming** (§7.1): verify in Phase B that `editor.semanticTokenColorCustomizations.rules` accepts selectors like `class.unresolved` / `*.*.ambiguous`, and that bare-type rules still match modified tokens (if bare rules stop matching, T1 degrades kind colors for stateful tokens → fall back to T2b for unresolved). Same spike for nvim `@lsp.typemod.class.unresolved` group chain.
-2. **Zed default-off + `full` mode**: stock Zed shows nothing until the user flips `semantic_tokens`; a user choosing `full` gets `augments=false`, and we only token entity occurrences → **bold/italic/code/headings lose grammar color entirely** in that mode. Mitigations: document `combined` as the supported mode; verify whether a Zed language config/extension can set per-language `semantic_tokens: combined` for markdown (unverified).
-3. **Helix floor**: no semantic tokens ever; wikilinks stay uncolored (status quo: helix's grammar query has no wiki capture either). Accept and document; 26's documentLink covers navigation.
-4. **State-primary vs kind-primary default UX**: moxide's unresolved→`comment` gets zero-config visibility we otherwise can't match; decide with a side-by-side rendering test (Phase B matrix) before locking §7.1.
-5. **VS Code by-name rendering** for off-list types is medium-confidence (inferred from RA behavior + docs; VS Code client code shows standard-only *advertisement*, not render-time filtering); re-verify in the same Phase B spike.
-6. **coc.nvim** row unverified (assumed mirror of VS Code); cheap to confirm before final synthesis.
-7. **Payload pathology**: a pathological note (`#a #b #c …` thousands per line) has no spec-level cap; decide whether to reuse 26's constant + `window/logMessage` truncation pattern or accept the 10k-line cap as sufficient.
-8. **Embed `!` and alias side**: mirror 26's rename range decisions (token covers `[[...]]`, `!` outside, alias side as display); confirm with 26's owner, don't silently diverge.
-9. **Frontmatter vs code-block boundaries**: frontmatter field keys = token (property); fenced code interiors = never (26's AST excludes); inline code = never.
-10. **markdown-oxide's exact `range: Some(false)` semantics** and whether its `DECORATOR` legend choice was deliberate design or accident; read `CHANGELOG`/issues before copying any of its conventions.
+1. **VS Code custom-modifier theming** (§7.1): verify in Phase B that
+   `editor.semanticTokenColorCustomizations.rules` accepts selectors like
+   `class.unresolved` / `*.*.ambiguous`, and that bare-type rules still match
+   modified tokens (if bare rules stop matching, T1 degrades kind colors for
+   stateful tokens → fall back to T2b for unresolved). Same spike for nvim
+   `@lsp.typemod.class.unresolved` group chain.
+2. **Zed default-off + `full` mode**: stock Zed shows nothing until the user
+   flips `semantic_tokens`; a user choosing `full` gets `augments=false`, and we
+   only token entity occurrences →
+   **bold/italic/code/headings lose grammar color entirely** in that mode.
+   Mitigations: document `combined` as the supported mode; verify whether a Zed
+   language config/extension can set per-language `semantic_tokens: combined`
+   for markdown (unverified).
+3. **Helix floor**: no semantic tokens ever; wikilinks stay uncolored (status
+   quo: helix's grammar query has no wiki capture either). Accept and document;
+   26's documentLink covers navigation.
+4. **State-primary vs kind-primary default UX**: moxide's unresolved→`comment`
+   gets zero-config visibility we otherwise can't match; decide with a
+   side-by-side rendering test (Phase B matrix) before locking §7.1.
+5. **VS Code by-name rendering** for off-list types is medium-confidence
+   (inferred from RA behavior + docs; VS Code client code shows standard-only
+   *advertisement*, not render-time filtering); re-verify in the same Phase B
+   spike.
+6. **coc.nvim** row unverified (assumed mirror of VS Code); cheap to confirm
+   before final synthesis.
+7. **Payload pathology**: a pathological note (`#a #b #c …` thousands per line)
+   has no spec-level cap; decide whether to reuse 26's constant +
+   `window/logMessage` truncation pattern or accept the 10k-line cap as
+   sufficient.
+8. **Embed `!` and alias side**: mirror 26's rename range decisions (token
+   covers `[[...]]`, `!` outside, alias side as display); confirm with 26's
+   owner, don't silently diverge.
+9. **Frontmatter vs code-block boundaries**: frontmatter field keys = token
+   (property); fenced code interiors = never (26's AST excludes); inline code =
+   never.
+10. **markdown-oxide's exact `range: Some(false)` semantics** and whether its
+    `DECORATOR` legend choice was deliberate design or accident; read
+    `CHANGELOG`/issues before copying any of its conventions.
 
 ---
 
 ## Appendix: evidence index
 
-- Upstream LSP 3.18 semantic-tokens sections: `/tmp/lsp318.txt` (legend/encoding :14660-14770; client-extension statement :14300; `SemanticTokensClientCapabilities` :15344-15480; range/minimap/flicker :15886-15888; refresh :15946-15995). Source URL in §2; local strip is transient (`/tmp`).
-- VS Code grammar: `microsoft/vscode` `extensions/markdown-basics/syntaxes/markdown.tmLanguage.json` (full fetch, 0 `wiki`/`[[` hits); issues microsoft/vscode#138173, kortina/vscode-markdown-notes#121.
-- tree-sitter: MDeiml `tree-sitter-markdown-inline/grammar.js` (`EXTENSION_WIKI_LINK`, lines ~100-103/179-196/425-429); nvim-treesitter `queries/markdown/highlights.scm`; helix `languages.toml` + `runtime/queries/markdown/highlights.scm`; Zed `crates/grammars/src/grammars.rs:33-34`, `crates/grammars/src/markdown{,-inline}/highlights.scm`.
-- VS Code client: `vscode-languageserver-node` `client/src/common/semanticTokens.ts:54-101` (capability block); rendering: vscode-docs `semantic-highlight-guide.md` (`configuredByTheme` default, built-in themes enable).
-- Neovim: `runtime/lua/vim/lsp/protocol.lua` (textDocument.semanticTokens capability: 23 types no `label`, 10 modifiers, range+delta, overlap/multiline true, cancel false, augments true; workspace refreshSupport true); `runtime/lua/vim/lsp/semantic_tokens.lua` (`:1027` enabled, `:829` debounce 200, `:700` priority, `:728-731` group formatting, `:665-688` staleness/clangd-refresh commentary); `runtime/doc/lsp.txt` (group chain, off-spec types, default links).
-- Zed: `crates/lsp/src/lsp.rs` (`SEMANTIC_TOKEN_TYPES` :467-495, `SEMANTIC_TOKEN_MODIFIERS` :497-511, capability :1048-1061 incl. `range: None`, refresh :942-944); `crates/project/src/lsp_store.rs:645-647` (augments = `use_tree_sitter()`); `crates/project/src/lsp_store/semantic_tokens.rs` (:96 capability probe, :206 delta response, :354 delta request, :670 legend-name map, :997 delta codec); `docs/src/semantic-tokens.md` (default `off`, modes, `semantic_token_rules`); `assets/settings/default_semantic_token_rules.json` (:189 `label`; no `unresolvedReference`).
-- Helix: `helix-lsp/src/client.rs` :586+ full `ClientCapabilities` literal (no `semanticTokens` anywhere, both blocks printed); PR #6102 closed/unmerged.
-- Marksman: `docs/digests/lsp_artempyanykh-marksman-digest.txt` (`Semato.fs` :10877-10990, legend :11163, handlers :11887/:11902, tests :17269).
-- markdown-oxide: `docs/digests/lsp_feel-ix-343-markdown-oxide-digest.txt` (`src/tokens.rs` :6240-6320 incl. `select_references`/`path_unresolved`/delta fold, capability :5046-5066, refresh :4695-4765, config gate :344/:608).
-- Absences: MS service digest (0 `SemanticToken`), rumdl digest (0), iwe digest (0), zk digest false positives (:2446/:3289; `zk-src:19202`).
-- rust-analyzer: `crates/rust-analyzer/src/lsp/semantic_tokens.rs` (`SupportedType` incl. `UnresolvedReference`, `standard_fallback_type` :193, `standard_fallback` :264, builder); `crates/rust-analyzer/src/lsp/to_proto.rs:749-816` (augment skip :764-779, non-standard fallback :786-791, per-line split :793-801, delta diff :809-816); `crates/rust-analyzer/src/config.rs:415-467` (toggles + "semantic tokens override other highlighting grammars" doc); PR #4034.
-- Tickets: `issues/26-definition-references-hover-rename.md` (Resolution, AmbiguityKind, ranges, hover `<2ms`), `issues/29-client-capability-negotiation.md` (non-advertisement discipline), `issues/33-performance-targets-and-strategy.md` (no token row; anchors used in §8).
-- Traces codebase: `grep -ri "semantic_token|SemanticTokens" src/` → 0 hits; `docs/refs/lsp_spec.md:655` stub.
+- Upstream LSP 3.18 semantic-tokens sections: `/tmp/lsp318.txt`
+  (legend/encoding :14660-14770; client-extension statement :14300;
+  `SemanticTokensClientCapabilities` :15344-15480;
+  range/minimap/flicker :15886-15888; refresh :15946-15995). Source URL in §2;
+  local strip is transient (`/tmp`).
+- VS Code grammar: `microsoft/vscode`
+  `extensions/markdown-basics/syntaxes/markdown.tmLanguage.json` (full fetch, 0
+  `wiki`/`[[` hits); issues microsoft/vscode#138173,
+  kortina/vscode-markdown-notes#121.
+- tree-sitter: MDeiml `tree-sitter-markdown-inline/grammar.js`
+  (`EXTENSION_WIKI_LINK`, lines ~100-103/179-196/425-429); nvim-treesitter
+  `queries/markdown/highlights.scm`; helix `languages.toml` +
+  `runtime/queries/markdown/highlights.scm`; Zed
+  `crates/grammars/src/grammars.rs:33-34`,
+  `crates/grammars/src/markdown{,-inline}/highlights.scm`.
+- VS Code client: `vscode-languageserver-node`
+  `client/src/common/semanticTokens.ts:54-101` (capability block); rendering:
+  vscode-docs `semantic-highlight-guide.md` (`configuredByTheme` default,
+  built-in themes enable).
+- Neovim: `runtime/lua/vim/lsp/protocol.lua` (textDocument.semanticTokens
+  capability: 23 types no `label`, 10 modifiers, range+delta, overlap/multiline
+  true, cancel false, augments true; workspace refreshSupport true);
+  `runtime/lua/vim/lsp/semantic_tokens.lua` (`:1027` enabled, `:829` debounce
+  200, `:700` priority, `:728-731` group formatting, `:665-688`
+  staleness/clangd-refresh commentary); `runtime/doc/lsp.txt` (group chain,
+  off-spec types, default links).
+- Zed: `crates/lsp/src/lsp.rs` (`SEMANTIC_TOKEN_TYPES` :467-495,
+  `SEMANTIC_TOKEN_MODIFIERS` :497-511, capability :1048-1061 incl.
+  `range: None`, refresh :942-944); `crates/project/src/lsp_store.rs:645-647`
+  (augments = `use_tree_sitter()`);
+  `crates/project/src/lsp_store/semantic_tokens.rs` (:96 capability probe, :206
+  delta response, :354 delta request, :670 legend-name map, :997 delta codec);
+  `docs/src/semantic-tokens.md` (default `off`, modes, `semantic_token_rules`);
+  `assets/settings/default_semantic_token_rules.json` (:189 `label`; no
+  `unresolvedReference`).
+- Helix: `helix-lsp/src/client.rs` :586+ full `ClientCapabilities` literal (no
+  `semanticTokens` anywhere, both blocks printed); PR #6102 closed/unmerged.
+- Marksman: `docs/digests/lsp_artempyanykh-marksman-digest.txt`
+  (`Semato.fs` :10877-10990, legend :11163, handlers :11887/:11902,
+  tests :17269).
+- markdown-oxide: `docs/digests/lsp_feel-ix-343-markdown-oxide-digest.txt`
+  (`src/tokens.rs` :6240-6320 incl. `select_references`/`path_unresolved`/delta
+  fold, capability :5046-5066, refresh :4695-4765, config gate :344/:608).
+- Absences: MS service digest (0 `SemanticToken`), rumdl digest (0), iwe digest
+  (0), zk digest false positives (:2446/:3289; `zk-src:19202`).
+- rust-analyzer: `crates/rust-analyzer/src/lsp/semantic_tokens.rs`
+  (`SupportedType` incl. `UnresolvedReference`, `standard_fallback_type` :193,
+  `standard_fallback` :264, builder);
+  `crates/rust-analyzer/src/lsp/to_proto.rs:749-816` (augment skip :764-779,
+  non-standard fallback :786-791, per-line split :793-801, delta diff :809-816);
+  `crates/rust-analyzer/src/config.rs:415-467` (toggles + "semantic tokens
+  override other highlighting grammars" doc); PR #4034.
+- Tickets: `issues/26-definition-references-hover-rename.md` (Resolution,
+  AmbiguityKind, ranges, hover `<2ms`),
+  `issues/29-client-capability-negotiation.md` (non-advertisement discipline),
+  `issues/33-performance-targets-and-strategy.md` (no token row; anchors used in
+  §8).
+- Traces codebase: `grep -ri "semantic_token|SemanticTokens" src/` → 0 hits;
+  `docs/refs/lsp_spec.md:655` stub.

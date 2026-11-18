@@ -79,7 +79,9 @@ Bad, because:
 
 - Multiple inheritance with first-listed-wins is an authoring contract —
   declaration order matters and can surprise
-- Resolution purity is scoped to the `extends`/`$ref`/Kahn's-sort linearization specifically — a `file` field's option list still resolves live from the `WorkspaceIndex` outside `resolve()`.
+- Resolution purity is scoped to the `extends`/`$ref`/Kahn's-sort linearization
+  specifically — a `file` field's option list still resolves live from the
+  `WorkspaceIndex` outside `resolve()`.
 - `$ref` is deliberately bounded to global + ancestors, so cross-schema field
   reuse outside the extends chain is not expressible (redefine or restructure
   instead)

@@ -1,18 +1,71 @@
 # Topology and red-team menu for the execution-input decision
 
-[V] Evidence notation: `[V]` means the cited current source, question, or research excerpt establishes the claim; `[H]` is an inference to test; `[P]` is a design option, not a decision. Code sketches are *proposed changed interfaces*, not a claim that they compile against today's tree. This file answers only the cross-cutting half of [What is the explicit execution context, and what ambient state is eliminated?](../../issues/21-ambient-environment-and-execution-context.md); it does not choose directory precedence, zone default, or date grammar. The four companion evidence files are [code](a-code-inventory.md), [prior decisions](b-prior-decisions.md), [digest lessons](c-digest-lessons.md), and [external precedent](d-external-precedent.md); see also [execution-context precedent](../04-execution-context-precedent.md).
+[V] Evidence notation: `[V]` means the cited current source, question, or
+research excerpt establishes the claim; `[H]` is an inference to test; `[P]` is
+a design option, not a decision. Code sketches are
+*proposed changed interfaces*, not a claim that they compile against today's
+tree. This file answers only the cross-cutting half of
+[What is the explicit execution context, and what ambient state is eliminated?](../../issues/21-ambient-environment-and-execution-context.md);
+it does not choose directory precedence, zone default, or date grammar. The four
+companion evidence files are [code](a-code-inventory.md),
+[prior decisions](b-prior-decisions.md), [digest lessons](c-digest-lessons.md),
+and [external precedent](d-external-precedent.md); see also
+[execution-context precedent](../04-execution-context-precedent.md).
 
 ## Summary and independent decisions
 
-- [P] **Leading topology D:** host may aggregate what it needs, but core app use cases are functions accepting only their actual inputs; pass a small immutable `(instant, resolved zone)` value through evaluation, and constructor-bind repeated filesystem policy at its *real* owner where that reduces forwarding. This is a shape, not approval of names, a crate split, or default-zone policy. [V] It is compatible with the explicit-input rule in [schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md) layering paragraph; [H] the difficulty is preserving one snapshot through lazy `QuerySet` and Minijinja callback registration, not constructing the two values.
-- [P] **Strong dissent:** split immutable host/workspace/evaluation inputs (C), or constructor-inject into existing services (E), without exporting a cross-cutting aggregate. [H] D can become hundreds of low-value forwarding edits; C/E may better exploit existing ownership. Keep guarded cwd and terminal I/O even in D: they are not automatically errors.
-- [V] `cli::run` currently creates `TerminalDialogProvider` and `ConfigService::new`; `Commands::run` passes a dialog handle to ten variants but only Init and Template use it (`src/cli/mod.rs:181-227`). [V] `ConfigService::load` constructs a `ConfigLocator::from_env` per load, while store roots are selected in `ConfigService::new`; `trust_subjects` constructs its own locator (`src/config/service.rs:43-65,97-100,194-199`). [H] The entry point is not a single all-purpose constructor today.
-- [V] The zone is read by query AST and template date leaves; query-builder transformations execute eagerly in `QueryService::run`/`run_from_store` (`src/query/service.rs:101-113,129-169`), but *later* `QuerySet` transformations execute once, lazily, on first read (`src/query/results.rs:456-490,536-540`). [P] Whichever topology is picked must keep its evaluation inputs with *both* execution paths; a borrowed `&Snapshot` only during `QueryService::run` cannot bind the deferred path.
-- [P] Separate decisions: **T1** who is allowed to acquire OS inputs; **T2** whether those inputs cross core as one object, lifetime-split values, or smallest views; **T3** whether repeated consumers own policy at construction; **T4** where a single evaluation snapshot lives through lazy results/callbacks; **T5** how scope refreshes for long-lived hosts; **T6** which test and lint guardrails enforce T1; **T7** names and outward visibility. None entails a `Clock` trait, MCP session manager, `cap-std`, or a new public CLI flag.
+- [P] **Leading topology D:** host may aggregate what it needs, but core app use
+  cases are functions accepting only their actual inputs; pass a small immutable
+  `(instant, resolved zone)` value through evaluation, and constructor-bind
+  repeated filesystem policy at its *real* owner where that reduces forwarding.
+  This is a shape, not approval of names, a crate split, or default-zone policy.
+  [V] It is compatible with the explicit-input rule in
+  [schema note typing and validation](../../issues/20-schema-note-typing-and-validation.md)
+  layering paragraph; [H] the difficulty is preserving one snapshot through lazy
+  `QuerySet` and Minijinja callback registration, not constructing the two
+  values.
+- [P] **Strong dissent:** split immutable host/workspace/evaluation inputs (C),
+  or constructor-inject into existing services (E), without exporting a
+  cross-cutting aggregate. [H] D can become hundreds of low-value forwarding
+  edits; C/E may better exploit existing ownership. Keep guarded cwd and
+  terminal I/O even in D: they are not automatically errors.
+- [V] `cli::run` currently creates `TerminalDialogProvider` and
+  `ConfigService::new`; `Commands::run` passes a dialog handle to ten variants
+  but only Init and Template use it (`src/cli/mod.rs:181-227`). [V]
+  `ConfigService::load` constructs a `ConfigLocator::from_env` per load, while
+  store roots are selected in `ConfigService::new`; `trust_subjects` constructs
+  its own locator (`src/config/service.rs:43-65,97-100,194-199`). [H] The entry
+  point is not a single all-purpose constructor today.
+- [V] The zone is read by query AST and template date leaves; query-builder
+  transformations execute eagerly in `QueryService::run`/`run_from_store`
+  (`src/query/service.rs:101-113,129-169`), but *later* `QuerySet`
+  transformations execute once, lazily, on first read
+  (`src/query/results.rs:456-490,536-540`). [P] Whichever topology is picked
+  must keep its evaluation inputs with *both* execution paths; a borrowed
+  `&Snapshot` only during `QueryService::run` cannot bind the deferred path.
+- [P] Separate decisions: **T1** who is allowed to acquire OS inputs; **T2**
+  whether those inputs cross core as one object, lifetime-split values, or
+  smallest views; **T3** whether repeated consumers own policy at construction;
+  **T4** where a single evaluation snapshot lives through lazy
+  results/callbacks; **T5** how scope refreshes for long-lived hosts; **T6**
+  which test and lint guardrails enforce T1; **T7** names and outward
+  visibility. None entails a `Clock` trait, MCP session manager, `cap-std`, or a
+  new public CLI flag.
 
 ## C1. Seven fully specified topologies
 
-[V] Current branching costs used below: `Cli::run` → command → `run_with_config` → `ConfigService::load` → `ConfigLocator::from_env` is about seven/eight frames, but locator/store construction admits two seams; CLI query → refresh → store service → plan → filter/AST → temporal leaves is roughly 9–11 frames; template query takes an additional Minijinja callback path ([inventory](a-code-inventory.md) §4; `src/cli/mod.rs:335-365,470-488`; `src/query/plan.rs:37-57,238-248`; `src/query/grammar/filter.rs:130-149,213-225,272-297`). [V] `IndexerService::scan(root)` filters with a global ignore predicate, and the trust subtree walker separately uses that predicate (`src/index/service.rs:422-440`; `src/config/discovery.rs:153-175`). Cost estimates are signatures/seams, not invented precise LOC or timing measurements.
+[V] Current branching costs used below: `Cli::run` → command → `run_with_config`
+→ `ConfigService::load` → `ConfigLocator::from_env` is about seven/eight frames,
+but locator/store construction admits two seams; CLI query → refresh → store
+service → plan → filter/AST → temporal leaves is roughly 9–11 frames; template
+query takes an additional Minijinja callback path
+([inventory](a-code-inventory.md) §4; `src/cli/mod.rs:335-365,470-488`;
+`src/query/plan.rs:37-57,238-248`;
+`src/query/grammar/filter.rs:130-149,213-225,272-297`). [V]
+`IndexerService::scan(root)` filters with a global ignore predicate, and the
+trust subtree walker separately uses that predicate
+(`src/index/service.rs:422-440`; `src/config/discovery.rs:153-175`). Cost
+estimates are signatures/seams, not invented precise LOC or timing measurements.
 
 | Option / construction, consumer and real cost | Ticket-20 functions / CLI-core surface | CLI, LSP, MCP and test behavior | Strongest case; disproof attempt |
 | --- | --- | --- | --- |
@@ -24,11 +77,27 @@
 | **F. Ambient scoped override.** `with_context(&ctx, \|run\|()` stores a thread-local or task-local pointer/owned `Arc`; old `FilterExpr::is_matching(row)` and date functions look up current value. Must scope and restore on panic, separately propagate to Rayon tasks and spawned async tasks, and retain scope until deferred `QuerySet` materialization. | [H] No immediate public signature growth but violates meaningful explicit-input principle. Core use cases' behavior changes based on an invisible host frame. | [V] `IndexerService::parse_notes` is `par_iter` (`src/index/service.rs:329-356`); `QuerySet::rows()` may run later (`src/query/results.rs:479-490`). [H] TLS will not follow Rayon workers or task migration; Tokio task-locals require scoped future access, not transfer into arbitrary blocking workers ([external precedent](d-external-precedent.md) §5 item 6). | [H] Steelman: cheap staged retrofit with existing `ZoneGuard` idiom and unchanged callers. Falsifier: context absent/replaced at lazy materialization produces wrong zone or panic; manually wrapping every spawned task negates its low-plumbing claim. |
 | **G. Capability-argument closure.** Host runs `evaluate(index, builder, source_sampler)` or supplies `&dyn InputProvider`/`fn() -> Zoned` so leaves request inputs on demand; directory resolution similarly takes an env lookup callback. | [H] Function injection keeps core abstract and could preserve source API, but one-implementor `InputProvider` conflicts with [20](../../issues/20-schema-note-typing-and-validation.md) layering paragraph; provider method calls at each leaf reintroduce ambient time. | [H] Useful only where repeated, deliberately live sampling is product behavior. A callback cannot retroactively bind source-relative operands or deferred sets, and generic/dyn plumbing expands public surface. | [H] Steelman: tests supply fake suppliers and hosts can reload without reconstructing services. Falsifier: requirement is *one value per evaluation*, not streaming a supplier; replace callback with sampled value at entry and delete machinery. |
 
-[P] B/F/G are deliberate counterfactuals, not recommendations. [V] There are only three direct runtime project-owned `std::env::var*` expressions (`src/dirs.rs:193`, `src/env_vars.rs:9,29`), although `dirs` resolves several named keys through its helper ([inventory](a-code-inventory.md) §1). Moving them at a narrow acquisition seam is not a justification for passing all of them through filter arithmetic.
+[P] B/F/G are deliberate counterfactuals, not recommendations. [V] There are
+only three direct runtime project-owned `std::env::var*` expressions
+(`src/dirs.rs:193`, `src/env_vars.rs:9,29`), although `dirs` resolves several
+named keys through its helper ([inventory](a-code-inventory.md) §1). Moving them
+at a narrow acquisition seam is not a justification for passing all of them
+through filter arithmetic.
 
 ### Representative sketches (signatures checked against current code, not compiled)
 
-[V] Today: `ConfigService::load(&self, cwd: &Path)`, static `ConfigService::trust_subjects(path,scope)`, `IndexerService::scan(root: &Path)`, `QueryService::run(&self,&Arc<WorkspaceIndex>,QueryBuilder) -> QuerySet`, `run_from_store(&self,&IndexStore,QueryBuilder) -> IndexResult<QuerySet>`; `ValueExpr::evaluate(&self,&QueryRow) -> Option<NoteFieldValue>` (`src/config/service.rs:97-99,194-199`; `src/index/service.rs:422-440`; `src/query/service.rs:104-113,129-169`; `src/query/grammar/filter.rs:272-297`). [P] The snippets below show changes, not completed Rust implementations: internal error mapping, sort binding and template query callback propagation are specified in the accompanying prose. `EvaluationInputs` is a placeholder name, not an approved type.
+[V] Today: `ConfigService::load(&self, cwd: &Path)`, static
+`ConfigService::trust_subjects(path,scope)`,
+`IndexerService::scan(root: &Path)`,
+`QueryService::run(&self,&Arc<WorkspaceIndex>,QueryBuilder) -> QuerySet`,
+`run_from_store(&self,&IndexStore,QueryBuilder) -> IndexResult<QuerySet>`;
+`ValueExpr::evaluate(&self,&QueryRow) -> Option<NoteFieldValue>`
+(`src/config/service.rs:97-99,194-199`; `src/index/service.rs:422-440`;
+`src/query/service.rs:104-113,129-169`; `src/query/grammar/filter.rs:272-297`).
+[P] The snippets below show changes, not completed Rust implementations:
+internal error mapping, sort binding and template query callback propagation are
+specified in the accompanying prose. `EvaluationInputs` is a placeholder name,
+not an approved type.
 
 ```rust
 // [P] D: core-facing concrete inputs; CLI host-only aggregate is private.
@@ -70,7 +139,25 @@ fn evaluate(
 }
 ```
 
-[P] In a real D implementation, the `evaluate` match covers the current four `ValueExpr` variants (`Field`, `Literal`, `Call`, `Binary`) with no new per-row allocation for input forwarding; `ArithOp::evaluate_date` receives the same zone it currently reads from `local_zone()`, and date-dependent operands plus sort keys are precomputed once when [query core and plan](../../issues/29-query-core-and-plan.md) does binding. [V] `QuerySet::filter` appends a pending transform and `rows()` materializes it on first read (`src/query/results.rs:536-540,479-490`). [P] A deferred set therefore owns/clones *only the small resolved evaluation input* alongside its plan, or obtains an explicit input at materialization; do not bind to an ambient `with_context` that may have ended. [P] `DateNamespace::register(self,&mut Environment<'static>)` currently registers free `date_format`, `is_past`, `is_future` functions (`src/template/engine/date.rs:75-109`): change registration to per-render closures or Minijinja render-state attachment, all reading the *same owned snapshot* also passed to `QueryOps::run`, not separate callback-local `Timestamp::now()` calls. Which carrier Minijinja favors is [template engine boundary](../../issues/31-template-engine-boundary.md)'s choice.
+[P] In a real D implementation, the `evaluate` match covers the current four
+`ValueExpr` variants (`Field`, `Literal`, `Call`, `Binary`) with no new per-row
+allocation for input forwarding; `ArithOp::evaluate_date` receives the same zone
+it currently reads from `local_zone()`, and date-dependent operands plus sort
+keys are precomputed once when
+[query core and plan](../../issues/29-query-core-and-plan.md) does binding. [V]
+`QuerySet::filter` appends a pending transform and `rows()` materializes it on
+first read (`src/query/results.rs:536-540,479-490`). [P] A deferred set
+therefore owns/clones *only the small resolved evaluation input* alongside its
+plan, or obtains an explicit input at materialization; do not bind to an ambient
+`with_context` that may have ended. [P]
+`DateNamespace::register(self,&mut Environment<'static>)` currently registers
+free `date_format`, `is_past`, `is_future` functions
+(`src/template/engine/date.rs:75-109`): change registration to per-render
+closures or Minijinja render-state attachment, all reading the
+*same owned snapshot* also passed to `QueryOps::run`, not separate
+callback-local `Timestamp::now()` calls. Which carrier Minijinja favors is
+[template engine boundary](../../issues/31-template-engine-boundary.md)'s
+choice.
 
 ```rust
 // [P] C: distinct construction lifetimes; use-case call still explicit.
@@ -114,7 +201,13 @@ fn scan(root: &Path, ignored: &IgnorePolicy) -> IndexResult<Vec<FileMeta>> {
 }
 ```
 
-[P] The C sketch above shows construction order; its `todo!`/`unimplemented!` markers are illustrations, never an implementation. In the actual change, `ConfigService` and `ConfigLocator` must both see the same captured discovery snapshot; otherwise static `trust_subjects` and the second ignored-directory walker still escape the boundary (`src/config/service.rs:194-199`; `src/config/discovery.rs:153-175`). [V] Scan retains Rayon metadata extraction and sorted output (`src/index/service.rs:422-440`).
+[P] The C sketch above shows construction order; its `todo!`/`unimplemented!`
+markers are illustrations, never an implementation. In the actual change,
+`ConfigService` and `ConfigLocator` must both see the same captured discovery
+snapshot; otherwise static `trust_subjects` and the second ignored-directory
+walker still escape the boundary (`src/config/service.rs:194-199`;
+`src/config/discovery.rs:153-175`). [V] Scan retains Rayon metadata extraction
+and sorted output (`src/index/service.rs:422-440`).
 
 ```rust
 // [P] E: stable policy constructor-injected; transient inputs passed per call.
@@ -150,11 +243,32 @@ fn run(
 }
 ```
 
-[P] The E sketch's `unimplemented!` markers likewise mark seams, not shipped code. [H] Because this file is research, short illustrative placeholders show the specific seam without claiming compilability; in the migration, replace placeholders with existing error paths, never a no-op fallback. [V] The current `IndexerService::from(&Config)` already owns root, tasks, frontmatter, dimensions and fingerprint (`src/index/service.rs:39-59`), so adding stable ignore policy there is a focused change; changing only `scan` misses `RefreshPlan::collect(&root,&fingerprint)` (`src/index/service.rs:209-230`), which calls the scanner indirectly. [P] Conversely, put neither `now` nor dialog on `IndexerService`.
+[P] The E sketch's `unimplemented!` markers likewise mark seams, not shipped
+code. [H] Because this file is research, short illustrative placeholders show
+the specific seam without claiming compilability; in the migration, replace
+placeholders with existing error paths, never a no-op fallback. [V] The current
+`IndexerService::from(&Config)` already owns root, tasks, frontmatter,
+dimensions and fingerprint (`src/index/service.rs:39-59`), so adding stable
+ignore policy there is a focused change; changing only `scan` misses
+`RefreshPlan::collect(&root,&fingerprint)` (`src/index/service.rs:209-230`),
+which calls the scanner indirectly. [P] Conversely, put neither `now` nor dialog
+on `IndexerService`.
 
 ## C2. God-object test with measurable tripwires
 
-[P] Review *every aggregate actually passed into core*, not a private host struct merely used to build narrow calls. A god object is an interface failure, not simply a high field count. Tripwires: **(1)** >5 independently owned input domains/fields or fields from >=2 lifetimes in one *core-facing* object; **(2)** >=25% of its consumers read <=25% of fields; **(3)** mutation/reload of one field changes another consumer's observed snapshot in flight; **(4)** a test of filter arithmetic must mock trust store or dialog, or a trust test must fake time; **(5)** the object becomes public solely because a thin CLI needs a constructor, exposing unrelated internal fields; **(6)** one constructor's change forces >=3 otherwise unrelated subsystems' fixtures to change. [P] Trigger at any two tripwires, or immediately on mutable cross-request authority (#3). Thresholds are review heuristics, not Clippy settings; measure consumers and fixtures after the first migration slice.
+[P] Review *every aggregate actually passed into core*, not a private host
+struct merely used to build narrow calls. A god object is an interface failure,
+not simply a high field count. Tripwires: **(1)** >5 independently owned input
+domains/fields or fields from >=2 lifetimes in one *core-facing* object;
+**(2)** >=25% of its consumers read <=25% of fields; **(3)** mutation/reload of
+one field changes another consumer's observed snapshot in flight; **(4)** a test
+of filter arithmetic must mock trust store or dialog, or a trust test must fake
+time; **(5)** the object becomes public solely because a thin CLI needs a
+constructor, exposing unrelated internal fields; **(6)** one constructor's
+change forces >=3 otherwise unrelated subsystems' fixtures to change. [P]
+Trigger at any two tripwires, or immediately on mutable cross-request authority
+(#3). Thresholds are review heuristics, not Clippy settings; measure consumers
+and fixtures after the first migration slice.
 
 | Option | Likely #1 lifetimes/fields | Likely #2/#4 unrelated consumer/test | #3 mutable authority | #5/#6 API churn | Score (0–4 high is bad); how to falsify |
 | --- | --- | --- | --- | --- | --- |
@@ -166,11 +280,25 @@ fn run(
 | F | 0 nominal, hidden ambient slot | 0 nominal | 1 (scope and worker inheritance) | 0 | **1** on object risk, severe implicit-authority risk. |
 | G | 1 if provider has many getters | 1 | 1 on live supplier | 1 | **1–4**; test if provider is a disguised universal context. |
 
-[V] Failure precedent is Cargo's `GlobalContext` (~2,700 lines, shell/env/home/cwd/caches/time together) and uv-preview's `OnceLock`/test mutex rather than "all structs are evil" ([precedent](../04-execution-context-precedent.md) §1/§3). [V] Traces's likely gravity: CLI currently forwards provider through eight arms that ignore it; `ConfigService::new` and `at` set stores independently of `ConfigLocator::from_env`; `TemplateEngine::new` composes schema/index/query/UI and free date callbacks (`src/cli/mod.rs:181-208`; `src/config/service.rs:43-65,97-99`; `src/template/engine.rs:109-165`). [H] A context that also swallows `DialogProvider`, query results, trust authority or filesystem capability would meet tripwires even if named `Workspace`.
+[V] Failure precedent is Cargo's `GlobalContext` (~2,700 lines,
+shell/env/home/cwd/caches/time together) and uv-preview's `OnceLock`/test mutex
+rather than "all structs are evil"
+([precedent](../04-execution-context-precedent.md) §1/§3). [V] Traces's likely
+gravity: CLI currently forwards provider through eight arms that ignore it;
+`ConfigService::new` and `at` set stores independently of
+`ConfigLocator::from_env`; `TemplateEngine::new` composes schema/index/query/UI
+and free date callbacks (`src/cli/mod.rs:181-208`;
+`src/config/service.rs:43-65,97-99`; `src/template/engine.rs:109-165`). [H] A
+context that also swallows `DialogProvider`, query results, trust authority or
+filesystem capability would meet tripwires even if named `Workspace`.
 
 ## C3. Neighbour interaction and handoff contract
 
-[V] Questions have been read, not answered here. Titles below link directly to their owners. [P] Codes in the second table: **R** leaves the decision to owner via explicit value; **P** prematurely fixes it; **H** hides the decision in ambient state. Option labels A–G match the comparison above. These are dependency *implications*, not claims the ticket has decided them.
+[V] Questions have been read, not answered here. Titles below link directly to
+their owners. [P] Codes in the second table: **R** leaves the decision to owner
+via explicit value; **P** prematurely fixes it; **H** hides the decision in
+ambient state. Option labels A–G match the comparison above. These are
+dependency *implications*, not claims the ticket has decided them.
 
 | Neighbour and actual question | Minimal contract from 21; boundary deliberately left open |
 | --- | --- |
@@ -194,13 +322,50 @@ fn run(
 | F | **22/27/26/28 H:** whichever scoped state happens to be active governs outcomes; **29 H:** ambient current root masquerades as authority; **30 P:** scope placement in host; **31 H:** missing scope errors leak deep; **32 R:** small surface but invisible dependencies; **34 H:** deferred work after scope loses request identity. [P] Leave neighbours free only by eliminating scoped lookup from core, becoming C/D. |
 | G | **22 P/R:** env provider may set reload semantics; **27/26/28 P:** callback timing sets time semantics; **29 P/R:** provider `root()` can become authority; **30 P:** provider owner/lifetime; **31 R:** errors through provider; **32 P:** public trait breadth; **34 H:** live callbacks are not cache invalidation. [P] Restrict supplier to a host acquisition seam; pass sampled values into core, becoming D. |
 
-[P] **Minimum 21 contract to unlock 22/27/30:** (1) identify the finite project-owned OS acquisition sites and bind config/state roots, ceilings and ignored names as an atomic *host discovery snapshot* with documented refresh boundary, preserving trust-before-parse; (2) identify an explicit selected project root distinct from cwd, without implying security capability; (3) one resolved zone and sampled instant per query/render evaluation, including lazy continuation and nested queries, derive `today` from the same pair, sample afresh on subsequent operations; (4) state whether local-zone failure is returned rather than silently using Jiff `unknown`; (5) `core` app use cases remain functions with explicit inputs, public only if actually host-facing; (6) define ambient exception list (CLI argv, terminal I/O, CLI Cwd acquisition, metadata timestamps as *data*, immutable tables). [P] Defer policy of configuration reload to 22, host storage/assembly to 30, zone grammar to 27 and refresh scheduling to 34.
+[P] **Minimum 21 contract to unlock 22/27/30:** (1) identify the finite
+project-owned OS acquisition sites and bind config/state roots, ceilings and
+ignored names as an atomic *host discovery snapshot* with documented refresh
+boundary, preserving trust-before-parse; (2) identify an explicit selected
+project root distinct from cwd, without implying security capability; (3) one
+resolved zone and sampled instant per query/render evaluation, including lazy
+continuation and nested queries, derive `today` from the same pair, sample
+afresh on subsequent operations; (4) state whether local-zone failure is
+returned rather than silently using Jiff `unknown`; (5) `core` app use cases
+remain functions with explicit inputs, public only if actually host-facing; (6)
+define ambient exception list (CLI argv, terminal I/O, CLI Cwd acquisition,
+metadata timestamps as *data*, immutable tables). [P] Defer policy of
+configuration reload to 22, host storage/assembly to 30, zone grammar to 27 and
+refresh scheduling to 34.
 
-[P] **Grill 21 as its own question tree, but review its host-discovery and config-reload boundary together with 22/30 before locking the final spec.** [V] 22 is blocked by 21 and 30 by both (`../../issues/22-config-ownership-and-lifecycle.md`, `../../issues/33-workspace-host-and-composition.md` headers). [H] A single bundled 21+22 grilling would ask the user to approve type ownership, trust pipeline, config fingerprints and host lifecycle together, violating independent-decision discipline; an isolated 21 that silently assumes process-start snapshot would fail the triangle. Ask 21 only for who captures, when values change, and who receives them; immediately hand those to 22/30 for interface review.
+[P] **Grill 21 as its own question tree, but review its host-discovery and
+config-reload boundary together with 22/30 before locking the final spec.** [V]
+22 is blocked by 21 and 30 by both
+(`../../issues/22-config-ownership-and-lifecycle.md`,
+`../../issues/33-workspace-host-and-composition.md` headers). [H] A single
+bundled 21+22 grilling would ask the user to approve type ownership, trust
+pipeline, config fingerprints and host lifecycle together, violating
+independent-decision discipline; an isolated 21 that silently assumes
+process-start snapshot would fail the triangle. Ask 21 only for who captures,
+when values change, and who receives them; immediately hand those to 22/30 for
+interface review.
 
 ## C4. Sequencing, reversibility and guardrails
 
-[V] **Do not overpromise on the current tree:** naive YAML datetime classification still resolves local time into an instant during indexing (`src/note/metadata.rs:56-72`; `src/field.rs:769-782,811-817`; `src/temporal/datetime.rs:559-570`; `src/index/service.rs:329-356`), and `FileMeta::derive_day` stores a local-zone-derived day (`src/file.rs:66-98`). [V] [Coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md) decides civil naive values and zone only at evaluation *after cutover*, not an implemented property. [P] 21 can now decide acquisition topology, fresh-per-evaluation time, bounded ambient exception list, default-zone/error semantics, test injection and host/CLI ownership. It **cannot** assert that all index data is zone-independent until ticket 19's persisted paths are migrated or explicitly retained under a documented zone-aware cache identity. [H] Zone-index fingerprinting now would encode an obsolete model and force reindex upon zone changes contrary to ticket 19.
+[V] **Do not overpromise on the current tree:** naive YAML datetime
+classification still resolves local time into an instant during indexing
+(`src/note/metadata.rs:56-72`; `src/field.rs:769-782,811-817`;
+`src/temporal/datetime.rs:559-570`; `src/index/service.rs:329-356`), and
+`FileMeta::derive_day` stores a local-zone-derived day (`src/file.rs:66-98`).
+[V]
+[Coercion and comparison policy](../../issues/19-coercion-and-comparison-policy.md)
+decides civil naive values and zone only at evaluation *after cutover*, not an
+implemented property. [P] 21 can now decide acquisition topology,
+fresh-per-evaluation time, bounded ambient exception list, default-zone/error
+semantics, test injection and host/CLI ownership. It **cannot** assert that all
+index data is zone-independent until ticket 19's persisted paths are migrated or
+explicitly retained under a documented zone-aware cache identity. [H] Zone-index
+fingerprinting now would encode an obsolete model and force reindex upon zone
+changes contrary to ticket 19.
 
 | Reversibility | Example / migration consequence |
 | --- | --- |
@@ -208,20 +373,80 @@ fn run(
 | [P] Moderate | Thread evaluation value through eager+lazy query and Minijinja callback graph (~9–11-frame path); change constructors for both walkers; replace 98 guard-method uses in 87 tests only as each affected slice lands ([inventory](a-code-inventory.md) §5). Existing zone tests can use direct pinned values rather than a global lock. |
 | [P] Expensive/one-way user behavior | Change config/state directory precedence or trust verification order; interpret unknown-zone as UTC instead of an error; make previously zone-shifted cached naive values civil without fresh-index equivalence; publish a giant cross-crate context then make every host rely on it. [V] Compatibility freezes trust-before-parse and fresh-index result equivalence, while index layout and Rust surface are free ([compatibility envelope](../../issues/16-grilling-compatibility-envelope.md) tiers table). |
 
-[P] Proposed staged migration **after grilling**, not implementation instructions already approved:
+[P] Proposed staged migration **after grilling**, not implementation
+instructions already approved:
 
-1. [P] Record existing path/env precedence and e2e behavior-change table; retain `src/dirs.rs` algorithm (including Mac `~/Library/Application Support` and `TRACES_STATE_DIR` override) and trust-before-parse. [V] Replacing resolver with `dirs::state_dir` silently loses Mac/Windows state path ([external precedent](d-external-precedent.md) §2).
-2. [P] Add an explicit resolver from supplied values; host invokes it once per chosen acquisition boundary. Supply both `ConfigLocator` discovery and tracker/trust stores from that snapshot, including `trust_subjects`; eliminate `#[cfg(test)] HOME` substitution only when direct tests can inject equivalent paths. Migrate both trust-subtree and index ignore walkers, not just one. Keep `Cwd` and terminal probes at CLI adapter initially.
-3. [P] Introduce evaluation pair at core-facing call and propagate through eager plan, deferred QuerySet, sort-key materialization, template date callbacks and nested query rendering; sample instant once, resolve zone once. For the *pre-19* index, do not advertise evaluation-only purity; either sequence this stage after 19 or explicitly pass zone through index parse/`FileMeta` temporarily and remove when civil cache lands.
-4. [P] Move CLI-owned query/config/schema composition to core app functions per 20/30, then split CLI crate only if 32 approves. Preserve output/exit and trust order; review every newly `pub` type under the visibility rule, update exactly affected `tests/baselines/public-api-default.txt`, `public-api-test-utils.txt`, `pub-tokens.txt`, not blindly freeze old surface.
-5. [P] Replace direct production ambient leaves with one or more guarded acquisition seams and tests: two evaluations crossing midnight against the same parsed relative expression, two zones in concurrent workspaces, a deferred `QuerySet` materialized after host call, one template using `date.now` plus nested query, two trust/config homes, and CLI subprocess path precedence. Avoid mutating parent env in Rust 2024 tests ([external precedent](d-external-precedent.md) §2.7-2.9).
-6. [V] `mise run verify` runs `fmt` then `check`, `lint --no-fix`, and `test`; `check` runs `check:visibility`/`check:layers` and public-API/token diff checks (`mise.toml` check/verify tasks). [P] Run it once after all implementation slices land, not during this research or in parallel with partial edits. Keep current test-unit, integration and binary e2e layer discipline (`mise.toml` `check:layers`).
+1. [P] Record existing path/env precedence and e2e behavior-change table; retain
+   `src/dirs.rs` algorithm (including Mac `~/Library/Application Support` and
+   `TRACES_STATE_DIR` override) and trust-before-parse. [V] Replacing resolver
+   with `dirs::state_dir` silently loses Mac/Windows state path
+   ([external precedent](d-external-precedent.md) §2).
+2. [P] Add an explicit resolver from supplied values; host invokes it once per
+   chosen acquisition boundary. Supply both `ConfigLocator` discovery and
+   tracker/trust stores from that snapshot, including `trust_subjects`;
+   eliminate `#[cfg(test)] HOME` substitution only when direct tests can inject
+   equivalent paths. Migrate both trust-subtree and index ignore walkers, not
+   just one. Keep `Cwd` and terminal probes at CLI adapter initially.
+3. [P] Introduce evaluation pair at core-facing call and propagate through eager
+   plan, deferred QuerySet, sort-key materialization, template date callbacks
+   and nested query rendering; sample instant once, resolve zone once. For the
+   *pre-19* index, do not advertise evaluation-only purity; either sequence this
+   stage after 19 or explicitly pass zone through index parse/`FileMeta`
+   temporarily and remove when civil cache lands.
+4. [P] Move CLI-owned query/config/schema composition to core app functions per
+   20/30, then split CLI crate only if 32 approves. Preserve output/exit and
+   trust order; review every newly `pub` type under the visibility rule, update
+   exactly affected `tests/baselines/public-api-default.txt`,
+   `public-api-test-utils.txt`, `pub-tokens.txt`, not blindly freeze old
+   surface.
+5. [P] Replace direct production ambient leaves with one or more guarded
+   acquisition seams and tests: two evaluations crossing midnight against the
+   same parsed relative expression, two zones in concurrent workspaces, a
+   deferred `QuerySet` materialized after host call, one template using
+   `date.now` plus nested query, two trust/config homes, and CLI subprocess path
+   precedence. Avoid mutating parent env in Rust 2024 tests
+   ([external precedent](d-external-precedent.md) §2.7-2.9).
+6. [V] `mise run verify` runs `fmt` then `check`, `lint --no-fix`, and `test`;
+   `check` runs `check:visibility`/`check:layers` and public-API/token diff
+   checks (`mise.toml` check/verify tasks). [P] Run it once after all
+   implementation slices land, not during this research or in parallel with
+   partial edits. Keep current test-unit, integration and binary e2e layer
+   discipline (`mise.toml` `check:layers`).
 
-[P] **Checkable meaning of “eliminated”:** no owned production `std::env::var*`, `std::env::current_dir`, `TimeZone::try_system`/`system`, `Timestamp::now` inside core config/index/query/note/temporal/template leaf code. Audited host/CLI acquisition may call each on documented scope; no `ZoneGuard` required by production behavior; query comparison and cache construction do not sample clock/zone; separate concrete tests show two evaluations can differ and one evaluation cannot. [V] `clippy.toml` *currently* disallows `std::env::current_dir` and `set_current_dir` (plus unrelated methods), **not** `Timestamp::now`, `TimeZone::try_system`, or `std::env::var*`; `src/cli/cwd.rs:27-31,78-82,117-121` explicitly exempts the audited cwd wrapper. [P] Add exact disallowed-method entries only after leaves are migrated, with narrowly annotated host acquisition exceptions; add aliases or a small source check for forms Clippy cannot recognize (import aliases, `Zoned::now`, `std::env::vars_os`, transitive dependency behavior). [H] Clippy plus a bounded exceptions audit is harness-independent *at source level*, but cannot prove temporal snapshot lifetime, third-party system reads, or reload correctness. Its enforcement depends on the lint being enabled in `mise run lint`/CI, not on this TOML existing alone. Do not ban test fixture clocks (`src/file.rs:104-135`) by accident.
+[P] **Checkable meaning of “eliminated”:** no owned production `std::env::var*`,
+`std::env::current_dir`, `TimeZone::try_system`/`system`, `Timestamp::now`
+inside core config/index/query/note/temporal/template leaf code. Audited
+host/CLI acquisition may call each on documented scope; no `ZoneGuard` required
+by production behavior; query comparison and cache construction do not sample
+clock/zone; separate concrete tests show two evaluations can differ and one
+evaluation cannot. [V] `clippy.toml` *currently* disallows
+`std::env::current_dir` and `set_current_dir` (plus unrelated methods), **not**
+`Timestamp::now`, `TimeZone::try_system`, or `std::env::var*`;
+`src/cli/cwd.rs:27-31,78-82,117-121` explicitly exempts the audited cwd wrapper.
+[P] Add exact disallowed-method entries only after leaves are migrated, with
+narrowly annotated host acquisition exceptions; add aliases or a small source
+check for forms Clippy cannot recognize (import aliases, `Zoned::now`,
+`std::env::vars_os`, transitive dependency behavior). [H] Clippy plus a bounded
+exceptions audit is harness-independent *at source level*, but cannot prove
+temporal snapshot lifetime, third-party system reads, or reload correctness. Its
+enforcement depends on the lint being enabled in `mise run lint`/CI, not on this
+TOML existing alone. Do not ban test fixture clocks (`src/file.rs:104-135`) by
+accident.
 
 ## C5. Red-team experiments and dissent
 
-[V] Experiments here are read-only source inspection, CodeGraph exploration and targeted literal searches; **no build, tests, lint, formatter, or benchmark was run**. CodeGraph MCP initially pointed at a different unindexed project even with `projectPath`; `codegraph status` in this worktree reported 229 files / 7,994 nodes, `codegraph sync` refreshed 42 changed files, then its CLI `explore -p /Users/jack/Documents/41_personal/traces` returned current source for `ConfigService::new`, `ConfigLocator::from_env`, `IndexerService::scan`, `QueryService::run_from_store`, `ExecutionPlan::apply`, `ValueExpr::evaluate`, `TemplateEngine::new` and later filter/query callbacks. [V] Exact cited lines below were independently read where needed. [H] No performance claim follows from source-call counts.
+[V] Experiments here are read-only source inspection, CodeGraph exploration and
+targeted literal searches;
+**no build, tests, lint, formatter, or benchmark was run**. CodeGraph MCP
+initially pointed at a different unindexed project even with `projectPath`;
+`codegraph status` in this worktree reported 229 files / 7,994 nodes,
+`codegraph sync` refreshed 42 changed files, then its CLI
+`explore -p /Users/jack/Documents/41_personal/traces` returned current source
+for `ConfigService::new`, `ConfigLocator::from_env`, `IndexerService::scan`,
+`QueryService::run_from_store`, `ExecutionPlan::apply`, `ValueExpr::evaluate`,
+`TemplateEngine::new` and later filter/query callbacks. [V] Exact cited lines
+below were independently read where needed. [H] No performance claim follows
+from source-call counts.
 
 | Attack on leading D | Cheapest discriminating experiment; read-only result | Remaining uncertainty / flip |
 | --- | --- | --- |
@@ -235,7 +460,17 @@ fn run(
 | [H] **TLS ZoneGuard and leaf now cannot promise a whole evaluation.** | [V] `TimeZone::try_system` is reached via `local_zone()` (`src/temporal/zone.rs:7-20`); targeted search confirms nine direct query filter zone calls, eleven template date zone calls and three template production `Timestamp::now` calls (`src/query/grammar/filter.rs:386-761`; `src/template/engine/date.rs:121-1026`). [V] Rayon note parsing (`src/index/service.rs:329-356`) does not inherit thread-local overrides. [H] These are source counts, not OS syscall counts: Jiff caches system zone ([precedent](../04-execution-context-precedent.md) §1). | [P] Test concurrent zones, `now` vs `today` across midnight and Rayon parse. A survives only if 19 removes indexing-zone dependence, the host promises one process zone, and all date-consuming paths accept a shared pinned eval value; then A is a partial hybrid. |
 | [H] **Existing test guards are a cost, but removing them is also a large test migration.** | [V] Inventory counted 98 direct `ZoneGuard` method sites across 87 functions and 29 `CwdGuard::enter`/`same_dir` sites across 29 tests ([inventory](a-code-inventory.md) §5); targeted search found most cwd sites in CLI tests, a single `same_dir` in `src/index/entry.rs:360-361`. [V] CLI unit-cwd guard has explicit Clippy exceptions (`src/cli/cwd.rs:27-31,78-82,117-121`); e2e sandboxes children instead (`tests/e2e/support.rs:228-300`). | [P] Keep `CwdGuard` if it remains only CLI/test plumbing; measure actual collisions before deletion. A wins for CLI alone if the LSP can take explicit root and eval pair while retaining process-global *host* config policy. Do not claim all guards require serial zone tests: current ZoneGuard is TLS, not a process-wide mutex. |
 
-[H] **Thin evidence:** no startup/lookup benchmark shows that explicit zone saves material CPU; no compiled signature-delta spike for D/C/E; future LSP root/reload/MCP transport choices remain open; dependency-owned ambient reads are unmeasured; no actual two-zone parallel host yet; Jiff tzdb reload timing and unavailability require explicit product choices ([external precedent](d-external-precedent.md) §1/§4). [P] The one assumption that most flips D is that a real LSP host must retain multiple independently configured workspaces *and* needs to reuse the same core use cases without duplicating orchestration. If that proves false and CLI remains effectively single-root, A plus explicit evaluation time/root could be the cheapest sound answer. If D's public signature spike fails, C/E is better, not automatically B.
+[H] **Thin evidence:** no startup/lookup benchmark shows that explicit zone
+saves material CPU; no compiled signature-delta spike for D/C/E; future LSP
+root/reload/MCP transport choices remain open; dependency-owned ambient reads
+are unmeasured; no actual two-zone parallel host yet; Jiff tzdb reload timing
+and unavailability require explicit product choices
+([external precedent](d-external-precedent.md) §1/§4). [P] The one assumption
+that most flips D is that a real LSP host must retain multiple independently
+configured workspaces *and* needs to reuse the same core use cases without
+duplicating orchestration. If that proves false and CLI remains effectively
+single-root, A plus explicit evaluation time/root could be the cheapest sound
+answer. If D's public signature spike fails, C/E is better, not automatically B.
 
 ## C6. Names are provisional, not approvals
 
@@ -250,22 +485,101 @@ fn run(
 
 ## Open questions requiring a user choice, not more code search
 
-1. [P] Does one server process need simultaneously independent *host directory/ignore policies* for different workspaces, or only independently selected roots/config and evaluation zones? This changes A-vs-D/C and env snapshot scope; LSP is committed but multi-root policy is not itself decided ([forward consumers](../../issues/17-grilling-forward-consumers-and-design-pressure.md); [prior decisions](b-prior-decisions.md) §3 item 27).
-2. [P] If system zone cannot be discovered, should date-bearing operation error rather than choose UTC/unknown, and at which host boundary is that reported? [V] `TimeZone::system()`'s unknown zero-offset is not explicit UTC ([external precedent](d-external-precedent.md) §1.4); current glossary says lookup errors propagate (`src/temporal/GLOSSARY.md:44-48`).
-3. [P] Should a deliberate host-configuration change be visible to the *next* operation automatically, only on workspace reopen/reload, or only on process restart? Distinguish OS env, config file, editor setting, system zone/tzdb, and clock; they need not share one trigger.
-4. [P] Is date-dependent editor output expected to refresh at midnight without an edit, or is the next explicit analysis request sufficient? Capturing fresh time cannot itself schedule a request ([digest lessons](c-digest-lessons.md) §2; [live buffer consistency](../../issues/28-live-buffer-and-persisted-index-consistency.md)).
+1. [P] Does one server process need simultaneously independent
+   *host directory/ignore policies* for different workspaces, or only
+   independently selected roots/config and evaluation zones? This changes
+   A-vs-D/C and env snapshot scope; LSP is committed but multi-root policy is
+   not itself decided
+   ([forward consumers](../../issues/17-grilling-forward-consumers-and-design-pressure.md);
+   [prior decisions](b-prior-decisions.md) §3 item 27).
+2. [P] If system zone cannot be discovered, should date-bearing operation error
+   rather than choose UTC/unknown, and at which host boundary is that reported?
+   [V] `TimeZone::system()`'s unknown zero-offset is not explicit UTC
+   ([external precedent](d-external-precedent.md) §1.4); current glossary says
+   lookup errors propagate (`src/temporal/GLOSSARY.md:44-48`).
+3. [P] Should a deliberate host-configuration change be visible to the *next*
+   operation automatically, only on workspace reopen/reload, or only on process
+   restart? Distinguish OS env, config file, editor setting, system zone/tzdb,
+   and clock; they need not share one trigger.
+4. [P] Is date-dependent editor output expected to refresh at midnight without
+   an edit, or is the next explicit analysis request sufficient? Capturing fresh
+   time cannot itself schedule a request ([digest lessons](c-digest-lessons.md)
+   §2;
+   [live buffer consistency](../../issues/28-live-buffer-and-persisted-index-consistency.md)).
 
 ## Proposed grilling script (frontiers, not one bundled approval)
 
-[P] Follow [grilling](../../../../.agents/skills/grilling/SKILL.md)'s dependent-frontier rule: ask the whole first independent frontier, wait, then expose questions contingent on it. The defaults below are leanings with their best flip facts; the user's choices, not this menu, settle them.
+[P] Follow [grilling](../../../../.agents/skills/grilling/SKILL.md)'s
+dependent-frontier rule: ask the whole first independent frontier, wait, then
+expose questions contingent on it. The defaults below are leanings with their
+best flip facts; the user's choices, not this menu, settle them.
 
-1. **Frontier 1 / acquisition:** Should owned OS env reads be limited to an audited host acquisition seam while keeping CLI's `Cwd` and concrete dialog adapter? Options A unchanged; B universal constructor; C/D/E boundary snapshot; F scoped override; G supplier callback. **Default:** yes, D-compatible bounded acquisition. **Flip:** if host policy is deliberately process-global for every committed consumer, A with explicit temporal exception is cheaper. [V] Present direct reads are only `src/dirs.rs:193` and `src/env_vars.rs:9,29`; cwd wrapper is already audited (`src/cli/cwd.rs:27-31`).
-2. **Frontier 1 / compatibility of scopes:** Should a selected project root be an explicit operation input, distinct from cwd and without claiming a filesystem capability? Options ambient cwd; explicit `&Path`; root newtype; Dir capability (29). **Default:** explicit selected path, defer authority model to 29. **Flip:** proof that all consumers only ever use CLI cwd or that security demands a Dir handle immediately. [V] The glossary already distinguishes project root and working directory (`src/GLOSSARY.md:8-20`).
-3. **Frontier 1 / value carrier:** Should core use cases take smallest concrete views (D), split lifetime tier objects (C), constructor-owned services with transient evaluation args (E), universal B, or retained A? **Default:** D as app interface with E for already-existing focused domain-service policy; no single held app context. **Flip:** one measured vertical slice requires widespread repeated 5+-input forwarding or duplicate host orchestration, favor C/E; binding [20](../../issues/20-schema-note-typing-and-validation.md) layering paragraph rules out B as app policy unless consciously revisited.
-4. **After acquisition choice / config lifetime:** Should captured homes, ceilings and ignore policy be pinned per invocation/workspace opening, reloaded per config revision, or rediscovered each operation? **Default:** atomic snapshot at host/workspace opening; 22 owns explicit replacement/revalidation on change, 30 owns storage. **Flip:** requirement to honor an env change without reopening workspace. Trust and tracker homes must not change mid-operation ([prior decisions](b-prior-decisions.md) §3 item 26).
-5. **After time/source choice / evaluation ownership:** Should one `(instant, resolved zone)` be sampled at query/render entry and retained by every deferred result, or per row/callback, or per host lifetime? **Default:** one per evaluation, fresh next evaluation, derive `today` from that pair. **Flip:** product requirement that one render deliberately shows *live ticking* time; then define separate explicit live operation, not accidental callback reads. [V] `QuerySet` defers transforms (`src/query/results.rs:456-490`).
-6. **After zone owner chosen / detection failure:** Choose local zone with propagated lookup failure, UTC by default, explicit configured-only, or local with explicit fallback and diagnostic. **Default:** local + propagated error pending compatibility review; never equate Jiff unknown with UTC. **Flip:** specified headless/container behavior must succeed without zoneinfo. Decision supplies 27/31 with semantics, not their error enum ([external precedent](d-external-precedent.md) §1).
-7. **After topology and lifetime / test enforcement:** Should `clippy::disallowed_methods` block owned ambient calls outside narrowly exempted acquisition modules and a small behavior test suite cover two zones, midnight and lazy continuation? Options lint+tests; grep-only; review-only; keep guard-only. **Default:** lint+tests; keep audited `CwdGuard` until evidence supports removal. **Flip:** a concrete import/alias escape makes Clippy unreliable; supplement with simple source check, do not pretend lint proves all behaviors. [V] Today's lint blocks cwd but not env/time (`clippy.toml` disallowed-methods list).
-8. **After 21 contract / handoff:** Review 21's captured-input and refresh contracts *against* 22's config loader and 30's host composition before any public type or crate split is frozen. Options standalone 21, one bundled 21+22+30 approval, or 21 independent with joint interface review. **Default:** independent 21 plus joint review. **Flip:** 22 reveals a trust/config transaction that cannot be expressed with 21's snapshot boundary, then reopen that subdecision rather than forcing an omnibus context.
+1. **Frontier 1 / acquisition:** Should owned OS env reads be limited to an
+   audited host acquisition seam while keeping CLI's `Cwd` and concrete dialog
+   adapter? Options A unchanged; B universal constructor; C/D/E boundary
+   snapshot; F scoped override; G supplier callback. **Default:** yes,
+   D-compatible bounded acquisition. **Flip:** if host policy is deliberately
+   process-global for every committed consumer, A with explicit temporal
+   exception is cheaper. [V] Present direct reads are only `src/dirs.rs:193` and
+   `src/env_vars.rs:9,29`; cwd wrapper is already audited
+   (`src/cli/cwd.rs:27-31`).
+2. **Frontier 1 / compatibility of scopes:** Should a selected project root be
+   an explicit operation input, distinct from cwd and without claiming a
+   filesystem capability? Options ambient cwd; explicit `&Path`; root newtype;
+   Dir capability (29). **Default:** explicit selected path, defer authority
+   model to 29. **Flip:** proof that all consumers only ever use CLI cwd or that
+   security demands a Dir handle immediately. [V] The glossary already
+   distinguishes project root and working directory (`src/GLOSSARY.md:8-20`).
+3. **Frontier 1 / value carrier:** Should core use cases take smallest concrete
+   views (D), split lifetime tier objects (C), constructor-owned services with
+   transient evaluation args (E), universal B, or retained A? **Default:** D as
+   app interface with E for already-existing focused domain-service policy; no
+   single held app context. **Flip:** one measured vertical slice requires
+   widespread repeated 5+-input forwarding or duplicate host orchestration,
+   favor C/E; binding [20](../../issues/20-schema-note-typing-and-validation.md)
+   layering paragraph rules out B as app policy unless consciously revisited.
+4. **After acquisition choice / config lifetime:** Should captured homes,
+   ceilings and ignore policy be pinned per invocation/workspace opening,
+   reloaded per config revision, or rediscovered each operation? **Default:**
+   atomic snapshot at host/workspace opening; 22 owns explicit
+   replacement/revalidation on change, 30 owns storage. **Flip:** requirement to
+   honor an env change without reopening workspace. Trust and tracker homes must
+   not change mid-operation ([prior decisions](b-prior-decisions.md) §3 item
+   26).
+5. **After time/source choice / evaluation ownership:** Should one
+   `(instant, resolved zone)` be sampled at query/render entry and retained by
+   every deferred result, or per row/callback, or per host lifetime?
+   **Default:** one per evaluation, fresh next evaluation, derive `today` from
+   that pair. **Flip:** product requirement that one render deliberately shows
+   *live ticking* time; then define separate explicit live operation, not
+   accidental callback reads. [V] `QuerySet` defers transforms
+   (`src/query/results.rs:456-490`).
+6. **After zone owner chosen / detection failure:** Choose local zone with
+   propagated lookup failure, UTC by default, explicit configured-only, or local
+   with explicit fallback and diagnostic. **Default:** local + propagated error
+   pending compatibility review; never equate Jiff unknown with UTC. **Flip:**
+   specified headless/container behavior must succeed without zoneinfo. Decision
+   supplies 27/31 with semantics, not their error enum
+   ([external precedent](d-external-precedent.md) §1).
+7. **After topology and lifetime / test enforcement:** Should
+   `clippy::disallowed_methods` block owned ambient calls outside narrowly
+   exempted acquisition modules and a small behavior test suite cover two zones,
+   midnight and lazy continuation? Options lint+tests; grep-only; review-only;
+   keep guard-only. **Default:** lint+tests; keep audited `CwdGuard` until
+   evidence supports removal. **Flip:** a concrete import/alias escape makes
+   Clippy unreliable; supplement with simple source check, do not pretend lint
+   proves all behaviors. [V] Today's lint blocks cwd but not env/time
+   (`clippy.toml` disallowed-methods list).
+8. **After 21 contract / handoff:** Review 21's captured-input and refresh
+   contracts *against* 22's config loader and 30's host composition before any
+   public type or crate split is frozen. Options standalone 21, one bundled
+   21+22+30 approval, or 21 independent with joint interface review.
+   **Default:** independent 21 plus joint review. **Flip:** 22 reveals a
+   trust/config transaction that cannot be expressed with 21's snapshot
+   boundary, then reopen that subdecision rather than forcing an omnibus
+   context.
 
-[P] Skipped: time/directory internals, build/tests, a compiled migration spike and any edits outside this research file. [H] Main risk: topology costs are source-grounded but not yet measured as compilable diffs; pre-19 persisted date coercion makes an evaluation-only implementation incorrect until cutover.
+[P] Skipped: time/directory internals, build/tests, a compiled migration spike
+and any edits outside this research file. [H] Main risk: topology costs are
+source-grounded but not yet measured as compilable diffs; pre-19 persisted date
+coercion makes an evaluation-only implementation incorrect until cutover.

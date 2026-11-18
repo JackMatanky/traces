@@ -18,9 +18,9 @@ be implemented:
    `pub(crate)`, and gain a `byte_to_utf16_cu` method. See ticket 11.
 3. **`InlineTokenLexer` byte spans**: The lexer currently returns
    `Vec<(FieldKey, NoteFieldValue)>` without byte ranges. Inline-field
-    diagnostics need spans. Options: (a) add a span-preserving variant. (b) run
-    a separate position-aware scan for diagnostics. (c) scope inline-field
-    diagnostics to line-level only until spans are added. See ticket 11 for the
+   diagnostics need spans. Options: (a) add a span-preserving variant. (b) run
+   a separate position-aware scan for diagnostics. (c) scope inline-field
+   diagnostics to line-level only until spans are added. See ticket 11 for the
    broader span model.
 
 ## Question

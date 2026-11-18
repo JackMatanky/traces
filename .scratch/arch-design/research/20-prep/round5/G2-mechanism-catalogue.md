@@ -70,12 +70,14 @@ validation can operate at three distinct intervention points:
     accepts whole-file text or rigid frontmatter key-value dictionaries.
 - **Precedent & Verification:**
   - `[V]` **IWE** (`iwe-org/iwe`): IWE exposes `iwec` (MCP client/server) that
-    validates markdown documents against per-type schemas. When an agent attempts
-    a schema-violating MCP write, the call is rejected with the specific violation
-    named in the MCP tool response (<https://github.com/iwe-org/iwe>).
-  - `[V]` **Obsidian Local REST API** (`coddingtonbear/obsidian-local-rest-api`):
-    Provides an MCP interface (`vault_write`, `vault_patch`) supporting JSON
-    patches and optimistic locking via ETags
+    validates markdown documents against per-type schemas. When an agent
+    attempts a schema-violating MCP write, the call is rejected with the
+    specific violation named in the MCP tool response
+    (<https://github.com/iwe-org/iwe>).
+  - `[V]` **Obsidian Local REST API**
+    (`coddingtonbear/obsidian-local-rest-api`): Provides an MCP interface
+    (`vault_write`, `vault_patch`) supporting JSON patches and optimistic
+    locking via ETags
     (<https://github.com/coddingtonbear/obsidian-local-rest-api>).
 
 ### M02. Copy-on-Write Staging Area & CLI Wrapper (`traces commit` / `stage`)
@@ -90,8 +92,8 @@ validation can operate at three distinct intervention points:
 - **Harness prerequisites:** None. Operates via standard CLI or bash execution
   tools already available to coding agents.
 - **Failure modes:**
-  - Requires agent discipline or workflow structuring to write to the staging area
-    rather than directly editing live notes.
+  - Requires agent discipline or workflow structuring to write to the staging
+    area rather than directly editing live notes.
   - Merging changes back to live storage can cause conflicts if multiple
     actors edit concurrently.
 - **Precedent & Verification:**
@@ -127,10 +129,11 @@ validation can operate at three distinct intervention points:
 
 - **How it works:** The agent harness process runs under OS-level access control
   rules. On Linux, unprivileged processes invoke the Landlock LSM
-  (`landlock_create_ruleset`) to enforce read-only access to the vault directory,
-  allowing write access only to `/tmp` or through a dedicated Unix socket connected
-  to a validating daemon [V: <https://man7.org/linux/man-pages/man7/landlock.7.html>].
-  On macOS, `sandbox-exec` (Seatbelt) enforces a `.sb` profile denying
+  (`landlock_create_ruleset`) to enforce read-only access to the vault
+  directory, allowing write access only to `/tmp` or through a dedicated Unix
+  socket connected to a validating daemon [V:
+  <https://man7.org/linux/man-pages/man7/landlock.7.html>]. On macOS,
+  `sandbox-exec` (Seatbelt) enforces a `.sb` profile denying
   `(file-write* (subpath "/path/to/vault"))` except via an authorized IPC shim.
 - **Intervention point:** Pre-write hard gate (enforced by OS kernel).
 - **Harness prerequisites:** OS privileges/kernel support; external sandbox
@@ -138,7 +141,8 @@ validation can operate at three distinct intervention points:
 - **Failure modes:**
   - Non-portable across operating systems (Linux Landlock vs macOS Seatbelt vs
     Windows AppContainer).
-  - Heavy deployment footprint; difficult to require for typical desktop PKM users.
+  - Heavy deployment footprint; difficult to require for typical desktop PKM
+    users.
 - **Precedent & Verification:**
   - `[V]` **Sandlock / ai-jail**: Sandlock (arXiv:2605.26298) and `ai-jail`
     demonstrate Landlock and `sandbox-exec` to restrict AI agent file access to
@@ -157,20 +161,20 @@ validation can operate at three distinct intervention points:
 - **Harness prerequisites:** Vault must be a git repository; agent must use git
   to record its work.
 - **Failure modes:**
-  - Hook inspection pitfall: naive pre-commit hooks check the file on the working
-    tree (`cat note.md`), which fails if the agent partially staged changes
-    (`git add -p`) or modified the working tree after staging [V]. The hook
-    MUST inspect the index blob via `git show ":$file"`.
+  - Hook inspection pitfall: naive pre-commit hooks check the file on the
+    working tree (`cat note.md`), which fails if the agent partially staged
+    changes (`git add -p`) or modified the working tree after staging [V]. The
+    hook MUST inspect the index blob via `git show ":$file"`.
   - Agents can bypass hooks if they invoke `git commit --no-verify` or never
     commit changes to git.
 - **Precedent & Verification:**
   - `[V]` **`markdownlint-cli2` / `check-jsonschema`**: Widely used in
     pre-commit frameworks to validate frontmatter and markdown structure
     (<https://github.com/DavidAnson/markdownlint-cli2>).
-  - `[V]` **Empirical Verification**: Executed a test verifying that `git show
-    ":note.md"` properly isolates staged content from unstaged working tree
-    modifications, correctly aborting invalid staged commits while allowing valid
-    staged commits even when the working tree has invalid edits.
+  - `[V]` **Empirical Verification**: Executed a test verifying that
+    `git show ":note.md"` properly isolates staged content from unstaged working
+    tree modifications, correctly aborting invalid staged commits while allowing
+    valid staged commits even when the working tree has invalid edits.
 
 ### M06. MCP Input Schema, Elicitation & System Prompts
 
@@ -183,9 +187,9 @@ validation can operate at three distinct intervention points:
 - **Intervention point:** Pre-write guidance and interactive confirmation.
 - **Harness prerequisites:** MCP client with elicitation support.
 - **Failure modes:**
-  - Complex custom note validation rules (e.g. cross-field constraints, file-path
-    existence, wikilink validation) cannot be fully expressed in JSON Schema
-    primitives alone and require server-side code validation.
+  - Complex custom note validation rules (e.g. cross-field constraints,
+    file-path existence, wikilink validation) cannot be fully expressed in JSON
+    Schema primitives alone and require server-side code validation.
 - **Precedent & Verification:**
   - `[V]` **Model Context Protocol Specification**: Tools declare input schemas
     and interactive elicitation primitives
@@ -214,29 +218,31 @@ validation can operate at three distinct intervention points:
     an LSP client by default without an intermediary bridge.
 - **Precedent & Verification:**
   - `[V]` **IWE Language Server** (`iwes`): Validates documents against schemas
-    and publishes diagnostics directly to LSP-enabled editors (<https://github.com/iwe-org/iwe>).
+    and publishes diagnostics directly to LSP-enabled editors
+    (<https://github.com/iwe-org/iwe>).
   - `[V]` **Roo Code / Cline**: Actively exposes `getDiagnostics` to collect
     diagnostics from language servers and auto-feed them to the LLM prompt.
 
 ### M08. Agent Lint / Self-Correction Loop (`aider --lint`, AgentLint)
 
-- **How it works:** The agent harness executes a linter after every modification.
-  If the command exits with non-zero status, the linter's stderr/stdout
-  is automatically injected into the agent's next conversation turn as an error
-  message with an explicit prompt to fix it (e.g., `traces check <file>`).
+- **How it works:** The agent harness executes a linter after every
+  modification. If the command exits with non-zero status, the linter's
+  stderr/stdout is automatically injected into the agent's next conversation
+  turn as an error message with an explicit prompt to fix it (e.g.,
+  `traces check <file>`).
 - **Intervention point:** Post-write automated remediation loop.
 - **Harness prerequisites:** Harness configuration supporting auto-linting
-  commands (e.g., Aider's `--lint-cmd`, Claude Code `/review` hooks, custom agent
-  evaluation loops).
+  commands (e.g., Aider's `--lint-cmd`, Claude Code `/review` hooks, custom
+  agent evaluation loops).
 - **Failure modes:**
   - If the agent fails to converge or enters an edit loop, it can exhaust
     token/tool limits.
   - Requires the harness to have an automated retry mechanism on non-zero exit.
 - **Precedent & Verification:**
   - `[V]` **Aider**: Aider implements `--lint-cmd` and auto-linting loops:
-    "Aider can automatically lint and test your code every time it makes changes.
-    This helps identify and repair any problems introduced by the AI edits"
-    (<https://aider.chat/docs/usage/lint-test.html>).
+    "Aider can automatically lint and test your code every time it makes
+    changes. This helps identify and repair any problems introduced by the AI
+    edits" (<https://aider.chat/docs/usage/lint-test.html>).
   - `[V]` **AgentLint**: CI gating and local linter for agent workflows
     (<https://github.com/marketplace/actions/agentlint>).
 
@@ -257,10 +263,10 @@ validation can operate at three distinct intervention points:
     modifications misses writes; watchers MUST monitor directory events and
     track rename/create event pairs.
   - **Event coalescing & storms:** Rapid multi-chunk writes generate bursts of
-    events. Watchers must debounce events using crates like `notify-debouncer-mini`
-    to prevent redundant validations.
-  - Asynchronous: the agent may have already moved on to reading or acting before
-    the watcher finishes validation.
+    events. Watchers must debounce events using crates like
+    `notify-debouncer-mini` to prevent redundant validations.
+  - Asynchronous: the agent may have already moved on to reading or acting
+    before the watcher finishes validation.
 - **Precedent & Verification:**
   - `[V]` **Obsidian Vault & MetadataCache**: Obsidian listens to file system
     events using internal file watchers, emitting `vault.on('modify')` and
@@ -276,9 +282,11 @@ validation can operate at three distinct intervention points:
   status report file (e.g. `.traces/problems.json` or `.traces/report.md`).
   After making note edits, the agent is instructed to run `traces check` or
   inspect `.traces/problems.json` before completing its task.
-- **Intervention point:** Post-write advisory inspection guided by system prompt.
-- **Harness prerequisites:** Agent must read repo instruction files (`AGENTS.md`,
-  `CLAUDE.md`, or system prompts). Standard across modern coding agents.
+- **Intervention point:** Post-write advisory inspection guided by system
+  prompt.
+- **Harness prerequisites:** Agent must read repo instruction files
+  (`AGENTS.md`, `CLAUDE.md`, or system prompts). Standard across modern coding
+  agents.
 - **Failure modes:**
   - Probabilistic compliance: agents may overlook system prompt instructions,
     skip running the check command, or hallucinate that the file is valid.
@@ -287,8 +295,9 @@ validation can operate at three distinct intervention points:
   - `[V]` **Claude Obsidian Skills & `CLAUDE.md`**: Widely used to instruct
     agents on frontmatter formatting and schema rules
     (<https://github.com/jykim/claude-obsidian-skills>).
-  - `[V]` **Vale CLI / SARIF**: Vale outputs structured lint reports to JSON/SARIF
-    files for consumption by other tools (<https://docs.vale.sh/topics/templates>).
+  - `[V]` **Vale CLI / SARIF**: Vale outputs structured lint reports to
+    JSON/SARIF files for consumption by other tools
+    (<https://docs.vale.sh/topics/templates>).
 
 ### M11. Validate on Read (Index Interception)
 
@@ -329,14 +338,15 @@ validation can operate at three distinct intervention points:
     frontmatter matching schema patterns when creating notes via lookup
     (<https://github.com/dendronhq/dendron>).
   - `[V]` **IWE `iwe new`**: Proposed feature to instantiate valid document
-    templates matching document type schemas (<https://github.com/iwe-org/iwe/issues/192>).
+    templates matching document type schemas
+    (<https://github.com/iwe-org/iwe/issues/192>).
 
 ### M13. Normalization & Auto-fix Commands (`traces fix`)
 
 - **How it works:** A deterministic normalization command (`traces fix <file>`)
   repairs common schema mistakes: coercing dates to standard format, reordering
-  fields to match schema declarations, stripping unregistered keys if configured,
-  and formatting scalar strings.
+  fields to match schema declarations, stripping unregistered keys if
+  configured, and formatting scalar strings.
 - **Intervention point:** Post-write automatic remediation.
 - **Harness prerequisites:** CLI or MCP tool call.
 - **Failure modes:**

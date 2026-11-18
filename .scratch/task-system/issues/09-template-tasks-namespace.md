@@ -15,12 +15,22 @@ exposing all universal and task fields.
 
 ## Acceptance Criteria
 
-- [x] Add `QueryMode::Lists` variant to `QueryMode` and `QueryBuilder::lists` in `src/query/builder.rs`.
-- [x] Implement `QueryService::list_rows` in `src/query/service.rs` to yield one row per list item (plain bullets, checkboxes, tasks) and wire `QueryMode::Lists` in `QueryService::run` and `QueryService::run_from_store`.
-- [x] Parameterize `QueryOps` by `QueryMode` in `src/template/engine/query.rs` (`QueryOps::page`, `QueryOps::list`, `QueryOps::task`).
-- [x] Register `lists`, `tasks`, and `query` globals in the MiniJinja environment in `src/template/engine.rs`.
-- [x] Implement `ListFields` wrapping `Arc<QueryRow>` in `src/template/engine/query.rs` to expose all universal and task fields via `list.<field>`, replacing `TaskFields`.
-- [x] Support `lists.from(...)` and `tasks.from(...)` using canonical `SourceSelector` DSL expressions (empty/all, `#tag`, `folder/`, `@Class*`, and boolean expressions).
+- [x] Add `QueryMode::Lists` variant to `QueryMode` and `QueryBuilder::lists` in
+      `src/query/builder.rs`.
+- [x] Implement `QueryService::list_rows` in `src/query/service.rs` to yield one
+      row per list item (plain bullets, checkboxes, tasks) and wire
+      `QueryMode::Lists` in `QueryService::run` and
+      `QueryService::run_from_store`.
+- [x] Parameterize `QueryOps` by `QueryMode` in `src/template/engine/query.rs`
+      (`QueryOps::page`, `QueryOps::list`, `QueryOps::task`).
+- [x] Register `lists`, `tasks`, and `query` globals in the MiniJinja
+      environment in `src/template/engine.rs`.
+- [x] Implement `ListFields` wrapping `Arc<QueryRow>` in
+      `src/template/engine/query.rs` to expose all universal and task fields via
+      `list.<field>`, replacing `TaskFields`.
+- [x] Support `lists.from(...)` and `tasks.from(...)` using canonical
+      `SourceSelector` DSL expressions (empty/all, `#tag`, `folder/`, `@Class*`,
+      and boolean expressions).
 - [x] Enable filtering on `list.*` fields in templates, e.g.,
   `tasks.where("list.status == \"Done\"")` and
   `lists.where("list.is_task == false")`.
@@ -29,9 +39,12 @@ exposing all universal and task fields.
 - [x] Terminal renderers (`task_list`, `table`, `list`, `count`) execute
   cleanly on list and task query sets.
 - [x] Migrate existing template query tests from `t.task.*` to `t.list.*`.
-- [x] Unit tests verifying task-specific fields return `none` when accessed on plain
-  bullets and non-task checkboxes in templates (e.g. `{{ item.list.due is none }}`).
-- [x] Unit tests verifying universal fields (`list.text`, `list.depth`, `list.line`, `list.is_task`, `list.kind`) resolve correctly on plain bullets and checkboxes in templates.
+- [x] Unit tests verifying task-specific fields return `none` when accessed on
+      plain bullets and non-task checkboxes in templates (e.g.
+      `{{ item.list.due is none }}`).
+- [x] Unit tests verifying universal fields (`list.text`, `list.depth`,
+      `list.line`, `list.is_task`, `list.kind`) resolve correctly on plain
+      bullets and checkboxes in templates.
 - [x] Unit tests for `lists` and `tasks` template evaluation in
   `src/template/engine/query.rs`.
 - [x] All checks pass under `mise run verify`.
@@ -60,10 +73,10 @@ exposing all universal and task fields.
   `QueryOps::page`, `QueryOps::list`, and `QueryOps::task` construct the
   respective dispatchers.
 
-- **`QueryMode::Lists` and `QueryBuilder::lists`:**
-  Add `Lists` to `QueryMode` and `QueryBuilder::lists(source: SourceSelector)`
-  in `src/query/builder.rs`. In `src/query/service.rs`, implement `list_rows`
-  to yield all list items from matching notes:
+- **`QueryMode::Lists` and `QueryBuilder::lists`:** Add `Lists` to `QueryMode`
+  and `QueryBuilder::lists(source: SourceSelector)` in `src/query/builder.rs`.
+  In `src/query/service.rs`, implement `list_rows` to yield all list items from
+  matching notes:
 
   ```rust
   fn list_rows(&self, index: &Arc<WorkspaceIndex>, source: &SourceSelector) -> Vec<QueryRow> {
@@ -105,54 +118,92 @@ exposing all universal and task fields.
 
 1. **Redundancy check**:
    - Checked `src/` and active `.worktrees/task-08-query-record-enrichment`.
-   - Ticket 08 added `RowKind::List { item_idx: u32 }`, `ListField`, `TaskField`, and `task_rows`, but left `QueryMode::Lists`, `QueryBuilder::lists`, and `src/template/engine/query.rs`'s `ListFields` unimplemented (intentionally deferred to Ticket 09).
-   - Neither `lists` template global nor `ListFields` wrapper exists. This issue is not redundant.
+   - Ticket 08 added `RowKind::List { item_idx: u32 }`, `ListField`,
+     `TaskField`, and `task_rows`, but left `QueryMode::Lists`,
+     `QueryBuilder::lists`, and `src/template/engine/query.rs`'s `ListFields`
+     unimplemented (intentionally deferred to Ticket 09).
+   - Neither `lists` template global nor `ListFields` wrapper exists. This issue
+     is not redundant.
 
 2. **Prior rejection check**:
-   - Checked `.out-of-scope/` (no directory exists in repo). No prior rejections.
+   - Checked `.out-of-scope/` (no directory exists in repo). No prior
+     rejections.
 
 3. **Spec Alignment & ADR 0008 Reconciliation**:
-   - The original ticket checklist referenced separate `from_tags()`, `from_folder()`, and `from_class()` methods.
-   - **ADR 0008** explicitly consolidated all query source selection into a single canonical `from([expr])` method accepting the `SourceSelector` DSL (`#tag`, `folder/`, `@Class*`, and boolean expressions), deleting the old `from_*` methods.
-   - The spec (`.scratch/task-system/spec.md`, User Stories 52-53, Implementation Decision 281) specifies `lists.from(...)` and `tasks.from(...)`.
+   - The original ticket checklist referenced separate `from_tags()`,
+     `from_folder()`, and `from_class()` methods.
+   - **ADR 0008** explicitly consolidated all query source selection into a
+     single canonical `from([expr])` method accepting the `SourceSelector` DSL
+     (`#tag`, `folder/`, `@Class*`, and boolean expressions), deleting the old
+     `from_*` methods.
+   - The spec (`.scratch/task-system/spec.md`, User Stories 52-53,
+     Implementation Decision 281) specifies `lists.from(...)` and
+     `tasks.from(...)`.
    - Updated the Acceptance Criteria to align with ADR 0008 and the spec.
 
 4. **Query Mode Prerequisite**:
-   - Ticket 08 did not introduce `QueryMode::Lists` or `QueryBuilder::lists` in `src/query/builder.rs`. Ticket 09 must implement these and `QueryService::list_rows` to support `lists.from(...)`.
+   - Ticket 08 did not introduce `QueryMode::Lists` or `QueryBuilder::lists` in
+     `src/query/builder.rs`. Ticket 09 must implement these and
+     `QueryService::list_rows` to support `lists.from(...)`.
 
 5. **Test Migration**:
-   - Existing tests in `src/template/engine/query.rs` still access `{{ t.task.text }}` and `{{ t.task.completed }}`. Cutting over `QueryRow::get_value` from `TaskFields` to `ListFields` requires updating those calls to `{{ t.list.text }}` and `{{ t.list.completed }}`.
+   - Existing tests in `src/template/engine/query.rs` still access
+     `{{ t.task.text }}` and `{{ t.task.completed }}`. Cutting over
+     `QueryRow::get_value` from `TaskFields` to `ListFields` requires updating
+     those calls to `{{ t.list.text }}` and `{{ t.list.completed }}`.
 
 ## Agent Brief
 
-**Category:** enhancement
-**Summary:** Expose `lists` and `tasks` template globals with parameterized `QueryOps`, `QueryMode::Lists`, and `ListFields` projection.
+**Category:** enhancement **Summary:** Expose `lists` and `tasks` template
+globals with parameterized `QueryOps`, `QueryMode::Lists`, and `ListFields`
+projection.
 
-**Current behavior:**
-`src/template/engine/query.rs` registers template query globals for pages (`query`) and tasks (`tasks`). `QueryOps` is parameterized by a boolean `is_task`. Dotted attribute access on `QueryRow` uses `TaskFields`, which only exposes `record.task.completed` and `record.task.text`. There is no `lists` global for querying generic list items (plain bullets, checklists, outlines), and `QueryMode` only has `Pages` and `Tasks` variants.
+**Current behavior:** `src/template/engine/query.rs` registers template query
+globals for pages (`query`) and tasks (`tasks`). `QueryOps` is parameterized by
+a boolean `is_task`. Dotted attribute access on `QueryRow` uses `TaskFields`,
+which only exposes `record.task.completed` and `record.task.text`. There is no
+`lists` global for querying generic list items (plain bullets, checklists,
+outlines), and `QueryMode` only has `Pages` and `Tasks` variants.
 
 **Desired behavior:**
-- Add `QueryMode::Lists` and `QueryBuilder::lists(source)` in `src/query/builder.rs`.
-- Implement `QueryService::list_rows` in `src/query/service.rs` to emit all list items from matching notes.
-- Parameterize `QueryOps` with `QueryMode` (`Pages`, `Lists`, `Tasks`) in `src/template/engine/query.rs`.
-- Register `lists` (all list items) alongside `tasks` (task list items) and `query` (pages) in MiniJinja.
-- Replace `TaskFields` with `ListFields` wrapping `Arc<QueryRow>`, exposing all universal list fields and task-specific fields via `record.list.<field>`.
-- On non-task items (plain bullets, checkboxes), task-specific fields project to `none` (`NoteFieldValue::Null`).
-- Pipeline operations (`where`/`filter`, `sort`, `limit`, `group_by`, `flatten`) and terminal renderers (`task_list`, `table`, `list`, `count`) function across both `lists` and `tasks` streams using `list.<field>` paths.
+
+- Add `QueryMode::Lists` and `QueryBuilder::lists(source)` in
+  `src/query/builder.rs`.
+- Implement `QueryService::list_rows` in `src/query/service.rs` to emit all list
+  items from matching notes.
+- Parameterize `QueryOps` with `QueryMode` (`Pages`, `Lists`, `Tasks`) in
+  `src/template/engine/query.rs`.
+- Register `lists` (all list items) alongside `tasks` (task list items) and
+  `query` (pages) in MiniJinja.
+- Replace `TaskFields` with `ListFields` wrapping `Arc<QueryRow>`, exposing all
+  universal list fields and task-specific fields via `record.list.<field>`.
+- On non-task items (plain bullets, checkboxes), task-specific fields project to
+  `none` (`NoteFieldValue::Null`).
+- Pipeline operations (`where`/`filter`, `sort`, `limit`, `group_by`, `flatten`)
+  and terminal renderers (`task_list`, `table`, `list`, `count`) function across
+  both `lists` and `tasks` streams using `list.<field>` paths.
 - Existing template tests migrated from `t.task.*` to `t.list.*`.
 
 **Key interfaces:**
-- `QueryMode::Lists` and `QueryBuilder::lists(source: SourceSelector)`: new row mode for all list items.
+
+- `QueryMode::Lists` and `QueryBuilder::lists(source: SourceSelector)`: new row
+  mode for all list items.
 - `QueryService::list_rows`: row generation for `QueryMode::Lists`.
-- `QueryOps`: parameterized with `mode: QueryMode`, exposing `QueryOps::page`, `QueryOps::list`, and `QueryOps::task`.
-- `ListFields`: implements `minijinja::value::Object`, resolving `FieldPath::List(field)` via `ListField::parse` and `ListField::ACCESSOR_NAMES`.
-- `QueryRow::get_value`: cuts over `"task"` to `"list" => Some(Value::from_object(ListFields(Arc::clone(self))))`.
+- `QueryOps`: parameterized with `mode: QueryMode`, exposing `QueryOps::page`,
+  `QueryOps::list`, and `QueryOps::task`.
+- `ListFields`: implements `minijinja::value::Object`, resolving
+  `FieldPath::List(field)` via `ListField::parse` and
+  `ListField::ACCESSOR_NAMES`.
+- `QueryRow::get_value`: cuts over `"task"` to
+  `"list" => Some(Value::from_object(ListFields(Arc::clone(self))))`.
 
 **Acceptance criteria:**
 Refer to the single Acceptance Criteria checklist at the top of this ticket.
 
 **Out of scope:**
-- Separate `from_tags()`, `from_folder()`, `from_class()` methods (subsumed by `from(...)` DSL per ADR 0008).
+
+- Separate `from_tags()`, `from_folder()`, `from_class()` methods (subsumed by
+  `from(...)` DSL per ADR 0008).
 - CLI argument parsing or command line options (addressed in Issue 10).
 - Integration test suite over whole vaults (addressed in Issue 11).
 - Benchmarking (addressed in Issue 12).

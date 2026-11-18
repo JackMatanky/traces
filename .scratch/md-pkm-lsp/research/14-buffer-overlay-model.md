@@ -1,58 +1,109 @@
 # Live editor buffer vs filesystem overlay — research
 
-Resolves ticket [14-live-buffer-vs-filesystem-overlay](../issues/14-live-buffer-vs-filesystem-overlay.md).
+Resolves ticket
+[14-live-buffer-vs-filesystem-overlay](../issues/14-live-buffer-vs-filesystem-overlay.md).
 
-Sources: `docs/digests/lsp_rvben-rumdl-digest.txt`, `docs/digests/lsp_rvben-rumdl-src-digest.txt`, `docs/digests/lsp_rvben-rumdl-docs-digest.txt`, `docs/digests/lsp_artempyanykh-marksman-digest.txt`, `docs/digests/lsp_artempyanykh-marksman-docs-digest.txt`, `docs/digests/lsp_feel-ix-343-markdown-oxide-digest.txt`, `docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt`, `docs/digests/lsp_feel-ix-343-markdown-oxide-docs-digest.txt`, `docs/digests/lsp_microsoft-vscode-markdown-languageservice-digest.txt`, `docs/digests/zk-digest.txt`, `docs/digests/zk-src-digest.txt`, `rust-docs-mcp` (ropey, lsp-types, pulldown-cmark, dashmap), web research (Biome LSP, TypeScript Go LSP, Zenzic, mdsmith, Ibex, Neovim LSP), `src/index/inlinks.rs`, `src/index/sync.rs`, `src/index/entry.rs`, `src/note/parser.rs`, `src/note/links.rs`, `src/query/service.rs`, `src/query/results.rs`.
+Sources: `docs/digests/lsp_rvben-rumdl-digest.txt`,
+`docs/digests/lsp_rvben-rumdl-src-digest.txt`,
+`docs/digests/lsp_rvben-rumdl-docs-digest.txt`,
+`docs/digests/lsp_artempyanykh-marksman-digest.txt`,
+`docs/digests/lsp_artempyanykh-marksman-docs-digest.txt`,
+`docs/digests/lsp_feel-ix-343-markdown-oxide-digest.txt`,
+`docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt`,
+`docs/digests/lsp_feel-ix-343-markdown-oxide-docs-digest.txt`,
+`docs/digests/lsp_microsoft-vscode-markdown-languageservice-digest.txt`,
+`docs/digests/zk-digest.txt`, `docs/digests/zk-src-digest.txt`, `rust-docs-mcp`
+(ropey, lsp-types, pulldown-cmark, dashmap), web research (Biome LSP, TypeScript
+Go LSP, Zenzic, mdsmith, Ibex, Neovim LSP), `src/index/inlinks.rs`,
+`src/index/sync.rs`, `src/index/entry.rs`, `src/note/parser.rs`,
+`src/note/links.rs`, `src/query/service.rs`, `src/query/results.rs`.
 
 ---
 
 ## Executive summary
 
-All three studied markdown PKM LSPs (Marksman, rumdl, markdown-oxide) use the same pattern: **editor content replaces disk content while the file is open**. There is no layered overlay with fallback — the rust-analyzer VFS "upper/lower layer" pattern is not used by any markdown LSP. For Traces, this means the "overlay" is a **transient replacement map**, not a merge layer: the persisted `WorkspaceIndex` is the baseline; open files temporarily override entries in it.
+All three studied markdown PKM LSPs (Marksman, rumdl, markdown-oxide) use the
+same pattern: **editor content replaces disk content while the file is open**.
+There is no layered overlay with fallback — the rust-analyzer VFS "upper/lower
+layer" pattern is not used by any markdown LSP. For Traces, this means the
+"overlay" is a **transient replacement map**, not a merge layer: the persisted
+`WorkspaceIndex` is the baseline; open files temporarily override entries in it.
 
-The hardest cross-file problem is **inlinks**: the `InlinkMap` requires the full file list for stem-based wikilink resolution and cannot be computed from a single file alone. The recommended approach is per-request inlink adjustment using the existing `patch_links` pattern from `src/index/sync.rs:216-226`, keeping the disk-based inlink graph as baseline and computing overlay-adjusted inlinks on-demand.
+The hardest cross-file problem is **inlinks**: the `InlinkMap` requires the full
+file list for stem-based wikilink resolution and cannot be computed from a
+single file alone. The recommended approach is per-request inlink adjustment
+using the existing `patch_links` pattern from `src/index/sync.rs:216-226`,
+keeping the disk-based inlink graph as baseline and computing overlay-adjusted
+inlinks on-demand.
 
 ---
 
 ## Stress-test corrections (applied after grilling round 1)
 
-Six recommendations were stress-tested against the codebase, previous ticket decisions, and performant-LSP conventions. Seven corrections were found:
+Six recommendations were stress-tested against the codebase, previous ticket
+decisions, and performant-LSP conventions. Seven corrections were found:
 
 ### C1: DashMap → RwLock<HashMap>
 
-DashMap's sharded concurrent access is unnecessary overhead with `concurrency_level(1)` (sequential dispatch). `RwLock<HashMap<Url, BufferState>>` is simpler, has less memory overhead, and the LSP model guarantees sequential access. DashMap only pays off with `concurrency_level > 1`.
+DashMap's sharded concurrent access is unnecessary overhead with
+`concurrency_level(1)` (sequential dispatch).
+`RwLock<HashMap<Url, BufferState>>` is simpler, has less memory overhead, and
+the LSP model guarantees sequential access. DashMap only pays off with
+`concurrency_level > 1`.
 
 ### C2: Don't store parsed_note in BufferState
 
-Storing `parsed_note: Option<Note>` in `BufferState` creates a staleness vector: the parsed note may reference schemas/templates that have changed on disk but the index hasn't refreshed yet. Since pulldown-cmark is fast (~0.02ms per 10KB), compute the parsed note on-demand from `content` when needed.
+Storing `parsed_note: Option<Note>` in `BufferState` creates a staleness vector:
+the parsed note may reference schemas/templates that have changed on disk but
+the index hasn't refreshed yet. Since pulldown-cmark is fast (~0.02ms per 10KB),
+compute the parsed note on-demand from `content` when needed.
 
 ### C3: WorkspaceIndex API gaps block per-request inlink adjustment
 
 Two API gaps prevent per-request inlink adjustment:
-- `WorkspaceIndex` does not expose `&[FileBase]` — `LinkResolver::new(files: &'a [FileBase])` needs the full sorted file list, but only `entries() -> &[FileEntry]` exists.
-- `FileEntry.inlinks()` returns `&[PathBuf]` (read-only), not an `InlinkMap` that can be patched.
 
-**Fix**: Add `WorkspaceIndex::files() -> &[FileBase]`. Redesign inlink patching to work with reconstructed per-entry inlink data.
+- `WorkspaceIndex` does not expose `&[FileBase]` —
+  `LinkResolver::new(files: &'a [FileBase])` needs the full sorted file list,
+  but only `entries() -> &[FileEntry]` exists.
+- `FileEntry.inlinks()` returns `&[PathBuf]` (read-only), not an `InlinkMap`
+  that can be patched.
+
+**Fix**: Add `WorkspaceIndex::files() -> &[FileBase]`. Redesign inlink patching
+to work with reconstructed per-entry inlink data.
 
 ### C4: Cost model for inlink adjustment is incomplete
 
-The stated cost `O(overlay_count × outlinks_per_overlay)` omits the `LinkResolver` construction cost: `O(files)` for the stem index build. **Fix**: Cache the `LinkResolver` between requests; rebuild only when the overlay set changes (didOpen/didClose).
+The stated cost `O(overlay_count × outlinks_per_overlay)` omits the
+`LinkResolver` construction cost: `O(files)` for the stem index build. **Fix**:
+Cache the `LinkResolver` between requests; rebuild only when the overlay set
+changes (didOpen/didClose).
 
 ### C5: didSave must not trigger refresh via didChangeWatchedFiles
 
-`workspace/didChangeWatchedFiles` is a client-to-server notification — the server cannot inject its own. On `didSave`, call `IndexerService::refresh` **directly**. Reserve `didChangeWatchedFiles` for external file changes detected by the client's filesystem watcher.
+`workspace/didChangeWatchedFiles` is a client-to-server notification — the
+server cannot inject its own. On `didSave`, call `IndexerService::refresh`
+**directly**. Reserve `didChangeWatchedFiles` for external file changes detected
+by the client's filesystem watcher.
 
 ### C6: FileBase needs a synthetic constructor for unsaved files
 
-`FileBase::from_metadata` requires `std::fs::Metadata` — impossible for non-existent files. `FileBase::new_test` is test-gated. **Fix**: Add `FileBase::new_buffer(path, size)` (public, not test-gated) that fills `modified_at` with `DateTimeValue::now()`, `created_at` with `None`, and derives `format` from extension.
+`FileBase::from_metadata` requires `std::fs::Metadata` — impossible for
+non-existent files. `FileBase::new_test` is test-gated. **Fix**: Add
+`FileBase::new_buffer(path, size)` (public, not test-gated) that fills
+`modified_at` with `DateTimeValue::now()`, `created_at` with `None`, and derives
+`format` from extension.
 
 ### C7: Two unsaved buffers referencing each other can't resolve links
 
-If file A (new, unsaved) links to file B (new, unsaved), neither is in the `WorkspaceIndex`, so `LinkResolver` can't resolve the link. **Fix**: The overlay layer must maintain its own `LinkResolver` over the union of `(WorkspaceIndex files ∪ DocumentStore overlay files)`.
+If file A (new, unsaved) links to file B (new, unsaved), neither is in the
+`WorkspaceIndex`, so `LinkResolver` can't resolve the link. **Fix**: The overlay
+layer must maintain its own `LinkResolver` over the union of
+`(WorkspaceIndex files ∪ DocumentStore overlay files)`.
 
 ---
 
 **LSPs analyzed:**
+
 - **rumdl** (Rust) — Markdown linter with LSP
 - **Marksman** (F#) — PKM-focused Markdown LSP
 - **markdown-oxide** (Rust) — PKM-focused Markdown LSP
@@ -81,11 +132,14 @@ If file A (new, unsaved) links to file B (new, unsaved), neither is in the `Work
 ### Recommendation
 
 **Use a two-tier debounce:**
-- **Typing (didChange):** 150-200ms quiet period before triggering index update
-- **Diagnostics:** 300-500ms to avoid re-computing diagnostics on every keystroke
-- **Max burst cap:** 1-2 seconds to prevent infinite deferral during rapid typing
 
-```
+- **Typing (didChange):** 150-200ms quiet period before triggering index update
+- **Diagnostics:** 300-500ms to avoid re-computing diagnostics on every
+  keystroke
+- **Max burst cap:** 1-2 seconds to prevent infinite deferral during rapid
+  typing
+
+```text
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
 │ didChange   │────>│ debounce     │────>│ update Arc  │
 │ (per keystroke)    │ timer (150ms)│     │ swap overlay│
@@ -105,14 +159,19 @@ If file A (new, unsaved) links to file B (new, unsaved), neither is in the `Work
 | **cmark (C)** | 4.653s (2x slower) |
 | **MD4C (C)** | 1.174s (fastest, but not Rust) |
 
-pulldown-cmark is a **pull parser** — it produces an iterator of events, not a full AST. This means:
+pulldown-cmark is a **pull parser** — it produces an iterator of events, not a
+full AST. This means:
+
 - **Low memory:** No tree construction unless explicitly collected
 - **Fast re-parse:** For a 10KB markdown file, parsing takes ~0.02ms
 - **No incremental parsing support:** Must re-parse entire document on change
 
 ### Recommendation
 
-**Full re-parse on each debounced change is viable.** At ~0.02ms per 10KB file, even 100 open documents can be re-parsed in ~2ms total. Don't invest in incremental parsing — pulldown-cmark's pull-parser design makes full re-parse cheap.
+**Full re-parse on each debounced change is viable.** At ~0.02ms per 10KB file,
+even 100 open documents can be re-parsed in ~2ms total. Don't invest in
+incremental parsing — pulldown-cmark's pull-parser design makes full re-parse
+cheap.
 
 ```rust
 // On debounced didChange:
@@ -157,7 +216,9 @@ impl OverlayStore {
 }
 ```
 
-**Key principle:** The overlay store is the **single source of truth** for open documents. Queries always go through `overlay_store.get(uri)` which returns either the editor buffer or disk content.
+**Key principle:** The overlay store is the **single source of truth** for open
+documents. Queries always go through `overlay_store.get(uri)` which returns
+either the editor buffer or disk content.
 
 ---
 
@@ -174,9 +235,11 @@ impl OverlayStore {
 
 ### Recommendation
 
-**No explicit eviction needed for typical PKM vaults.** A 10KB markdown file uses ~10KB memory. Even 1,000 open documents use ~10MB — negligible.
+**No explicit eviction needed for typical PKM vaults.** A 10KB markdown file
+uses ~10KB memory. Even 1,000 open documents use ~10MB — negligible.
 
 If memory is a concern:
+
 - Use LRU eviction with capacity = 2x expected open documents
 - Evict on `didClose` immediately (release the overlay entry)
 - Keep the immutable WorkspaceIndex (on-disk index) always available
@@ -246,7 +309,7 @@ fn did_close(&mut self, uri: DocumentUri) {
 
 **Treat unsaved files as primary source while open:**
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │ Query for document content                  │
 │                                             │
@@ -260,6 +323,7 @@ fn did_close(&mut self, uri: DocumentUri) {
 ```
 
 For cross-file references (links from unsaved doc to other docs):
+
 - Parse links from the **overlay content** (what user is editing)
 - Resolve targets from the **WorkspaceIndex** (what's on disk)
 - This ensures link resolution works even for unsaved changes
@@ -279,7 +343,8 @@ For cross-file references (links from unsaved doc to other docs):
 
 ### Recommendation
 
-**Use `DocumentUri` (URL-formatted path) as the key.** This is the LSP standard and avoids path normalization issues.
+**Use `DocumentUri` (URL-formatted path) as the key.** This is the LSP standard
+and avoids path normalization issues.
 
 ```rust
 type DocumentUri = String; // or url::Url
@@ -290,6 +355,7 @@ struct OverlayStore {
 ```
 
 **Normalization:** Always normalize URIs before lookup:
+
 - `file:///path/to/note.md` → canonical form
 - Handle case-insensitive filesystems (macOS/Windows)
 - Handle trailing slashes
@@ -312,7 +378,8 @@ struct OverlayStore {
 **Two-level invalidation:**
 
 1. **Local (single document):** On didChange, rebuild only that document's index
-2. **Global (cross-references):** After local rebuild, re-resolve links that reference or are referenced by the changed document
+2. **Global (cross-references):** After local rebuild, re-resolve links that
+   reference or are referenced by the changed document
 
 ```rust
 fn on_document_change(&mut self, uri: DocumentUri, new_content: String) {
@@ -332,6 +399,7 @@ fn on_document_change(&mut self, uri: DocumentUri, new_content: String) {
 ```
 
 **For inverted indexes** (e.g., "which documents link to X?"):
+
 - Maintain a separate `HashMap<DocumentUri, HashSet<DocumentUri>>` for backlinks
 - On document change, update only the entries for that document
 - This avoids full re-scan of all documents
@@ -340,7 +408,7 @@ fn on_document_change(&mut self, uri: DocumentUri, new_content: String) {
 
 ## Summary: Recommended Architecture (corrected)
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │                    LSP Server                            │
 ├─────────────────────────────────────────────────────────┤
@@ -377,9 +445,11 @@ fn on_document_change(&mut self, uri: DocumentUri, new_content: String) {
 │  didSave: refresh directly, not via didChangeWatched    │
 └─────────────────────────────────────────────────────────┘
 ```
-│  Invalidation: Local doc rebuild + targeted cross-ref   │
+
+│ Invalidation: Local doc rebuild + targeted cross-ref │
 └─────────────────────────────────────────────────────────┘
-```
+
+```text
 
 ---
 
@@ -517,3 +587,4 @@ fn on_document_change(&mut self, uri: DocumentUri, new_content: String) {
 11. **FileBase needs new_buffer constructor** — for unsaved/new files (C6)
 12. **Overlay layer needs its own LinkResolver** — for cross-overlay link resolution (C7)
 13. **Overlay can represent non-existent files** (Ibex pattern) — unsaved files participate in include resolution
+```

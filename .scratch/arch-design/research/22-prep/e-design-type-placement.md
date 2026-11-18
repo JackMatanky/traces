@@ -1,27 +1,61 @@
 # Design Options: Config Ownership, Type Placement, and Ambient Seams (Ticket 22)
 
-- **Deliverable Path**: `.scratch/arch-design/research/22-prep/e-design-type-placement.md`
+- **Deliverable Path**:
+  `.scratch/arch-design/research/22-prep/e-design-type-placement.md`
 - **Focus Sub-questions**:
-  - **(a)** Root domain type placement (`task.rs`, `tag.rs`, `field.rs`, `TaskStatusMap`, tag filters, emoji/date parsing, `Tag`, and the disjoint `field.rs` hierarchies).
-  - **(b)** Upward `note -> config` edge (`src/note/parser/input.rs:9`), parser inputs, and the `NoteParserConfig` pattern.
-  - **(f)** Location of ambient primitives (`file_tracker.rs`, `dirs.rs`, `env_vars.rs`), OS snapshots, and directory ignore policy.
-- **Baseline Git HEAD**: `8064cf76` (94,829 LoC across 72 source files, 25 crate-root modules).
-- **Discipline & Rules**: `rust-design` discipline (concrete types first, invalid states unconstructable, typestate only for correctness-critical transitions, panic-free `Result` seams, no junk-drawer modules). Ticket 16 Visibility Rule (reduce visibility wherever possible, default direction is narrower). Ticket 21 Invariants (adapter snapshots OS inputs once at workspace open, independent per-workspace policy generations, zero process globals, Clippy `disallowed-methods`).
-- **Claim Tags**: `[V]` verified by direct source read or compile; `[H]` inference; `[P]` proposal.
+  - **(a)** Root domain type placement (`task.rs`, `tag.rs`, `field.rs`,
+    `TaskStatusMap`, tag filters, emoji/date parsing, `Tag`, and the disjoint
+    `field.rs` hierarchies).
+  - **(b)** Upward `note -> config` edge (`src/note/parser/input.rs:9`), parser
+    inputs, and the `NoteParserConfig` pattern.
+  - **(f)** Location of ambient primitives (`file_tracker.rs`, `dirs.rs`,
+    `env_vars.rs`), OS snapshots, and directory ignore policy.
+- **Baseline Git HEAD**: `8064cf76` (94,829 LoC across 72 source files, 25
+  crate-root modules).
+- **Discipline & Rules**: `rust-design` discipline (concrete types first,
+  invalid states unconstructable, typestate only for correctness-critical
+  transitions, panic-free `Result` seams, no junk-drawer modules). Ticket 16
+  Visibility Rule (reduce visibility wherever possible, default direction is
+  narrower). Ticket 21 Invariants (adapter snapshots OS inputs once at workspace
+  open, independent per-workspace policy generations, zero process globals,
+  Clippy `disallowed-methods`).
+- **Claim Tags**: `[V]` verified by direct source read or compile; `[H]`
+  inference; `[P]` proposal.
 
 ---
 
 ## 0. Executive Summary & Problem Decomposition
 
-The root of `traces` (`src/`) currently holds 18 single-file modules alongside 7 multi-file subsystem directories [V: `src/lib.rs:110-134`]. Many of these root files were placed there historically to circumvent Rust's module cycle detector:
+The root of `traces` (`src/`) currently holds 18 single-file modules alongside 7
+multi-file subsystem directories [V: `src/lib.rs:110-134`]. Many of these root
+files were placed there historically to circumvent Rust's module cycle detector:
 
-1. `src/task.rs` (1,911 LoC) hosts both task configuration models (`TaskStatusMap`, `TaskStatus`) and markdown document AST types (`TaskDateSet`, `TaskPriority`, emoji tables) solely so `config` and `note` could share task status symbols without mutual imports [V].
-2. `src/field.rs` (1,845 LoC) glues two completely disjoint hierarchies: schema/config exact field names (`FieldName`, 69 references in `config`/`schema`, 0 in `note`) and note forgiving lookup keys (`FieldKey`, 68 references in `note`/`query`, 0 in `config`), alongside legacy dynamic values (`FieldValue`, `FieldValueRef`, 299 references) already marked for deletion by Ticket 18 [V].
-3. `src/note/parser/input.rs:9` imports `FrontmatterConfig` and `TaskConfig` from `crate::config`, creating an inverted dependency from Tier 5 (domain document parser) to Tier 4 (application configuration), yet the parser reads only **3 scalar settings** out of the two structs (`statuses`, `tag_filters`, and `tags_field_name`), leaving 4 frontmatter settings completely unread [V].
-4. `src/file_tracker.rs` (1,189 LoC) lives at the root despite having **zero callers outside `src/config/`** [V].
-5. `src/dirs.rs` (218 LoC) and `src/env_vars.rs` (68 LoC) embed ambient `LazyLock` process globals reading `std::env`, violating Ticket 21's mandate for isolated multi-root execution; furthermore, `src/index/service.rs:424` depends directly on `env_vars::is_ignored_dir`, creating an architectural obstacle to moving `env_vars` into `config` [V].
+1. `src/task.rs` (1,911 LoC) hosts both task configuration models
+   (`TaskStatusMap`, `TaskStatus`) and markdown document AST types
+   (`TaskDateSet`, `TaskPriority`, emoji tables) solely so `config` and `note`
+   could share task status symbols without mutual imports [V].
+2. `src/field.rs` (1,845 LoC) glues two completely disjoint hierarchies:
+   schema/config exact field names (`FieldName`, 69 references in
+   `config`/`schema`, 0 in `note`) and note forgiving lookup keys (`FieldKey`,
+   68 references in `note`/`query`, 0 in `config`), alongside legacy dynamic
+   values (`FieldValue`, `FieldValueRef`, 299 references) already marked for
+   deletion by Ticket 18 [V].
+3. `src/note/parser/input.rs:9` imports `FrontmatterConfig` and `TaskConfig`
+   from `crate::config`, creating an inverted dependency from Tier 5 (domain
+   document parser) to Tier 4 (application configuration), yet the parser reads
+   only **3 scalar settings** out of the two structs (`statuses`, `tag_filters`,
+   and `tags_field_name`), leaving 4 frontmatter settings completely unread [V].
+4. `src/file_tracker.rs` (1,189 LoC) lives at the root despite having
+   **zero callers outside `src/config/`** [V].
+5. `src/dirs.rs` (218 LoC) and `src/env_vars.rs` (68 LoC) embed ambient
+   `LazyLock` process globals reading `std::env`, violating Ticket 21's mandate
+   for isolated multi-root execution; furthermore, `src/index/service.rs:424`
+   depends directly on `env_vars::is_ignored_dir`, creating an architectural
+   obstacle to moving `env_vars` into `config` [V].
 
-This document presents concrete, evaluated options for each sub-question, calculates edge and LoC deltas across the 10-tier module DAG, and synthesizes 3 coherent cross-cutting packages.
+This document presents concrete, evaluated options for each sub-question,
+calculates edge and LoC deltas across the 10-tier module DAG, and synthesizes 3
+coherent cross-cutting packages.
 
 ---
 
@@ -43,7 +77,8 @@ Current placement at HEAD `8064cf76` [V]:
 
 ### 1.2 The Current 10-Tier Topological DAG (`survey/cross-cutting.md:35`) [V]
 
-- **Tier 0**: `delimiter`, `dialog`, `dirs`, `dirtree`, `env_vars`, `hash`, `path`, `position`, `strsim`, `tag`, `yaml`
+- **Tier 0**: `delimiter`, `dialog`, `dirs`, `dirtree`, `env_vars`, `hash`,
+  `path`, `position`, `strsim`, `tag`, `yaml`
 - **Tier 1**: `file_tracker`, `lexer`
 - **Tier 2**: `temporal`
 - **Tier 3**: `field`, `file`, `task`
@@ -58,7 +93,9 @@ Current placement at HEAD `8064cf76` [V]:
 
 #### Option a1: Keep at Root (Status Quo Baseline)
 
-Leave `src/task.rs`, `src/tag.rs`, and `src/field.rs` at the crate root in Tiers 0 and 3. `field.rs` deletes `FieldValue`/`FieldValueRef` per Ticket 18 but retains `FieldName` and `FieldKey` together.
+Leave `src/task.rs`, `src/tag.rs`, and `src/field.rs` at the crate root in Tiers
+0 and 3. `field.rs` deletes `FieldValue`/`FieldValueRef` per Ticket 18 but
+retains `FieldName` and `FieldKey` together.
 
 ```rust
 // src/lib.rs (Current exports maintained)
@@ -67,19 +104,28 @@ pub mod task;
 pub(crate) mod field;
 ```
 
-- **Invariants Enforced**: Preserves existing module layout; zero migration churn.
-- **Cost**: Retains 4,356 LoC of domain logic at crate root. Obscures that `task.rs` contains 157 note-only AST references and 0 config references for dates/priorities. Conflates schema exact naming with note forgiving keys.
-- **DAG Impact**: Tier 3 remains bloated (`task`, `field`, `file`). `note` stays forced above `config`.
+- **Invariants Enforced**: Preserves existing module layout; zero migration
+  churn.
+- **Cost**: Retains 4,356 LoC of domain logic at crate root. Obscures that
+  `task.rs` contains 157 note-only AST references and 0 config references for
+  dates/priorities. Conflates schema exact naming with note forgiving keys.
+- **DAG Impact**: Tier 3 remains bloated (`task`, `field`, `file`). `note` stays
+  forced above `config`.
 
 #### Option a2: Subsystem Dissolution into `note` and `config` with Leaf `primitives` [LEAN]
 
 Decompose the root files along functional boundaries:
 
-1. `TaskDateSet`, `TaskDate`, `TaskDateType`, `TaskPriority`, and markdown emoji lookup tables move into `src/note/task.rs` (or `src/note/task/`).
-2. `TaskStatus`, `TaskStatusMap`, `TaskStatusSymbol`, `TaskStatusType`, and `TaskError` move to a leaf module `src/task_status.rs` (Tier 0).
-3. `Tag` stays at leaf `src/tag.rs` (Tier 0) or moves to `src/primitives/tag.rs`.
+1. `TaskDateSet`, `TaskDate`, `TaskDateType`, `TaskPriority`, and markdown emoji
+   lookup tables move into `src/note/task.rs` (or `src/note/task/`).
+2. `TaskStatus`, `TaskStatusMap`, `TaskStatusSymbol`, `TaskStatusType`, and
+   `TaskError` move to a leaf module `src/task_status.rs` (Tier 0).
+3. `Tag` stays at leaf `src/tag.rs` (Tier 0) or moves to
+   `src/primitives/tag.rs`.
 4. Delete legacy `FieldValue`/`FieldValueRef` (515 LoC).
-5. Split `field.rs`: `FieldName` moves to `src/schema/field_name.rs` (borrowed by `config` or placed in `primitives`), `FieldKey` moves to `src/note/field_key.rs` (or `src/note/metadata/key.rs`).
+5. Split `field.rs`: `FieldName` moves to `src/schema/field_name.rs` (borrowed
+   by `config` or placed in `primitives`), `FieldKey` moves to
+   `src/note/field_key.rs` (or `src/note/metadata/key.rs`).
 
 ```rust
 // Sketch: Leaf status types in src/task_status.rs (Tier 0, ~380 LoC)
@@ -106,19 +152,24 @@ pub struct TaskStatusMap {
 // TaskDateSet, TaskDate, TaskDateType (with EMOJIS), TaskPriority (with EMOJIS)
 ```
 
-- **Invariants Enforced**: Note markdown parsing specifics (emojis, date AST slots) cannot leak into `config`. Schema field definitions cannot accidentally use forgiving note key logic.
-- **Removable Code**: 515 LoC deleted from `field.rs` (`FieldValue`/`FieldValueRef`). 1,152 LoC moved out of crate root.
-- **DAG Impact**: `task.rs` deleted from root. `task_status` is Tier 0. `note` drops from Tier 5 to Tier 3 (once (b) is resolved).
+- **Invariants Enforced**: Note markdown parsing specifics (emojis, date AST
+  slots) cannot leak into `config`. Schema field definitions cannot accidentally
+  use forgiving note key logic.
+- **Removable Code**: 515 LoC deleted from `field.rs`
+  (`FieldValue`/`FieldValueRef`). 1,152 LoC moved out of crate root.
+- **DAG Impact**: `task.rs` deleted from root. `task_status` is Tier 0. `note`
+  drops from Tier 5 to Tier 3 (once (b) is resolved).
 
 #### Option a3: Cohesive Domain Leaf Module (`src/domain/` or `src/vault/`)
 
-Rather than individual leaf files, consolidate all vault primitives into a single leaf module `src/domain/`:
+Rather than individual leaf files, consolidate all vault primitives into a
+single leaf module `src/domain/`:
 
 - `src/domain/tag.rs` (`Tag`)
 - `src/domain/status.rs` (`TaskStatusMap`, `TaskStatusSymbol`)
 - `src/domain/field.rs` (`FieldName`, `FieldKey`)
-- `src/domain/link.rs` (`Link` from Ticket 18)
-Markdown-specific AST types (`TaskDateSet`, `TaskPriority`, emojis) move to `src/note/`.
+- `src/domain/link.rs` (`Link` from Ticket 18) Markdown-specific AST types
+  (`TaskDateSet`, `TaskPriority`, emojis) move to `src/note/`.
 
 ```rust
 // Sketch: src/domain/mod.rs
@@ -128,14 +179,17 @@ pub mod status; // TaskStatusMap, TaskStatusSymbol, TaskStatusType
 pub mod tag;    // Tag, TagError
 ```
 
-- **Invariants Enforced**: Establishes a single, explicit Tier 0 domain foundational vocabulary for vault objects without application dependencies.
+- **Invariants Enforced**: Establishes a single, explicit Tier 0 domain
+  foundational vocabulary for vault objects without application dependencies.
 - **Cost**: Introduces a directory layer `domain::` for ~1,200 LoC.
 
 #### Option a4: First-Crate-Split: `traces-core` Primitives Crate (Workspace Steer)
 
-Honoring the map steer toward workspace crates (Notes 2026-10-18): extract pure domain types into a separate `crates/traces-core/` crate:
+Honoring the map steer toward workspace crates (Notes 2026-10-18): extract pure
+domain types into a separate `crates/traces-core/` crate:
 
-- `Tag`, `TaskStatusSymbol`, `TaskStatusMap`, `FieldName`, `FieldKey`, `BytePos`, `ByteSpan`, `LineIndex`, `Blake3Digest`.
+- `Tag`, `TaskStatusSymbol`, `TaskStatusMap`, `FieldName`, `FieldKey`,
+  `BytePos`, `ByteSpan`, `LineIndex`, `Blake3Digest`.
 - Independent of `config`, `note`, `schema`, `index`, `cli`.
 
 ```rust
@@ -144,8 +198,10 @@ Honoring the map steer toward workspace crates (Notes 2026-10-18): extract pure 
 members = ["crates/traces-core", "crates/traces-cli"]
 ```
 
-- **Invariants Enforced**: Physical compiler-enforced barrier. Impossible for leaf primitives to import application config or I/O.
-- **Cost**: High initial workspace setup churn; cargo build matrix configuration; version management.
+- **Invariants Enforced**: Physical compiler-enforced barrier. Impossible for
+  leaf primitives to import application config or I/O.
+- **Cost**: High initial workspace setup churn; cargo build matrix
+  configuration; version management.
 
 ### 1.4 Comparison Table for Sub-question (a)
 
@@ -156,9 +212,17 @@ members = ["crates/traces-core", "crates/traces-cli"]
 | **a3: `src/domain/` leaf** | Consolidates shared vocabulary into one Tier 0 module | ~515 LoC deleted | Consolidates ~300 imports under `crate::domain::*` | ~60 test imports updated | High |
 | **a4: `traces-core` crate** | Compile-time boundary prevents domain types from ever depending on app/config | ~515 LoC deleted in core | Replaces internal crate paths with external crate imports | High: touches tests, benches, CI | Moderate (workspace undo is tedious) |
 
-- **Lean**: **Option a2**. Dissolve `task.rs` and `field.rs`. Move status definitions to `src/task_status.rs`, markdown emojis/dates to `src/note/task.rs`, and split `field.rs` into `schema::FieldName` and `note::FieldKey`.
-- **Best Dissent against a2**: Splitting `task.rs` into `task_status.rs` and `note::task.rs` separates things that both have "task" in their name; developers searching for task logic must look in two places.
-- **Flip Fact**: If Ticket 23 (Note document model) proves that task checkboxes and task dates are inextricably coupled during list parsing (e.g., status changes mutate date fields in place), keeping them together in a single module becomes preferable.
+- **Lean**: **Option a2**. Dissolve `task.rs` and `field.rs`. Move status
+  definitions to `src/task_status.rs`, markdown emojis/dates to
+  `src/note/task.rs`, and split `field.rs` into `schema::FieldName` and
+  `note::FieldKey`.
+- **Best Dissent against a2**: Splitting `task.rs` into `task_status.rs` and
+  `note::task.rs` separates things that both have "task" in their name;
+  developers searching for task logic must look in two places.
+- **Flip Fact**: If Ticket 23 (Note document model) proves that task checkboxes
+  and task dates are inextricably coupled during list parsing (e.g., status
+  changes mutate date fields in place), keeping them together in a single module
+  becomes preferable.
 
 ---
 
@@ -166,24 +230,35 @@ members = ["crates/traces-core", "crates/traces-cli"]
 
 ### 2.1 Inventory and Root Cause of the Edge
 
-At HEAD `8064cf76`, there is **exactly one production import edge from `note` to `config`** in the entire codebase [V: `a1` §3.1]:
+At HEAD `8064cf76`, there is
+**exactly one production import edge from `note` to `config`** in the entire
+codebase [V: `a1` §3.1]:
 
 ```rust
 // src/note/parser/input.rs:9 [V]
 use crate::config::{FrontmatterConfig, TaskConfig};
 ```
 
-`MarkdownParserInput<'a>` stores borrowed references to these two application-configuration structs [V: `src/note/parser/input.rs:24-34`]. However, auditing every call site inside `src/note/parser/` reveals that the parser accesses only **three scalar values** [V: `src/note/parser.rs:381, 527-528`]:
+`MarkdownParserInput<'a>` stores borrowed references to these two
+application-configuration structs [V: `src/note/parser/input.rs:24-34`].
+However, auditing every call site inside `src/note/parser/` reveals that the
+parser accesses only **three scalar values** [V:
+`src/note/parser.rs:381, 527-528`]:
 
-1. `statuses: &TaskStatusMap` (looked up on line 528 for list item checkbox matching).
-2. `tag_filters: &[Tag]` (read on line 527 to filter which checklist items count as tasks).
-3. `tags_name: &str` (read on line 381 to extract frontmatter tags from the configured YAML key).
+1. `statuses: &TaskStatusMap` (looked up on line 528 for list item checkbox
+   matching).
+2. `tag_filters: &[Tag]` (read on line 527 to filter which checklist items count
+   as tasks).
+3. `tags_name: &str` (read on line 381 to extract frontmatter tags from the
+   configured YAML key).
 
 ### 2.2 What Happens to the Unused 4 of 5 `FrontmatterConfig` Fields?
 
-`FrontmatterConfig` contains 5 settings [V: `src/config/model/frontmatter.rs:29-35`]:
+`FrontmatterConfig` contains 5 settings [V:
+`src/config/model/frontmatter.rs:29-35`]:
 
-- `tags: FieldName` (**Consumed** by note parser at line 381 to populate `Note::tags()`) [V].
+- `tags: FieldName` (**Consumed** by note parser at line 381 to populate
+  `Note::tags()`) [V].
 - `title: FieldName` (**Unused** by note parser) [V].
 - `aliases: FieldName` (**Unused** by note parser) [V].
 - `date_created: DateFieldConfig` (**Unused** by note parser) [V].
@@ -191,17 +266,28 @@ use crate::config::{FrontmatterConfig, TaskConfig};
 
 **Why are these 4 fields in `FrontmatterConfig` if the parser ignores them?**
 
-1. **Text Parsing vs. Read-Model Extraction**: Markdown document parsing is purely structural: it preserves all YAML frontmatter keys verbatim in `RawFrontmatter` (`IndexMap<String, Value>`). The parser does not need to know which key represents the note's creation date or title to produce a valid `Note` AST [V].
-2. **Ticket 23 (Note Document Model) and Ticket 24 (Index Read Model)**: The 4 fields represent *metadata extraction policies* for downstream services:
-   - Ticket 23 consumes `title` and `aliases` when projecting high-level note getters (`Note::title()`, `Note::aliases()`).
-   - Ticket 24 consumes `date_created` and `date_modified` when populating redb index rows (`file_meta.date_created`, `file_meta.date_modified`) or indexing title aliases into secondary tables.
-3. **Premature Coupling**: Passing the entirety of `FrontmatterConfig` into `MarkdownParserInput` coupled the low-level text parser to high-level index metadata extraction policies.
+1. **Text Parsing vs. Read-Model Extraction**: Markdown document parsing is
+   purely structural: it preserves all YAML frontmatter keys verbatim in
+   `RawFrontmatter` (`IndexMap<String, Value>`). The parser does not need to
+   know which key represents the note's creation date or title to produce a
+   valid `Note` AST [V].
+2. **Ticket 23 (Note Document Model) and Ticket 24 (Index Read Model)**: The 4
+   fields represent *metadata extraction policies* for downstream services:
+   - Ticket 23 consumes `title` and `aliases` when projecting high-level note
+     getters (`Note::title()`, `Note::aliases()`).
+   - Ticket 24 consumes `date_created` and `date_modified` when populating redb
+     index rows (`file_meta.date_created`, `file_meta.date_modified`) or
+     indexing title aliases into secondary tables.
+3. **Premature Coupling**: Passing the entirety of `FrontmatterConfig` into
+   `MarkdownParserInput` coupled the low-level text parser to high-level index
+   metadata extraction policies.
 
 ### 2.3 Design Options for Sub-question (b)
 
 #### Option b1: Keep as is (Status Quo Baseline)
 
-Keep `MarkdownParserInput` borrowing `&'a TaskConfig` and `&'a FrontmatterConfig`.
+Keep `MarkdownParserInput` borrowing `&'a TaskConfig` and
+`&'a FrontmatterConfig`.
 
 ```rust
 // src/note/parser/input.rs
@@ -214,11 +300,16 @@ pub struct MarkdownParserInput<'a> {
 }
 ```
 
-- **Cost**: Inverts the module DAG: Tier 5 (`note`) imports Tier 4 (`config`). Precludes making `note` a pure domain leaf crate in a multi-crate workspace. Requires tests in `note` to construct `TaskConfig` and `FrontmatterConfig` via `LazyLock` fixtures (`src/note/parser/input.rs:11-17`) [V].
+- **Cost**: Inverts the module DAG: Tier 5 (`note`) imports Tier 4 (`config`).
+  Precludes making `note` a pure domain leaf crate in a multi-crate workspace.
+  Requires tests in `note` to construct `TaskConfig` and `FrontmatterConfig` via
+  `LazyLock` fixtures (`src/note/parser/input.rs:11-17`) [V].
 
 #### Option b2: Consumer-Owned `NoteParserConfig` in `src/note/` (rust-analyzer Pattern) [LEAN]
 
-Adopt the standard rust-analyzer pattern where the consumer (`note`) defines the configuration it requires (`NoteParserConfig`), and the orchestrating caller (`IndexerService`) projects it from `Config`.
+Adopt the standard rust-analyzer pattern where the consumer (`note`) defines the
+configuration it requires (`NoteParserConfig`), and the orchestrating caller
+(`IndexerService`) projects it from `Config`.
 
 ```rust
 // In src/note/config.rs (Tier 0/1, no dependency on config) [P]
@@ -275,12 +366,16 @@ impl IndexerService {
 }
 ```
 
-- **Invariants Enforced**: `note` has 0 dependencies on `config`. Open-world document parsing is completely decoupled from application configuration files.
-- **LoC / Edge Delta**: Removes the `note -> config` edge entirely. Deletes `src/note/parser/input.rs:9`. Eliminates `LazyLock<TaskConfig>` and `LazyLock<FrontmatterConfig>` test statics (18 LoC).
+- **Invariants Enforced**: `note` has 0 dependencies on `config`. Open-world
+  document parsing is completely decoupled from application configuration files.
+- **LoC / Edge Delta**: Removes the `note -> config` edge entirely. Deletes
+  `src/note/parser/input.rs:9`. Eliminates `LazyLock<TaskConfig>` and
+  `LazyLock<FrontmatterConfig>` test statics (18 LoC).
 
 #### Option b3: Deconstructed Primitives in `parse_markdown`
 
-Eliminate config structs from `note` entirely; pass raw primitive arguments or a tuple:
+Eliminate config structs from `note` entirely; pass raw primitive arguments or a
+tuple:
 
 ```rust
 pub fn parse_markdown(
@@ -292,12 +387,14 @@ pub fn parse_markdown(
 ) -> Note
 ```
 
-- **Cost**: Cumbersome call sites with 5 individual parameters. Every unit test must pass all 5 arguments.
+- **Cost**: Cumbersome call sites with 5 individual parameters. Every unit test
+  must pass all 5 arguments.
 - **DAG Impact**: Removes `note -> config` edge, but degrades API ergonomics.
 
 #### Option b4: Pass `&Config` (Widening Anti-Pattern)
 
-Pass a reference to the entire monolithic `Config` struct into `MarkdownParserInput`.
+Pass a reference to the entire monolithic `Config` struct into
+`MarkdownParserInput`.
 
 ```rust
 pub struct MarkdownParserInput<'a> {
@@ -307,7 +404,9 @@ pub struct MarkdownParserInput<'a> {
 }
 ```
 
-- **Cost**: Severe regression against Ticket 16 and Ticket 20 layering rules. Leaks template directories, schema paths, and trust configuration into the pure document parser.
+- **Cost**: Severe regression against Ticket 16 and Ticket 20 layering rules.
+  Leaks template directories, schema paths, and trust configuration into the
+  pure document parser.
 
 ### 2.4 Comparison Table for Sub-question (b)
 
@@ -318,9 +417,15 @@ pub struct MarkdownParserInput<'a> {
 | **b3: Primitives** | No config struct at all | Deletes `input.rs` (~182 LoC) | Cuts `note -> config` edge | High churn: rewrites every parser call site across 15 note tests | Moderate |
 | **b4: Pass `&Config`** | None (anti-pattern) | 0 LoC | Widens coupling to entire `Config` | Negative: tests must mock whole `Config` | Low |
 
-- **Lean**: **Option b2**. Adopt consumer-owned `NoteParserConfig` in `src/note/`.
-- **Best Dissent against b2**: `NoteParserConfig` introduces another config struct when `TaskConfig` already has `statuses` and `tag_filters`.
-- **Flip Fact**: If Ticket 23 (Note document model) requires the note parser to directly validate frontmatter fields against class schemas during parsing (which Ticket 20 rejected, but if reopened), then `NoteParserConfig` would be insufficient. Under Ticket 20's ratified decision, `NoteParserConfig` is 100% sufficient.
+- **Lean**: **Option b2**. Adopt consumer-owned `NoteParserConfig` in
+  `src/note/`.
+- **Best Dissent against b2**: `NoteParserConfig` introduces another config
+  struct when `TaskConfig` already has `statuses` and `tag_filters`.
+- **Flip Fact**: If Ticket 23 (Note document model) requires the note parser to
+  directly validate frontmatter fields against class schemas during parsing
+  (which Ticket 20 rejected, but if reopened), then `NoteParserConfig` would be
+  insufficient. Under Ticket 20's ratified decision, `NoteParserConfig` is 100%
+  sufficient.
 
 ---
 
@@ -328,48 +433,75 @@ pub struct MarkdownParserInput<'a> {
 
 ### 3.1 Inventory and Callers Analysis
 
-Auditing callers across the entire codebase reveals three distinct placement anomalies [V: `a1` §4.1]:
+Auditing callers across the entire codebase reveals three distinct placement
+anomalies [V: `a1` §4.1]:
 
 1. **`src/file_tracker.rs` (1,189 LoC)**:
-   - Encapsulates hash-keyed filesystem tracking (symlinks on Unix, text pointers on Windows) [V: `src/file_tracker.rs:22-34`].
-   - **Only two production callers in the entire repository**: `src/config/tracker.rs:9` (`TrackerStore`) and `src/config/trust.rs:16` (`TrustStore`) [V].
+   - Encapsulates hash-keyed filesystem tracking (symlinks on Unix, text
+     pointers on Windows) [V: `src/file_tracker.rs:22-34`].
+   - **Only two production callers in the entire repository**:
+     `src/config/tracker.rs:9` (`TrackerStore`) and `src/config/trust.rs:16`
+     (`TrustStore`) [V].
    - Zero callers in `index`, `template`, `note`, `query`, or `schema`.
-   - Re-exported at crate root in `src/lib.rs:148-150` solely because of historical file placement.
+   - Re-exported at crate root in `src/lib.rs:148-150` solely because of
+     historical file placement.
 2. **`src/dirs.rs` (218 LoC)**:
-   - Defines static `LazyLock`s resolving platform paths: `CONFIG_HOME`, `TRACKED_CONFIGS`, `TRUSTED_CONFIGS` [V: `src/dirs.rs:91, 176, 188`].
+   - Defines static `LazyLock`s resolving platform paths: `CONFIG_HOME`,
+     `TRACKED_CONFIGS`, `TRUSTED_CONFIGS` [V: `src/dirs.rs:91, 176, 188`].
    - Hardcodes test `HOME` to `CARGO_MANIFEST_DIR/test` on line 81 [V].
-   - Consumers: `src/config/discovery.rs` (global config), `src/config/tracker.rs`, `src/config/trust.rs`, and `file_tracker.rs`.
+   - Consumers: `src/config/discovery.rs` (global config),
+     `src/config/tracker.rs`, `src/config/trust.rs`, and `file_tracker.rs`.
    - **Zero consumers outside `config` and `file_tracker`** [V].
 3. **`src/env_vars.rs` (68 LoC)**:
-   - Defines ambient `LazyLock`s reading `$TRACES_CEILING_DIRS` and `$TRACES_IGNORED_DIRS` [V: `src/env_vars.rs:8, 25`].
+   - Defines ambient `LazyLock`s reading `$TRACES_CEILING_DIRS` and
+     `$TRACES_IGNORED_DIRS` [V: `src/env_vars.rs:8, 25`].
    - Consumers:
      - `src/config/discovery.rs`: reads `CEILING_DIRS` and `is_ignored_dir` [V].
-     - `src/index/service.rs:424` (`IndexerService::scan`): calls `crate::env_vars::is_ignored_dir(node.file_name())` to prune directories during vault note walks [V]!
-   - **Architectural Hazard**: Moving `env_vars.rs` directly into `src/config/` would force `src/index/` to depend on `src/config/` just to filter directory names during filesystem traversal [H].
+     - `src/index/service.rs:424` (`IndexerService::scan`): calls
+       `crate::env_vars::is_ignored_dir(node.file_name())` to prune directories
+       during vault note walks [V]!
+   - **Architectural Hazard**: Moving `env_vars.rs` directly into `src/config/`
+     would force `src/index/` to depend on `src/config/` just to filter
+     directory names during filesystem traversal [H].
 
 ### 3.2 Ticket 21 Interface Obligations on Ambient State
 
-Ticket 21 ratified strict execution-context invariants bounding this sub-question:
+Ticket 21 ratified strict execution-context invariants bounding this
+sub-question:
 
-1. **Adapter Snapshot at Workspace Open**: The host adapter (CLI, LSP, MCP) acquires OS-valued inputs once when opening a workspace: state/config homes, discovery ceilings, ignored directory names, and start path [V: `issues/21:76-82`].
-2. **Zero Process Globals**: Ambient `LazyLock`s in `dirs.rs` and `env_vars.rs` must be eliminated to allow concurrent workspaces with independent policies [V: `issues/21:83-89`].
-3. **Clippy Enforcement**: Core crates enforce `disallowed-methods` for `std::env::var*` and `std::env::current_dir` [V: `issues/21:194-202`].
-4. **Path Conventions Preserved**: Existing XDG / platform path resolution conventions (`~/.config/traces/`, `~/.local/state/traces/`) must be preserved exactly [V: `issues/21:78`].
+1. **Adapter Snapshot at Workspace Open**: The host adapter (CLI, LSP, MCP)
+   acquires OS-valued inputs once when opening a workspace: state/config homes,
+   discovery ceilings, ignored directory names, and start path [V:
+   `issues/21:76-82`].
+2. **Zero Process Globals**: Ambient `LazyLock`s in `dirs.rs` and `env_vars.rs`
+   must be eliminated to allow concurrent workspaces with independent policies
+   [V: `issues/21:83-89`].
+3. **Clippy Enforcement**: Core crates enforce `disallowed-methods` for
+   `std::env::var*` and `std::env::current_dir` [V: `issues/21:194-202`].
+4. **Path Conventions Preserved**: Existing XDG / platform path resolution
+   conventions (`~/.config/traces/`, `~/.local/state/traces/`) must be preserved
+   exactly [V: `issues/21:78`].
 
 ### 3.3 Design Options for Sub-question (f)
 
 #### Option f1: Keep at Root with Ambient Globals (Status Quo Baseline)
 
-Keep `src/file_tracker.rs`, `src/dirs.rs`, and `src/env_vars.rs` at the crate root with their existing static `LazyLock`s.
+Keep `src/file_tracker.rs`, `src/dirs.rs`, and `src/env_vars.rs` at the crate
+root with their existing static `LazyLock`s.
 
-- **Cost**: Directly violates Ticket 21 obligations O1, O4, and O6. Keeps 1,475 LoC of ambient plumbing at crate root. Unit tests remain unhermetic (defect D4 in `brief-r3`).
+- **Cost**: Directly violates Ticket 21 obligations O1, O4, and O6. Keeps 1,475
+  LoC of ambient plumbing at crate root. Unit tests remain unhermetic (defect D4
+  in `brief-r3`).
 
 #### Option f2: Fold `file_tracker` into `config`, Snapshot `HostPaths` in Adapter, Place `IgnorePolicy` in `dirtree` [LEAN]
 
-1. **Fold `file_tracker.rs` into `src/config/store/file_tracker.rs`**:
-   Make `FilePathTracker` private to `config` (`pub(super)`). Remove re-exports from `src/lib.rs`.
-2. **Dissolve `src/dirs.rs` into Pure Platform Resolvers**:
-   Remove all `LazyLock` statics. Move pure platform path resolution logic to `src/host/paths.rs` (or `src/cli/host.rs`). The host adapter instantiates an immutable `HostPaths` struct:
+1. **Fold `file_tracker.rs` into `src/config/store/file_tracker.rs`**: Make
+   `FilePathTracker` private to `config` (`pub(super)`). Remove re-exports from
+   `src/lib.rs`.
+2. **Dissolve `src/dirs.rs` into Pure Platform Resolvers**: Remove all
+   `LazyLock` statics. Move pure platform path resolution logic to
+   `src/host/paths.rs` (or `src/cli/host.rs`). The host adapter instantiates an
+   immutable `HostPaths` struct:
 
    ```rust
    #[derive(Clone, Debug)]
@@ -385,8 +517,9 @@ Keep `src/file_tracker.rs`, `src/dirs.rs`, and `src/env_vars.rs` at the crate ro
    }
    ```
 
-3. **Extract `IgnorePolicy` into `src/dirtree.rs` (Tier 0)**:
-   Remove ambient `std::env::var` calls. Place the pure directory filtering policy where traversal happens:
+3. **Extract `IgnorePolicy` into `src/dirtree.rs` (Tier 0)**: Remove ambient
+   `std::env::var` calls. Place the pure directory filtering policy where
+   traversal happens:
 
    ```rust
    // In src/dirtree.rs (Tier 0, no config dependency) [P]
@@ -412,12 +545,17 @@ Keep `src/file_tracker.rs`, `src/dirs.rs`, and `src/env_vars.rs` at the crate ro
    ```
 
 4. **Wiring**:
-   - Adapter snapshots `IgnorePolicy` from `$TRACES_IGNORED_DIRS` and passes it to `IndexerService` and `ConfigService`.
-   - `IndexerService::scan` uses `self.ignore_policy.is_ignored(...)` instead of calling `env_vars::is_ignored_dir`.
-   - Index freshness (Ticket 21 §O8): `IgnorePolicy` feeds its sorted names into `IndexFingerprint`.
+   - Adapter snapshots `IgnorePolicy` from `$TRACES_IGNORED_DIRS` and passes it
+     to `IndexerService` and `ConfigService`.
+   - `IndexerService::scan` uses `self.ignore_policy.is_ignored(...)` instead of
+     calling `env_vars::is_ignored_dir`.
+   - Index freshness (Ticket 21 §O8): `IgnorePolicy` feeds its sorted names into
+     `IndexFingerprint`.
 
-- **Invariants Enforced**: Core is 100% free of ambient environment reads; tests are fully hermetic; no `index -> config` dependency edge is created.
-- **Removable Code**: Deletes `src/dirs.rs` (218 LoC) and `src/env_vars.rs` (68 LoC); removes `file_tracker.rs` (1,189 LoC) from root.
+- **Invariants Enforced**: Core is 100% free of ambient environment reads; tests
+  are fully hermetic; no `index -> config` dependency edge is created.
+- **Removable Code**: Deletes `src/dirs.rs` (218 LoC) and `src/env_vars.rs` (68
+  LoC); removes `file_tracker.rs` (1,189 LoC) from root.
 
 #### Option f3: Co-locate `dirs` and `env_vars` in a Dedicated `src/host/` Adapter Module
 
@@ -435,14 +573,19 @@ pub mod env;
 pub mod ignore;
 ```
 
-- **Cost**: Creates an extra abstraction layer `host::` inside a crate that is primarily a domain library.
+- **Cost**: Creates an extra abstraction layer `host::` inside a crate that is
+  primarily a domain library.
 - **Benefit**: Groups all OS-boundary adaptation into one discoverable location.
 
 #### Option f4: Fold `dirs`, `env_vars`, and `file_tracker` into `src/config/`
 
 Move all three files into `src/config/`.
 
-- **Failure Mode**: `src/index/service.rs:424` calls `is_ignored_dir`. Moving `env_vars` into `config` creates a direct `index -> config` dependency edge. This introduces an architectural cycle hazard if `config` ever needs to reference `index` (or forces `index` to depend on the entire config subsystem just for string matching).
+- **Failure Mode**: `src/index/service.rs:424` calls `is_ignored_dir`. Moving
+  `env_vars` into `config` creates a direct `index -> config` dependency edge.
+  This introduces an architectural cycle hazard if `config` ever needs to
+  reference `index` (or forces `index` to depend on the entire config subsystem
+  just for string matching).
 
 ### 3.4 Comparison Table for Sub-question (f)
 
@@ -453,23 +596,35 @@ Move all three files into `src/config/`.
 | **f3: `src/host/` module** | Isolates host OS adaptation into one module | Privatizes `file_tracker.rs`; replaces ambient globals | Replaces 2 root modules with 1 `host` module | Similar to f2 | High |
 | **f4: Fold all into `config`** | None | Deletes 3 root modules | **Creates unwanted `index -> config` edge** | Negative | Moderate |
 
-- **Lean**: **Option f2**. Fold `file_tracker` into `src/config/store/`; snapshot `HostPaths` at adapter entry; place `IgnorePolicy` in `src/dirtree.rs`.
-- **Best Dissent against f2**: Moving `IgnorePolicy` into `src/dirtree.rs` mixes directory traversal mechanics with vault configuration policy.
-- **Flip Fact**: If Ticket 25 (Index freshness) decides that ignore rules should be arbitrary `.gitignore`-style glob matchers loaded from multiple nested vault config files, then a dedicated `src/ignore/` or `src/filter/` module becomes mandatory.
+- **Lean**: **Option f2**. Fold `file_tracker` into `src/config/store/`;
+  snapshot `HostPaths` at adapter entry; place `IgnorePolicy` in
+  `src/dirtree.rs`.
+- **Best Dissent against f2**: Moving `IgnorePolicy` into `src/dirtree.rs` mixes
+  directory traversal mechanics with vault configuration policy.
+- **Flip Fact**: If Ticket 25 (Index freshness) decides that ignore rules should
+  be arbitrary `.gitignore`-style glob matchers loaded from multiple nested
+  vault config files, then a dedicated `src/ignore/` or `src/filter/` module
+  becomes mandatory.
 
 ---
 
 ## 4. Cross-Cutting Packages of (a) + (b) + (f)
 
-To assist human decision-making, the options for (a), (b), and (f) are combined into three coherent, self-consistent packages:
+To assist human decision-making, the options for (a), (b), and (f) are combined
+into three coherent, self-consistent packages:
 
 ### 4.1 Package 1: Conservative Baseline ("Status Quo Maintenance")
 
-Preserves existing module structure to minimize immediate line churn while mechanically patching ambient reads.
+Preserves existing module structure to minimize immediate line churn while
+mechanically patching ambient reads.
 
-- **Sub-Q (a)**: Option a1. Keep `task.rs`, `tag.rs`, `field.rs` at root. (Delete legacy `FieldValue`/`FieldValueRef` only per Ticket 18).
-- **Sub-Q (b)**: Option b1. Keep `MarkdownParserInput` borrowing `&TaskConfig` and `&FrontmatterConfig`.
-- **Sub-Q (f)**: Option f1 modified. Keep `dirs.rs`, `env_vars.rs`, `file_tracker.rs` at root; parameterize `dirs`/`env_vars` with setters for tests.
+- **Sub-Q (a)**: Option a1. Keep `task.rs`, `tag.rs`, `field.rs` at root.
+  (Delete legacy `FieldValue`/`FieldValueRef` only per Ticket 18).
+- **Sub-Q (b)**: Option b1. Keep `MarkdownParserInput` borrowing `&TaskConfig`
+  and `&FrontmatterConfig`.
+- **Sub-Q (f)**: Option f1 modified. Keep `dirs.rs`, `env_vars.rs`,
+  `file_tracker.rs` at root; parameterize `dirs`/`env_vars` with setters for
+  tests.
 
 ```text
 src/ (Package 1: 25 root modules retained)
@@ -487,30 +642,44 @@ src/ (Package 1: 25 root modules retained)
 └── ... (14 other root modules)
 ```
 
-- **Public Surface Delta**: Minimal. Legacy `FieldValue`/`FieldValueRef` deleted per Ticket 18; no root items moved.
-- **Evaluation**: Fails Ticket 21's mandate for zero ambient globals; retains DAG inversion (`note -> config`).
+- **Public Surface Delta**: Minimal. Legacy `FieldValue`/`FieldValueRef` deleted
+  per Ticket 18; no root items moved.
+- **Evaluation**: Fails Ticket 21's mandate for zero ambient globals; retains
+  DAG inversion (`note -> config`).
 
 ---
 
 ### 4.2 Package 2: Subsystem Decoupling & Inversion ("Clean Seams") [LEAN RECOMMENDATION]
 
-Dissolves misplaced root modules, severs the upward edge, privatizes internal plumbing, and enforces Ticket 21's adapter boundaries.
+Dissolves misplaced root modules, severs the upward edge, privatizes internal
+plumbing, and enforces Ticket 21's adapter boundaries.
 
 - **Sub-Q (a)**: Option a2.
-  - Move task checkbox symbols and lookup map (`TaskStatus`, `TaskStatusMap`, `TaskStatusSymbol`, `TaskStatusType`, `TaskError`) to `src/task_status.rs` (Tier 0).
-  - Move note document AST task types (`TaskDateSet`, `TaskDate`, `TaskDateType`, `TaskPriority`, emoji tables) to `src/note/task.rs`.
+  - Move task checkbox symbols and lookup map (`TaskStatus`, `TaskStatusMap`,
+    `TaskStatusSymbol`, `TaskStatusType`, `TaskError`) to `src/task_status.rs`
+    (Tier 0).
+  - Move note document AST task types (`TaskDateSet`, `TaskDate`,
+    `TaskDateType`, `TaskPriority`, emoji tables) to `src/note/task.rs`.
   - `src/task.rs` is **deleted**.
-  - Split `field.rs`: move `FieldName` to `src/schema/field_name.rs` (shared with `config`), `FieldKey` to `src/note/field_key.rs`. Delete legacy `FieldValue`/`FieldValueRef`. `src/field.rs` is **deleted**.
+  - Split `field.rs`: move `FieldName` to `src/schema/field_name.rs` (shared
+    with `config`), `FieldKey` to `src/note/field_key.rs`. Delete legacy
+    `FieldValue`/`FieldValueRef`. `src/field.rs` is **deleted**.
   - `src/tag.rs` remains a Tier 0 leaf.
 - **Sub-Q (b)**: Option b2.
   - Define `NoteParserConfig` in `src/note/config.rs`.
   - `MarkdownParserInput` borrows `NoteParserConfig<'a>`.
   - `IndexerService::from(&Config)` projects `NoteParserConfig`.
-  - Production edge `src/note/parser/input.rs:9` (`note -> config`) is **completely eliminated**.
+  - Production edge `src/note/parser/input.rs:9` (`note -> config`) is
+    **completely eliminated**.
 - **Sub-Q (f)**: Option f2.
-  - Move `src/file_tracker.rs` to `src/config/store/file_tracker.rs` as private `config` plumbing (`pub(super)`).
-  - Dissolve `src/dirs.rs` static `LazyLock`s; platform resolution becomes pure helpers in adapter, snapshotting immutable `HostPaths`. `src/dirs.rs` is **deleted**.
-  - Dissolve `src/env_vars.rs` ambient parsing; move pure `IgnorePolicy` to `src/dirtree.rs` (Tier 0) and snapshot additional ignore names in adapter. `src/env_vars.rs` is **deleted**.
+  - Move `src/file_tracker.rs` to `src/config/store/file_tracker.rs` as private
+    `config` plumbing (`pub(super)`).
+  - Dissolve `src/dirs.rs` static `LazyLock`s; platform resolution becomes pure
+    helpers in adapter, snapshotting immutable `HostPaths`. `src/dirs.rs` is
+    **deleted**.
+  - Dissolve `src/env_vars.rs` ambient parsing; move pure `IgnorePolicy` to
+    `src/dirtree.rs` (Tier 0) and snapshot additional ignore names in adapter.
+    `src/env_vars.rs` is **deleted**.
 
 ```text
 src/ (Package 2: 19 root modules, 6 root files deleted)
@@ -551,18 +720,26 @@ Tier 9: cli
 #### Public Surface Delta in Package 2 (Ticket 16 Visibility Rule)
 
 - **Removed from Crate / Root Surface**:
-  - `src/lib.rs:148-150`: `CleanMode`, `FilePathTracker`, `FilePathTrackerError` (privatized to `config`).
+  - `src/lib.rs:148-150`: `CleanMode`, `FilePathTracker`, `FilePathTrackerError`
+    (privatized to `config`).
   - `src/lib.rs:114`: `dirs::*` (deleted; pure resolver internal to adapter).
-  - `src/lib.rs:116`: `env_vars::*` (deleted; replaced by `dirtree::IgnorePolicy`).
-  - `src/lib.rs:143-145`: `field::*` (`FieldValue`, `FieldValueRef`, `DateTimeCoercion`, `FieldStringValue` deleted; `FieldName` and `FieldKey` scoped to `schema` and `note`).
-  - `src/lib.rs:164-167`: `task::TaskDateSet`, `task::TaskDate`, `task::TaskPriority` narrowed from root `pub` to `note::*`.
-- **Net Surface Reduction**: 4 root modules deleted from `src/lib.rs`; 14 public/crate-internal re-exports removed; 515 LoC deleted; zero ambient globals.
+  - `src/lib.rs:116`: `env_vars::*` (deleted; replaced by
+    `dirtree::IgnorePolicy`).
+  - `src/lib.rs:143-145`: `field::*` (`FieldValue`, `FieldValueRef`,
+    `DateTimeCoercion`, `FieldStringValue` deleted; `FieldName` and `FieldKey`
+    scoped to `schema` and `note`).
+  - `src/lib.rs:164-167`: `task::TaskDateSet`, `task::TaskDate`,
+    `task::TaskPriority` narrowed from root `pub` to `note::*`.
+- **Net Surface Reduction**: 4 root modules deleted from `src/lib.rs`; 14
+  public/crate-internal re-exports removed; 515 LoC deleted; zero ambient
+  globals.
 
 ---
 
 ### 4.3 Package 3: Workspace-Steer First-Crate Split ("Modular Multi-Crate") [RADICAL]
 
-Executes the user steer (Map Notes 2026-10-18) by partitioning the repository into 3 workspace crates:
+Executes the user steer (Map Notes 2026-10-18) by partitioning the repository
+into 3 workspace crates:
 
 ```text
 traces/ (Package 3 Workspace)
@@ -585,32 +762,49 @@ traces/ (Package 3 Workspace)
 │       └── cli/
 ```
 
-- **Public Surface Delta**: Domain primitives become public API of `traces-core`. Compiler physically prevents engine modules from leaking application config into primitives.
-- **Evaluation**: Excellent architectural boundaries; higher initial setup churn; defers until Ticket 33.
+- **Public Surface Delta**: Domain primitives become public API of
+  `traces-core`. Compiler physically prevents engine modules from leaking
+  application config into primitives.
+- **Evaluation**: Excellent architectural boundaries; higher initial setup
+  churn; defers until Ticket 33.
 
 ---
 
 ## 5. Questions for the Human (Value-Laden Choices)
 
-These three questions cannot be answered by mechanical facts alone; they require human architectural judgment during grilling:
+These three questions cannot be answered by mechanical facts alone; they require
+human architectural judgment during grilling:
 
-1. **Flat Primitives vs. Domain Sub-directory**:
-   In Package 2, should `tag.rs` and `task_status.rs` remain directly in `src/` (keeping them immediately visible as Tier 0 primitives), or should they be grouped into a `src/domain/` sub-directory (`src/domain/tag.rs`, `src/domain/status.rs`)?
-   *Tradeoff*: `src/` flatness vs. reducing root directory entry count from 19 to 18.
+1. **Flat Primitives vs. Domain Sub-directory**: In Package 2, should `tag.rs`
+   and `task_status.rs` remain directly in `src/` (keeping them immediately
+   visible as Tier 0 primitives), or should they be grouped into a `src/domain/`
+   sub-directory (`src/domain/tag.rs`, `src/domain/status.rs`)? *Tradeoff*:
+   `src/` flatness vs. reducing root directory entry count from 19 to 18.
 
-2. **Timing of the Workspace Crate Split**:
-   Should the extraction of `traces-core` (primitives) and separating `traces-cli` into its own crate happen now as part of Ticket 22, or should it be deferred to Ticket 33 (Crate Topology & Public Surface) after Tickets 23–30 have completed internal module decoupling?
-   *Recommendation*: Defer crate extraction to Ticket 33. Perform internal module cleanups (Package 2) in Ticket 22 so internal dependencies are already clean when the physical crate split occurs.
+2. **Timing of the Workspace Crate Split**: Should the extraction of
+   `traces-core` (primitives) and separating `traces-cli` into its own crate
+   happen now as part of Ticket 22, or should it be deferred to Ticket 33 (Crate
+   Topology & Public Surface) after Tickets 23–30 have completed internal module
+   decoupling? *Recommendation*: Defer crate extraction to Ticket 33. Perform
+   internal module cleanups (Package 2) in Ticket 22 so internal dependencies
+   are already clean when the physical crate split occurs.
 
-3. **Task Status Memory Footprint in `TaskListItem`**:
-   `TaskStatus` currently stores an owned `String` (`name: String`) alongside `symbol: TaskStatusSymbol` and `kind: TaskStatusType` [V: `src/task.rs:51-55`]. This forces every `TaskListItem` AST node to allocate a heap `String` [V: `a1` §2.2]. Should Ticket 22 simplify `TaskStatus` to `(TaskStatusSymbol, TaskStatusType)` and make the status name accessible only via lookup in `TaskStatusMap`?
-   *Tradeoff*: Saves ~10,000 heap string allocations across large vaults; requires downstream queries to consult `TaskStatusMap` when printing custom status names.
+3. **Task Status Memory Footprint in `TaskListItem`**: `TaskStatus` currently
+   stores an owned `String` (`name: String`) alongside
+   `symbol: TaskStatusSymbol` and `kind: TaskStatusType` [V:
+   `src/task.rs:51-55`]. This forces every `TaskListItem` AST node to allocate a
+   heap `String` [V: `a1` §2.2]. Should Ticket 22 simplify `TaskStatus` to
+   `(TaskStatusSymbol, TaskStatusType)` and make the status name accessible only
+   via lookup in `TaskStatusMap`? *Tradeoff*: Saves ~10,000 heap string
+   allocations across large vaults; requires downstream queries to consult
+   `TaskStatusMap` when printing custom status names.
 
 ---
 
 ## 6. Independence and Sequencing Analysis
 
-The three sub-questions can be resolved and implemented in largely decoupled stages:
+The three sub-questions can be resolved and implemented in largely decoupled
+stages:
 
 ```mermaid
 flowchart TD
@@ -621,16 +815,28 @@ flowchart TD
     SubF --> Ticket25["Ticket 25: Index Freshness (IgnorePolicy)"]
 ```
 
-1. **Sub-question (b) is 100% Independent**:
-   Defining `NoteParserConfig` in `src/note/config.rs` and modifying `MarkdownParserInput` requires no changes to `task.rs`, `dirs.rs`, or `file_tracker.rs`. It can be specified and implemented first.
-2. **Sub-question (f) is 100% Independent of (a) and (b)**:
-   Privatizing `file_tracker.rs` inside `config/`, removing `LazyLock`s from `dirs.rs`, and moving `IgnorePolicy` to `dirtree.rs` touches only the host/config/traversal boundary. It can be implemented in parallel or immediately following Ticket 21.
-3. **Sub-question (a) Sequences Best After (b)**:
-   Once `note` no longer imports `config` via `input.rs`, moving `TaskStatusMap` to `src/task_status.rs` and markdown emojis to `src/note/task.rs` immediately drops `note` to Tier 3 without cycle risk.
+1. **Sub-question (b) is 100% Independent**: Defining `NoteParserConfig` in
+   `src/note/config.rs` and modifying `MarkdownParserInput` requires no changes
+   to `task.rs`, `dirs.rs`, or `file_tracker.rs`. It can be specified and
+   implemented first.
+2. **Sub-question (f) is 100% Independent of (a) and (b)**: Privatizing
+   `file_tracker.rs` inside `config/`, removing `LazyLock`s from `dirs.rs`, and
+   moving `IgnorePolicy` to `dirtree.rs` touches only the host/config/traversal
+   boundary. It can be implemented in parallel or immediately following Ticket
+   21.
+3. **Sub-question (a) Sequences Best After (b)**: Once `note` no longer imports
+   `config` via `input.rs`, moving `TaskStatusMap` to `src/task_status.rs` and
+   markdown emojis to `src/note/task.rs` immediately drops `note` to Tier 3
+   without cycle risk.
 
 ### Summary Recommended Specification Sequence
 
-1. **Phase 1**: Land Sub-question (b) (`NoteParserConfig` pattern) to sever the `note -> config` edge.
-2. **Phase 2**: Land Sub-question (f) (`file_tracker` fold into `config::store`, `HostPaths` snapshot, `IgnorePolicy` in `dirtree`) to satisfy Ticket 21 invariants.
-3. **Phase 3**: Land Sub-question (a) (Dissolve `task.rs` into `task_status.rs` and `note::task`; delete legacy `field.rs` contents).
-4. **Phase 4**: Downstream handoff to Ticket 23 (Note document model) and Ticket 24 (Index read model).
+1. **Phase 1**: Land Sub-question (b) (`NoteParserConfig` pattern) to sever the
+   `note -> config` edge.
+2. **Phase 2**: Land Sub-question (f) (`file_tracker` fold into `config::store`,
+   `HostPaths` snapshot, `IgnorePolicy` in `dirtree`) to satisfy Ticket 21
+   invariants.
+3. **Phase 3**: Land Sub-question (a) (Dissolve `task.rs` into `task_status.rs`
+   and `note::task`; delete legacy `field.rs` contents).
+4. **Phase 4**: Downstream handoff to Ticket 23 (Note document model) and Ticket
+   24 (Index read model).

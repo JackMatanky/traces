@@ -1,8 +1,18 @@
 # Subagent A — inventory of `tests/` (integration + e2e)
 
-Scope: every `#[test]` under `tests/`. **Actual counts (grep of `#\[(test|rstest)\]` in `tests/`): 57 total = 30 integration (`tests/integration/*.rs`, wired via `tests/integration.rs:12-23`) + 27 e2e (`tests/e2e/*.rs`, wired via `tests/e2e.rs:8-19`).** The brief's "17 integration tests" is wrong; the e2e count (27) is correct.
+Scope: every `#[test]` under `tests/`. **Actual counts (grep of
+`#\[(test|rstest)\]` in `tests/`): 57 total = 30 integration
+(`tests/integration/*.rs`, wired via `tests/integration.rs:12-23`) + 27 e2e
+(`tests/e2e/*.rs`, wired via `tests/e2e.rs:8-19`).** The brief's "17 integration
+tests" is wrong; the e2e count (27) is correct.
 
-Entry-point legend (all traced): **test-utils export** = `src/lib.rs:156-162` re-exports; **service API** = production `pub`/`pub(crate)` service method; **production pub API** = `test-utils`-gated `pub` type used directly; **CLI dispatcher** = `cli::run` → `Cli::parse` → `Commands::run` (`src/cli/mod.rs:214,181`); **compiled binary** = `env!("CARGO_BIN_EXE_traces-pkm")` via `Sandbox::command` (`tests/e2e/support.rs:60,187-194`).
+Entry-point legend (all traced): **test-utils export** = `src/lib.rs:156-162`
+re-exports; **service API** = production `pub`/`pub(crate)` service method;
+**production pub API** = `test-utils`-gated `pub` type used directly;
+**CLI dispatcher** = `cli::run` → `Cli::parse` → `Commands::run`
+(`src/cli/mod.rs:214,181`); **compiled binary** =
+`env!("CARGO_BIN_EXE_traces-pkm")` via `Sandbox::command`
+(`tests/e2e/support.rs:60,187-194`).
 
 | path::test | behavior under test | entry point | production collaborators exercised (traced) | boundaries crossed | final assertion surface | nominal class | actual class | suspected duplication | recommendation |
 |---|---|---|---|---|---|---|---|---|---|
@@ -68,24 +78,92 @@ Entry-point legend (all traced): **test-utils export** = `src/lib.rs:156-162` re
 
 ## 1. Harness observations (`tests/e2e/support.rs`)
 
-- **Isolation model is child-only and mostly correct.** `Sandbox::command` (`support.rs:187-194`) sets `current_dir`, `TRACES_STATE_DIR`, `XDG_CONFIG_HOME` on the spawned `Command` only — no parent env mutation anywhere in `tests/` (grep: no `env::set_var` under `tests/`). Trust/tracked stores therefore land in per-test tempdirs (`src/dirs.rs:161-189`).
-- **Isolation gap:** the child still *inherits* the parent environment, and the binary also reads `TRACES_CEILING_DIRS` (`src/env_vars.rs:5`) and `TRACES_IGNORED_DIRS` (`src/env_vars.rs:23`), which `Sandbox::command` does not override. A developer/CI shell exporting either would silently change indexing results in every e2e test. Same vars are read *in-process* by integration tests (they are `LazyLock` statics evaluated during `IndexerService::build`), so `TRACES_IGNORED_DIRS=notes` would break e.g. `tests/integration/index_query.rs::page_query_returns_real_indexed_notes`.
-- **`Sandbox::trusted()` is arrangement with a hidden assertion.** It writes config, spawns `traces trust`, and `assert!`s exit success (`support.rs:215-225`): a `trust` regression surfaces as "fixture setup failed" inside unrelated tests (misattributed failures), and `trust`'s own output/exit contract is never asserted by the 24 tests that use it — only `golden_path` asserts it directly. Cost: one extra spawn per test (24 tests).
-- **`Sandbox::trusted()` is over-fixture for `completions`.** `Completions::run` with `--shell` returns straight to `print_script` and never calls `load_config` (`src/cli/completions.rs:45-53`), so the fixture's config + `traces trust` spawn buys nothing for `bash/zsh/fish` tests. It is correctly needed for `tracked` (via `index` → `load_config`) and all query tests.
-- **`CwdGuard` is the suite's only parent-state mutation and it is unlocked.** `CwdGuard::enter` calls `env::set_current_dir` with no mutex (`support.rs:243-249`) and `Drop` restores the *captured* `self.original` (`:254`). Because `cargo test` runs `init.rs`'s and `golden_path.rs`'s tests concurrently inside the one `e2e` binary, an interleave can (a) make `Init::run` read the *other* test's directory, and (b) after guard A drops, leave cwd = repo root while guard B's `Init::run` still executes — `Init::scaffold_directory` (`src/cli/init.rs:82-94`) would then create `.traces/` + `.traces/templates/` and write `config.toml` **into the repository checkout**. The module doc (`support.rs:44-49`) acknowledges the missing lock but not this side effect. A guard whose restore target has already been deleted also makes later `env::set_current_dir` fail and panic.
-- **Wrap-fragile assertions are handled deliberately**: `plain()` (`support.rs:83-90`) strips Miette glyphs and is used only for short hints (`dispatch.rs` module docs + usages at `:92,:117,:230,:456`); long paths are never reconstructed.
-- **`TzGuard` is unreachable from `tests/`** (`#[cfg(test)] pub(crate)` at `src/lib.rs:154-155`), so `tests/` cannot pin `TZ`. Verified: no `TZ`/`TzGuard` usage anywhere under `tests/`. Currently harmless because no `tests/` assertion depends on local-zone formatting (dates are compared as `NaiveDate`), but any future local-time assertion in `tests/` would be unpinned.
+- **Isolation model is child-only and mostly correct.** `Sandbox::command`
+  (`support.rs:187-194`) sets `current_dir`, `TRACES_STATE_DIR`,
+  `XDG_CONFIG_HOME` on the spawned `Command` only — no parent env mutation
+  anywhere in `tests/` (grep: no `env::set_var` under `tests/`). Trust/tracked
+  stores therefore land in per-test tempdirs (`src/dirs.rs:161-189`).
+- **Isolation gap:** the child still *inherits* the parent environment, and the
+  binary also reads `TRACES_CEILING_DIRS` (`src/env_vars.rs:5`) and
+  `TRACES_IGNORED_DIRS` (`src/env_vars.rs:23`), which `Sandbox::command` does
+  not override. A developer/CI shell exporting either would silently change
+  indexing results in every e2e test. Same vars are read *in-process* by
+  integration tests (they are `LazyLock` statics evaluated during
+  `IndexerService::build`), so `TRACES_IGNORED_DIRS=notes` would break e.g.
+  `tests/integration/index_query.rs::page_query_returns_real_indexed_notes`.
+- **`Sandbox::trusted()` is arrangement with a hidden assertion.** It writes
+  config, spawns `traces trust`, and `assert!`s exit success
+  (`support.rs:215-225`): a `trust` regression surfaces as "fixture setup
+  failed" inside unrelated tests (misattributed failures), and `trust`'s own
+  output/exit contract is never asserted by the 24 tests that use it — only
+  `golden_path` asserts it directly. Cost: one extra spawn per test (24 tests).
+- **`Sandbox::trusted()` is over-fixture for `completions`.** `Completions::run`
+  with `--shell` returns straight to `print_script` and never calls
+  `load_config` (`src/cli/completions.rs:45-53`), so the fixture's config +
+  `traces trust` spawn buys nothing for `bash/zsh/fish` tests. It is correctly
+  needed for `tracked` (via `index` → `load_config`) and all query tests.
+- **`CwdGuard` is the suite's only parent-state mutation and it is unlocked.**
+  `CwdGuard::enter` calls `env::set_current_dir` with no mutex
+  (`support.rs:243-249`) and `Drop` restores the *captured* `self.original`
+  (`:254`). Because `cargo test` runs `init.rs`'s and `golden_path.rs`'s tests
+  concurrently inside the one `e2e` binary, an interleave can (a) make
+  `Init::run` read the *other* test's directory, and (b) after guard A drops,
+  leave cwd = repo root while guard B's `Init::run` still executes —
+  `Init::scaffold_directory` (`src/cli/init.rs:82-94`) would then create
+  `.traces/` + `.traces/templates/` and write `config.toml`
+  **into the repository checkout**. The module doc (`support.rs:44-49`)
+  acknowledges the missing lock but not this side effect. A guard whose restore
+  target has already been deleted also makes later `env::set_current_dir` fail
+  and panic.
+- **Wrap-fragile assertions are handled deliberately**: `plain()`
+  (`support.rs:83-90`) strips Miette glyphs and is used only for short hints
+  (`dispatch.rs` module docs + usages at `:92,:117,:230,:456`); long paths are
+  never reconstructed.
+- **`TzGuard` is unreachable from `tests/`** (`#[cfg(test)] pub(crate)` at
+  `src/lib.rs:154-155`), so `tests/` cannot pin `TZ`. Verified: no
+  `TZ`/`TzGuard` usage anywhere under `tests/`. Currently harmless because no
+  `tests/` assertion depends on local-zone formatting (dates are compared as
+  `NaiveDate`), but any future local-time assertion in `tests/` would be
+  unpinned.
 
 ## 2. Tests that never spawn the binary (31 of 57)
 
-- **All 30 `tests/integration/*` tests** — evidence: no `std::process`, `Command`, `spawn`, or `CARGO_BIN` reference anywhere under `tests/integration/` (grep returned zero matches); they enter via test-utils re-exports (`tests/integration.rs:5` `#![cfg(feature = "test-utils")]`, `src/lib.rs:156-162`) and service APIs (`ConfigService`, `IndexerService`, `QueryService`, `SchemaService`, `TemplateService`).
-  - `config_lifecycle.rs::{trust_then_untrust…, test_project_manages…}`; `index_persistence_roundtrip.rs` (4); `index_query.rs` (11); `schema_field_resolution.rs` (5); `task_tag_filters.rs` (3); `template_render.rs` (5).
-- **`tests/e2e/init.rs::init_scaffolds_preset_defaults_and_refuses_existing_traces_dir`** — calls `Init.run(&provider)` directly (`init.rs:34,45,58`) under `CwdGuard`; never constructs a `Command`. It is classified as e2e only by location/module doc (`tests/e2e.rs:1-3`, `init.rs:1-7`).
-- **Partial:** `tests/e2e/golden_path.rs` spawns 6 times for the post-init steps but runs its `init` step in-process (`golden_path.rs:51-54`) — the test as a whole does spawn.
+- **All 30 `tests/integration/*` tests** — evidence: no `std::process`,
+  `Command`, `spawn`, or `CARGO_BIN` reference anywhere under
+  `tests/integration/` (grep returned zero matches); they enter via test-utils
+  re-exports (`tests/integration.rs:5` `#![cfg(feature = "test-utils")]`,
+  `src/lib.rs:156-162`) and service APIs (`ConfigService`, `IndexerService`,
+  `QueryService`, `SchemaService`, `TemplateService`).
+  - `config_lifecycle.rs::{trust_then_untrust…, test_project_manages…}`;
+    `index_persistence_roundtrip.rs` (4); `index_query.rs` (11);
+    `schema_field_resolution.rs` (5); `task_tag_filters.rs` (3);
+    `template_render.rs` (5).
+- **`tests/e2e/init.rs::init_scaffolds_preset_defaults_and_refuses_existing_traces_dir`**
+  — calls `Init.run(&provider)` directly (`init.rs:34,45,58`) under `CwdGuard`;
+  never constructs a `Command`. It is classified as e2e only by location/module
+  doc (`tests/e2e.rs:1-3`, `init.rs:1-7`).
+- **Partial:** `tests/e2e/golden_path.rs` spawns 6 times for the post-init steps
+  but runs its `init` step in-process (`golden_path.rs:51-54`) — the test as a
+  whole does spawn.
 
 ## 3. Tests that mutate process-global state
 
-- **`tests/e2e/init.rs::init_scaffolds_preset_defaults_and_refuses_existing_traces_dir`** — three `CwdGuard::enter` sites (`init.rs:29,42,55`) → `env::set_current_dir` on the *test process* (`support.rs:245`), restored on `Drop` (`:254`); no lock (`support.rs:243-249`), and the module doc itself states `init` and `golden_path` "must not run concurrently … but `cargo test`'s default per-binary test parallelism still runs them concurrently" (`support.rs:39-49`).
-- **`tests/e2e/golden_path.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`** — one `CwdGuard::enter` (`golden_path.rs:52`) around the in-process `Init.run`.
-- **No `env::set_var` / `TZ` / locale mutation anywhere under `tests/`** (grep over `tests/` for `set_var|TZ|unsafe` matched only `support.rs:190,244,245,254`, all `current_dir`/`set_current_dir`). Child-only env is set via `Command::env` (`support.rs:191-192`), which does not affect the parent.
-- **Read-only process-global state touched by tests (not mutations):** `TRACES_IGNORED_DIRS`/`TRACES_CEILING_DIRS` via `src/env_vars.rs:5,23` (integration tests read them during `IndexerService::build`; e2e children inherit them from the cargo/test environment).
+- **`tests/e2e/init.rs::init_scaffolds_preset_defaults_and_refuses_existing_traces_dir`**
+  — three `CwdGuard::enter` sites (`init.rs:29,42,55`) → `env::set_current_dir`
+  on the *test process* (`support.rs:245`), restored on `Drop` (`:254`); no lock
+  (`support.rs:243-249`), and the module doc itself states `init` and
+  `golden_path` "must not run concurrently … but `cargo test`'s default
+  per-binary test parallelism still runs them concurrently"
+  (`support.rs:39-49`).
+- **`tests/e2e/golden_path.rs::init_trust_index_list_table_task_and_template_chain_through_one_project`**
+  — one `CwdGuard::enter` (`golden_path.rs:52`) around the in-process
+  `Init.run`.
+- **No `env::set_var` / `TZ` / locale mutation anywhere under `tests/`** (grep
+  over `tests/` for `set_var|TZ|unsafe` matched only
+  `support.rs:190,244,245,254`, all `current_dir`/`set_current_dir`). Child-only
+  env is set via `Command::env` (`support.rs:191-192`), which does not affect
+  the parent.
+- **Read-only process-global state touched by tests (not mutations):**
+  `TRACES_IGNORED_DIRS`/`TRACES_CEILING_DIRS` via `src/env_vars.rs:5,23`
+  (integration tests read them during `IndexerService::build`; e2e children
+  inherit them from the cargo/test environment).

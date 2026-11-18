@@ -14,8 +14,8 @@ source. `[H]` marks an implication for ticket 29.
    when the encoding keeps the filter relation's order.
 
 2. **CockroachDB column encoding.** [V] Each type has one canonical byte
-   encoding with the property enc(x) <= enc(y) iff x <= y for ascending
-   columns, and prefix-free composable fields
+   encoding with the property enc(x) <= enc(y) iff x <= y for ascending columns,
+   and prefix-free composable fields
    (`https://github.com/cockroachdb/cockroach/blob/master/docs/tech-notes/encoding.md`).
    Lesson for 29: C3 — composite keys (row mode + field + value) need
    prefix-free encoding so a range over the value does not leak across fields.

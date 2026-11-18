@@ -244,14 +244,14 @@ visibility (34), tower-lsp-server not yet in Cargo.toml (09), 18/24/26 open.
 - Workspace/symbol serving: 27 ratifies eager full `Location` responses and NOT
   advertising `workspaceSymbol/resolve`. This proposes an amendment to 23's
   Section 6 uri-only+resolve+fallback design; implementation ownership stays
-  with 29. Task children in document symbols follow 23's S3 pin. It is a
-  single pass over `note.lists()` with an ancestor stack (each Task attaches to
-  the nearest Task ancestor, else to the root; Plain intermediates are
-  traversed, not emitted; never `Note::tasks()` + depth, per 23:43's
-  mis-nesting fixture), fed by 27's walk and never QueryService (`QueryMode` is
-  pub(crate), a 34 crate-split hazard). 27's research first phrased this as a `Note::tasks()` +
+  with 29. Task children in document symbols follow 23's S3 pin. It is a single
+  pass over `note.lists()` with an ancestor stack (each Task attaches to the
+  nearest Task ancestor, else to the root; Plain intermediates are traversed,
+  not emitted; never `Note::tasks()` + depth, per 23:43's mis-nesting fixture),
+  fed by 27's walk and never QueryService (`QueryMode` is pub(crate), a 34
+  crate-split hazard). 27's research first phrased this as a `Note::tasks()` +
   depth/parent walk; it was corrected 2026-10-22 to 23's pin (research Part
   XII.1 amended in step with this block). Tasks also appear in the workspace
-  picker inside the shared merged cap 128. This restates 23's conditional A3
-  row at the 10k vault tier (<50ms per 27's row set). The row's original 20K-anchor
+  picker inside the shared merged cap 128. This restates 23's conditional A3 row
+  at the 10k vault tier (<50ms per 27's row set). The row's original 20K-anchor
   derivation and its mean-to-p95 factor remain open per 23:50(b)/33:117.

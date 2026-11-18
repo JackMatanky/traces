@@ -163,9 +163,9 @@
   legacy documents that hold existing schema violations [H]. Every edit requires
   fixing the entire document, causing write lockouts on legacy vaults.
 - **Full In-Memory Execution:** Field filters scale linearly (12 ms at 20k
-  notes) in IWE's own benchmark [V: `docs/benchmark.md:185-208`]. `$includedBy`/`--roots` are
-  super-linear (60 ms at 20k). The earlier "poor past 10,000" reading is [H]
-  and unmeasured for Traces.
+  notes) in IWE's own benchmark [V: `docs/benchmark.md:185-208`].
+  `$includedBy`/`--roots` are super-linear (60 ms at 20k). The earlier "poor
+  past 10,000" reading is [H] and unmeasured for Traces.
 - **No Class Inheritance:** Pure path glob matching avoids class conflict
   resolution and MRO complexity, but cannot model polymorphic frontmatter types
   (e.g. `book` extending `work`) [H].

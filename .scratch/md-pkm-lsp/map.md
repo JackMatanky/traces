@@ -2,107 +2,888 @@
 
 ## Destination
 
-Reach a fully settled design for the Traces Markdown/PKM language server — including the architectural changes needed to integrate it coherently with the existing Traces codebase — such that the completed map can be converted into an implementation specification without unresolved material product, semantic, architectural, interoperability, or performance decisions.
+Reach a fully settled design for the Traces Markdown/PKM language server —
+including the architectural changes needed to integrate it coherently with the
+existing Traces codebase — such that the completed map can be converted into an
+implementation specification without unresolved material product, semantic,
+architectural, interoperability, or performance decisions.
 
-Product shape: **Traces LSP** owns Markdown semantic/editor intelligence and PKM intelligence; **rumdl** owns Markdown linting, formatting, and lint-oriented fixes. A user running Traces together with rumdl needs no other Markdown LSP (Markdown Oxide, Marksman, Microsoft's markdown-language-server) for comprehensive Markdown semantic/editor functionality. Traces must cover at least the valuable generic Markdown language-service capabilities and the full useful PKM capability set of Markdown Oxide, while extending beyond both through Traces' existing/planned Templater-, Dataview-, and Metadata-Menu-inspired functionality.
+Product shape: **Traces LSP** owns Markdown semantic/editor intelligence and PKM
+intelligence; **rumdl** owns Markdown linting, formatting, and lint-oriented
+fixes. A user running Traces together with rumdl needs no other Markdown LSP
+(Markdown Oxide, Marksman, Microsoft's markdown-language-server) for
+comprehensive Markdown semantic/editor functionality. Traces must cover at least
+the valuable generic Markdown language-service capabilities and the full useful
+PKM capability set of Markdown Oxide, while extending beyond both through
+Traces' existing/planned Templater-, Dataview-, and Metadata-Menu-inspired
+functionality.
 
-This is a **planning-only** effort: no production code is written or modified while working this map. Throwaway prototypes are permitted only when genuinely necessary to resolve a design question.
+This is a **planning-only** effort: no production code is written or modified
+while working this map. Throwaway prototypes are permitted only when genuinely
+necessary to resolve a design question.
 
 ## Notes
 
-**Domain**: read `GLOSSARY-MAP.md` and the per-module `src/*/GLOSSARY.md` files (Core, CLI, Config, Dialog, Index, Note, Query, Schema, Template) before any ticket touching that module's terminology — they are the authoritative glossary. Existing ADRs (`docs/adr/0001`–`0007`) cover minijinja interactivity, dialog selection, CLI error presentation, template/query interplay, config trust/tracking, File-Class schemas, and field-inheritance resolution; consult the relevant one before any ticket that could revisit those decisions.
+**Domain**: read `GLOSSARY-MAP.md` and the per-module `src/*/GLOSSARY.md` files
+(Core, CLI, Config, Dialog, Index, Note, Query, Schema, Template) before any
+ticket touching that module's terminology — they are the authoritative glossary.
+Existing ADRs (`docs/adr/0001`–`0007`) cover minijinja interactivity, dialog
+selection, CLI error presentation, template/query interplay, config
+trust/tracking, File-Class schemas, and field-inheritance resolution; consult
+the relevant one before any ticket that could revisit those decisions.
 
-**Skills**: every grilling-type ticket invokes `/grilling` and `/domain-modeling`. Every research-type ticket is resolved by a `/research` subagent. Prototype-type tickets (none created yet; may be added later if a "how should it look/behave" question surfaces) invoke `/prototype`.
+**Skills**: every grilling-type ticket invokes `/grilling` and
+`/domain-modeling`. Every research-type ticket is resolved by a `/research`
+subagent. Prototype-type tickets (none created yet; may be added later if a "how
+should it look/behave" question surfaces) invoke `/prototype`.
 
-**Local research corpus**: prefer `docs/refs/lsp_spec.md` (LSP 3.18 spec) and `docs/digests/*.txt` (Markdown Oxide, Marksman, rumdl, zk, plus bonus Obsidian-plugin digests for Dataview/Templater/Metadata-Menu/obsidian-tasks) plus dedicated tool studies for iwe and fileclass in this effort's research/ ([tool-iwe](research/tool-iwe.md), [tool-fileclass](research/tool-fileclass.md); amended 2026-10-21) over live fetches; read directory structure first, then targeted sections. Use `rust-docs-mcp` as the primary source for Rust crate/API questions. Fall back to primary upstream sources (repos, official docs) when the local corpus is stale, incomplete, or silent.
+**Local research corpus**: prefer `docs/refs/lsp_spec.md` (LSP 3.18 spec) and
+`docs/digests/*.txt` (Markdown Oxide, Marksman, rumdl, zk, plus bonus
+Obsidian-plugin digests for Dataview/Templater/Metadata-Menu/obsidian-tasks)
+plus dedicated tool studies for iwe and fileclass in this effort's research/
+([tool-iwe](research/tool-iwe.md), [tool-fileclass](research/tool-fileclass.md);
+amended 2026-10-21) over live fetches; read directory structure first, then
+targeted sections. Use `rust-docs-mcp` as the primary source for Rust crate/API
+questions. Fall back to primary upstream sources (repos, official docs) when the
+local corpus is stale, incomplete, or silent.
 
-**Research-ticket output convention (tracker-specific deviation)**: this repo's local-markdown tracker (`docs/agents/issue-tracker.md`) has no existing git-branch convention for research artifacts. Findings for each research ticket are written to `.scratch/md-pkm-lsp/research/<slug>.md` (plain files in this effort's directory) instead of a throwaway `research/<name>` git branch, and linked from the ticket's `## Answer`.
+**Research-ticket output convention (tracker-specific deviation)**: this repo's
+local-markdown tracker (`docs/agents/issue-tracker.md`) has no existing
+git-branch convention for research artifacts. Findings for each research ticket
+are written to `.scratch/md-pkm-lsp/research/<slug>.md` (plain files in this
+effort's directory) instead of a throwaway `research/<name>` git branch, and
+linked from the ticket's `## Answer`.
 
 **Standing constraints** (apply to every ticket):
 
-- Filesystem Markdown is the authoritative persistent source of truth; unsaved editor buffers must be reflected in live language intelligence without requiring disk writes.
-- Reuse existing Traces semantics/services (Index, Query, Schema, Template, Config) rather than building parallel LSP-only models.
-- LSP protocol DTOs and client-specific concerns stay at the protocol boundary; they never define core semantics.
-- Preserve existing architecture where it remains suitable — do not refactor merely to conform to an abstract language-server pattern.
-- Performance is first-class: initial indexing, incremental editor changes, interactive requests, and large PKM workspaces all need explicit targets (ticket 33).
-- Prefer explicit, idiomatic Rust; strong domain types; clear ownership; simple interfaces; introduce abstractions only for real boundaries/invariants/reuse.
-- Design intentional, documented coexistence with rumdl (ticket 32) rather than relying on accidental multi-LSP behavior.
-- **Do not presume the current single-crate, synchronous status quo is sticky.** Converting to a Cargo workspace and/or adopting an async runtime (`tokio` or another async primitive) for the LSP addition are live, unbiased options for tickets 09 and 34 — evaluate them on their merits for the LSP's actual needs, not against a bar of "changes more than staying as-is."
-- Prefer evidence from the existing repository, the local reference corpus, `rust-docs-mcp`, and primary upstream sources over assumptions from memory. (Dropped from the first draft of this list; restored 2026-09-03 after a research subagent violated it — see the methodology caveat below.)
-- **Debounce figures were provisional until ticket 25 (resolved 2026-10-15)**: final three-tier model — T1 content/index **100ms** (reconciles 13's 50–100ms and 33's 100ms; 14's 150ms dropped), T2 per-document diagnostics publish **~50ms** typical with adaptive clamp `[50ms, compute, 500ms]` (reconciles 14/20/21/23's 300ms; strengthened from 150ms on external evidence: clangd 50ms floor, Zed 50ms, gopls tens of ms, ty 1–4ms; ts-ls 200+50ms), T3 workspace event-driven (no settle-timer). Debounce = spawn timer + generation counter, never in-handler sleep; publication via 22's β single-lane publisher generalized to all diagnostics. [Ticket 25](issues/25-diagnostics-architecture.md).
+- Filesystem Markdown is the authoritative persistent source of truth; unsaved
+  editor buffers must be reflected in live language intelligence without
+  requiring disk writes.
+- Reuse existing Traces semantics/services (Index, Query, Schema, Template,
+  Config) rather than building parallel LSP-only models.
+- LSP protocol DTOs and client-specific concerns stay at the protocol boundary;
+  they never define core semantics.
+- Preserve existing architecture where it remains suitable — do not refactor
+  merely to conform to an abstract language-server pattern.
+- Performance is first-class: initial indexing, incremental editor changes,
+  interactive requests, and large PKM workspaces all need explicit targets
+  (ticket 33).
+- Prefer explicit, idiomatic Rust; strong domain types; clear ownership; simple
+  interfaces; introduce abstractions only for real boundaries/invariants/reuse.
+- Design intentional, documented coexistence with rumdl (ticket 32) rather than
+  relying on accidental multi-LSP behavior.
+- **Do not presume the current single-crate, synchronous status quo is sticky.**
+  Converting to a Cargo workspace and/or adopting an async runtime (`tokio` or
+  another async primitive) for the LSP addition are live, unbiased options for
+  tickets 09 and 34 — evaluate them on their merits for the LSP's actual needs,
+  not against a bar of "changes more than staying as-is."
+- Prefer evidence from the existing repository, the local reference corpus,
+  `rust-docs-mcp`, and primary upstream sources over assumptions from memory.
+  (Dropped from the first draft of this list; restored 2026-09-03 after a
+  research subagent violated it — see the methodology caveat below.)
+- **Debounce figures were provisional until ticket 25 (resolved 2026-10-15)**:
+  final three-tier model — T1 content/index **100ms** (reconciles 13's 50–100ms
+  and 33's 100ms; 14's 150ms dropped), T2 per-document diagnostics publish
+  **~50ms** typical with adaptive clamp `[50ms, compute, 500ms]` (reconciles
+  14/20/21/23's 300ms; strengthened from 150ms on external evidence: clangd 50ms
+  floor, Zed 50ms, gopls tens of ms, ty 1–4ms; ts-ls 200+50ms), T3 workspace
+  event-driven (no settle-timer). Debounce = spawn timer + generation counter,
+  never in-handler sleep; publication via 22's β single-lane publisher
+  generalized to all diagnostics.
+  [Ticket 25](issues/25-diagnostics-architecture.md).
 
-**Named tension — reuse vs. performance**: "Reuse existing Traces semantics/services" and "performance is first-class... sub-100ms interactive requests" are in real, not hypothetical, tension. `QueryService`'s source resolution is a linear scan of every `WorkspaceIndex` entry (`run_from_store`, `matched_file_rows` at `src/query/service.rs:318-329`; the earlier `:132-139`/`execute` citation was wrong, corrected 2026-10-15 by 25), `IndexerService::refresh` is a whole-tree diff (metadata scan and note parsing already parallel via `rayon`; the merge-join delta itself is single-threaded), and `Note` parsing is single-pass, full-file, no incremental re-parse — none of that was built for per-keystroke latency. Tickets 10, 12, 13, and 33 each touch a piece of this; none of them is authorized to quietly resolve the tension by picking "reuse as-is" as the path of least resistance. If reuse and the performance targets (once ticket 33 sets numbers) turn out incompatible at target scale, that conflict needs to surface explicitly in whichever ticket hits it first, not get smoothed over.
+**Named tension — reuse vs. performance**: "Reuse existing Traces
+semantics/services" and "performance is first-class... sub-100ms interactive
+requests" are in real, not hypothetical, tension. `QueryService`'s source
+resolution is a linear scan of every `WorkspaceIndex` entry (`run_from_store`,
+`matched_file_rows` at `src/query/service.rs:318-329`; the earlier
+`:132-139`/`execute` citation was wrong, corrected 2026-10-15 by 25),
+`IndexerService::refresh` is a whole-tree diff (metadata scan and note parsing
+already parallel via `rayon`; the merge-join delta itself is single-threaded),
+and `Note` parsing is single-pass, full-file, no incremental re-parse — none of
+that was built for per-keystroke latency. Tickets 10, 12, 13, and 33 each touch
+a piece of this; none of them is authorized to quietly resolve the tension by
+picking "reuse as-is" as the path of least resistance. If reuse and the
+performance targets (once ticket 33 sets numbers) turn out incompatible at
+target scale, that conflict needs to surface explicitly in whichever ticket hits
+it first, not get smoothed over.
 
-**Methodology caveat — research-subagent reliability**: the eight research findings below are single-pass, single-subagent reports, not independently cross-checked by a second reader before this map absorbed them. Three claims were spot-checked directly against primary sources while auditing this map (Marksman's documented-but-not-implemented duplicate-heading diagnostic; rumdl's `enableSymbols` setting; `tower-lsp-server`'s `future::abortable`-based cancellation) and all three held up — but that is three claims out of dozens across eight reports, not a full audit. One research subagent (ticket 07) also violated the "use `rust-docs-mcp`, not raw fetches" instruction by shelling out to `cargo clone` when its first `cache_crate` calls hit a tool-schema error, leaving `tower-lsp-server/` and `lsp-server/` as untracked directories in the repo root (found and deleted 2026-09-03; the underlying findings were re-verified and are accurate, but the process violation went uncaught until asked about directly — treat "subagent reported completed" as unverified until spot-checked, per the hub tool's own warning, not as settled fact). Treat any single research claim that later turns out to be load-bearing for a specific wording/threshold decision as worth a direct primary-source check before relying on it, especially anything from Marksman/rumdl's F#/Rust source (dense, easy to misattribute line numbers in) rather than their prose docs.
+**Methodology caveat — research-subagent reliability**: the eight research
+findings below are single-pass, single-subagent reports, not independently
+cross-checked by a second reader before this map absorbed them. Three claims
+were spot-checked directly against primary sources while auditing this map
+(Marksman's documented-but-not-implemented duplicate-heading diagnostic; rumdl's
+`enableSymbols` setting; `tower-lsp-server`'s `future::abortable`-based
+cancellation) and all three held up — but that is three claims out of dozens
+across eight reports, not a full audit. One research subagent (ticket 07) also
+violated the "use `rust-docs-mcp`, not raw fetches" instruction by shelling out
+to `cargo clone` when its first `cache_crate` calls hit a tool-schema error,
+leaving `tower-lsp-server/` and `lsp-server/` as untracked directories in the
+repo root (found and deleted 2026-09-03; the underlying findings were
+re-verified and are accurate, but the process violation went uncaught until
+asked about directly — treat "subagent reported completed" as unverified until
+spot-checked, per the hub tool's own warning, not as settled fact). Treat any
+single research claim that later turns out to be load-bearing for a specific
+wording/threshold decision as worth a direct primary-source check before relying
+on it, especially anything from Marksman/rumdl's F#/Rust source (dense, easy to
+misattribute line numbers in) rather than their prose docs.
 
-**Second confirmed instance (2026-09-03)**: ticket 07's research was also found to be one-sided in a different way — it answered "what does each crate's code demand" (via `rust-docs-mcp` and source archaeology) but never checked real-world ecosystem adoption, documentation quality, or practitioner consensus, then let the one axis it did check stand in for the whole question. A web sweep afterward confirmed `tower-lsp-server` (not `lsp-server`) is the current de facto standard/most-recommended Rust LSP framework across 2025/2026 tutorials and community discussion. The research file and ticket 09 have been corrected. General lesson: a research subagent restricted to source-code/API tools alone cannot answer "what's generally recommended" — that needs an explicit instruction to check practitioner consensus (web search, tutorials, forums), and I should have scoped ticket 07 that way from the start rather than letting a purely code-level investigation implicitly answer a socio-technical question.
+**Second confirmed instance (2026-09-03)**: ticket 07's research was also found
+to be one-sided in a different way — it answered "what does each crate's code
+demand" (via `rust-docs-mcp` and source archaeology) but never checked
+real-world ecosystem adoption, documentation quality, or practitioner consensus,
+then let the one axis it did check stand in for the whole question. A web sweep
+afterward confirmed `tower-lsp-server` (not `lsp-server`) is the current de
+facto standard/most-recommended Rust LSP framework across 2025/2026 tutorials
+and community discussion. The research file and ticket 09 have been corrected.
+General lesson: a research subagent restricted to source-code/API tools alone
+cannot answer "what's generally recommended" — that needs an explicit
+instruction to check practitioner consensus (web search, tutorials, forums), and
+I should have scoped ticket 07 that way from the start rather than letting a
+purely code-level investigation implicitly answer a socio-technical question.
 
-**Full-audit pass (2026-09-03), prompted by the tower-lsp-server correction**: reviewed all eight research files and all 34 tickets for the same class of problem (an unverified authority/adoption/maintenance claim, or a "which technology" question answered from source-code archaeology alone). Found and fixed two more: (1) ticket 07's own `## Answer` section still carried the pre-correction one-sided summary after the research file and ticket 09 were fixed — a real propagation gap, now corrected to match. (2) Markdown Oxide's project-health context (creator publicly sought a maintainer handoff, Sept 2025; ~1.6k GitHub stars vs. Marksman's ~3.3k) was missing from `research/tool-markdown-oxide.md`, which is cited as PKM precedent across five tickets (15, 16, 17, 18, 23) — added as a caveat on how much weight its specific design choices should carry. Checked and held up: Marksman's "mature, widely-used" framing (star-count-verified), and Markdown Oxide's `tower-lsp` custom-fork dependency (independently web-confirmed, not just digest-sourced — the digest wasn't stale on this point). No other research file made a comparable unverified market-position/recommendation claim — R01/02/04 describe existing tools' actual behavior (verifiable from their own source, no "which is best" question involved), R05/06 document single canonical/undisputed implementations (VS Code's own Markdown support; rust-analyzer, THE Rust LSP), and R03/08 describe currently-in-use or extremely well-established tools (rumdl is the project's own chosen linter; Dataview/Templater/Metadata Menu/obsidian-tasks are all mainstream Obsidian plugins) where "is this adopted" was never in question.
+**Full-audit pass (2026-09-03), prompted by the tower-lsp-server correction**:
+reviewed all eight research files and all 34 tickets for the same class of
+problem (an unverified authority/adoption/maintenance claim, or a "which
+technology" question answered from source-code archaeology alone). Found and
+fixed two more: (1) ticket 07's own `## Answer` section still carried the
+pre-correction one-sided summary after the research file and ticket 09 were
+fixed — a real propagation gap, now corrected to match. (2) Markdown Oxide's
+project-health context (creator publicly sought a maintainer handoff, Sept 2025;
+~1.6k GitHub stars vs. Marksman's ~3.3k) was missing from
+`research/tool-markdown-oxide.md`, which is cited as PKM precedent across five
+tickets (15, 16, 17, 18, 23) — added as a caveat on how much weight its specific
+design choices should carry. Checked and held up: Marksman's "mature,
+widely-used" framing (star-count-verified), and Markdown Oxide's `tower-lsp`
+custom-fork dependency (independently web-confirmed, not just digest-sourced —
+the digest wasn't stale on this point). No other research file made a comparable
+unverified market-position/recommendation claim — R01/02/04 describe existing
+tools' actual behavior (verifiable from their own source, no "which is best"
+question involved), R05/06 document single canonical/undisputed implementations
+(VS Code's own Markdown support; rust-analyzer, THE Rust LSP), and R03/08
+describe currently-in-use or extremely well-established tools (rumdl is the
+project's own chosen linter; Dataview/Templater/Metadata Menu/obsidian-tasks are
+all mainstream Obsidian plugins) where "is this adopted" was never in question.
 
-**Generalized rule** for every future ticket resolution that involves picking a crate, library, or technology (tickets 10's filesystem-watcher choice, 11's `ropey`/tree-sitter mention, 33's `rayon` mention, and any other not-yet-specified pick): answer both "what does the source/API demand" (rust-docs-mcp, crate source) *and* "what does the ecosystem actually reach for and why" (web search for current tutorials, comparison posts, practitioner discussion) as two separate, explicitly-scoped questions — never let one stand in for the other. A minor, secondary caveat: the Obsidian-plugin digests (`docs/digests/obsidian_*`) underlying ticket 08's research are ~3 months older than the LSP-reference digests (~hours old) — the Obsidian plugin ecosystem moves fast; the broad architectural patterns found (EditorSuggest-based completion, no LSP precedent for any of the four) are unlikely to have changed, but a specific implementation detail from that research should be re-verified against the live plugin source before being treated as load-bearing.
+**Generalized rule** for every future ticket resolution that involves picking a
+crate, library, or technology (tickets 10's filesystem-watcher choice, 11's
+`ropey`/tree-sitter mention, 33's `rayon` mention, and any other
+not-yet-specified pick): answer both "what does the source/API demand"
+(rust-docs-mcp, crate source) *and* "what does the ecosystem actually reach for
+and why" (web search for current tutorials, comparison posts, practitioner
+discussion) as two separate, explicitly-scoped questions — never let one stand
+in for the other. A minor, secondary caveat: the Obsidian-plugin digests
+(`docs/digests/obsidian_*`) underlying ticket 08's research are ~3 months older
+than the LSP-reference digests (~hours old) — the Obsidian plugin ecosystem
+moves fast; the broad architectural patterns found (EditorSuggest-based
+completion, no LSP precedent for any of the four) are unlikely to have changed,
+but a specific implementation detail from that research should be re-verified
+against the live plugin source before being treated as load-bearing.
 
-**Target editors** (user-stated 2026-10-07): **Zed is a primary target** — completion/client-behavior research must treat Zed as first-class, not an open question or a footnote. Prior ticket-24 research swept VS Code, Neovim core, nvim-cmp, and Helix for client behavior and left Zed's fan-out/resolve-timing unverified (now closed by ticket 24's Zed verification pass — findings in `research/24-completion-architecture.md`, evidence in git history); any future client-behavior question must include Zed in the verified set. VS Code and Neovim remain first-class as before; Helix remains the de-facto sparse-client floor.
+**Target editors** (user-stated 2026-10-07): **Zed is a primary target** —
+completion/client-behavior research must treat Zed as first-class, not an open
+question or a footnote. Prior ticket-24 research swept VS Code, Neovim core,
+nvim-cmp, and Helix for client behavior and left Zed's fan-out/resolve-timing
+unverified (now closed by ticket 24's Zed verification pass — findings in
+`research/24-completion-architecture.md`, evidence in git history); any future
+client-behavior question must include Zed in the verified set. VS Code and
+Neovim remain first-class as before; Helix remains the de-facto sparse-client
+floor.
 
-**Grounded baseline facts already established** (from direct repo investigation, so later tickets should treat these as given rather than re-deriving them):
+**Grounded baseline facts already established** (from direct repo investigation,
+so later tickets should treat these as given rather than re-deriving them):
 
-- Traces is a **single Cargo package** *today*, not a workspace; one binary (`traces-pkm`, `src/main.rs`) wrapping `pub mod cli`. Starting state only — see the standing constraint above; ticket 34 decides whether this changes.
-- The **entire codebase is synchronous** *today* — no tokio/async-std dependency, no `async fn` anywhere in `src/`. Starting state only — see the standing constraint above; ticket 09 decides whether this changes.
-- Every CLI invocation is a **fresh, short-lived process**: load config → run one command → exit. No daemon, no filesystem watcher, no long-running state anywhere today.
-- `Note` parsing is a `pulldown-cmark` event stream plus a custom `logos`-based lexer for inline fields/tags/task markers (`src/note/parser.rs`, `src/note/parser/lexer.rs`); **single-pass, no incremental re-parse**.
-- **Source spans are almost entirely absent** from the `Note` AST today: links, tags, inline fields, and frontmatter carry no position; only list items/tasks carry a line-only (not byte-offset) position. `src/position.rs` (`BytePos`/`SourceLine`, `LineIndex` at `src/position.rs:33`; the earlier `src/note/parser/line.rs` citation was stale, corrected 2026-10-15 by 25; `Heading` does carry a line, contrary to the earlier "only list items/tasks" claim) already supply the plumbing to add spans; `pulldown-cmark` already emits byte-offset spans per event today (currently discarded).
-- `WorkspaceIndex` (`src/index/entry.rs`) is an **immutable, single-owned snapshot**, persisted across three `redb` tables (`FILES`/`NOTES`/`LINKS`, no raw text, no spans), refreshed only via a manual whole-tree mtime/size diff (`src/index/delta.rs`; metadata scan and note parsing already parallel via `rayon`) — **no filesystem watching exists**.
-- `QueryService`/`QuerySet` already expect `Arc<WorkspaceIndex>` at the call boundary; query parsing is hand-rolled recursive-descent over `logos`, **`miette` is already fully span-aware** for query diagnostics (`QuerySyntaxError`, `src/query/error.rs:134`) — the strongest existing precedent for LSP-diagnostic-shaped errors in the codebase.
-- `SchemaService` is a load-once, in-memory-cached registry (Kahn's-topo-sort `extends` inheritance); **no runtime field-value validator exists** — schema validation only happens when schema *definitions* are parsed, never against Note content.
-- Template rendering is **inherently interactive and unsafe to execute for analysis**: minijinja helpers (`ui.*`) synchronously block on live `DialogProvider` I/O mid-render (No-Declaration Format); there is **no static-analysis capability** today (no code path lists a template's referenced helpers/variables without fully executing it) and **no root-template AST caching** (every render re-parses).
-- **rumdl already ships its own LSP** (`rumdl server`) with diagnostics, code actions, formatting, fenced-code-block language completion, and file-path/heading-anchor **link completion plus hover/definition/references/rename** for Markdown links, plus its own document/workspace symbol outline — with `enableLinkCompletions` / `enableLinkNavigation` / **`enableSymbols`** settings *explicitly documented* for ceding link intelligence and the heading outline to "another language server (for example a PKM/notes LSP)" (see [rumdl-boundary research](research/tool-rumdl-boundary.md)). Wikilinks are **permanently, unconditionally out of rumdl's link-checking scope by design** ("they name a vault entry rather than a path... the tool that renders them resolves the name itself") — zero overlap to resolve there. rumdl's link-*diagnostics* (`MD057`/`MD051`) are **not** gated by those LSP settings, only by separate lint-rule config.
-- **The Rust LSP framework landscape has two separate axes, not one** — see [Rust LSP framework crate research (corrected 2026-09-03)](research/07-rust-lsp-framework-crates.md): on runtime demands, `tower-lsp-server`/`async-lsp` require an async runtime end-to-end and cancel `$/cancelRequest` by dropping a `Future` (which does not interrupt `spawn_blocking`'d synchronous work if the core stays sync), while `lsp-server`+`lsp-types` (the pair rust-analyzer uses) is a minimal synchronous crossbeam-channel API with fully manual cancellation and no async requirement. On ecosystem adoption, `tower-lsp-server` (the actively-maintained `tower-lsp-community` fork, not the abandoned original `tower-lsp`) is the current de facto standard and most-recommended choice across 2025/2026 tutorials and community discussion — `lsp-server`'s low-level manual-everything shape is what rust-analyzer specifically chose for its own unusual needs (it also built its own incremental query engine), not evidence it's the broader default. Both axes are real input for ticket 09; the first draft of this research over-weighted the runtime-demands axis and under-reported the ecosystem-adoption axis, which is now corrected.
-- **rust-analyzer's Host/Snapshot split is a proven, real-world instance of the map's prior hypothesis** — see [rust-analyzer precedent research](research/tool-rust-analyzer-precedent.md): `AnalysisHost` (mutable, transactional `apply_change`) / `Analysis` (immutable, cheaply-cloned snapshot, lock-free concurrent reads) enables "parse-once/project-many"; its VFS treats open editor buffers as the sole source of truth for their own content (files are opaque IDs, no disk IO for already-open files) — directly reusable for the live-buffer-vs-filesystem decision regardless of whether Traces adopts salsa-style full incrementality.
+- Traces is a **single Cargo package** *today*, not a workspace; one binary
+  (`traces-pkm`, `src/main.rs`) wrapping `pub mod cli`. Starting state only —
+  see the standing constraint above; ticket 34 decides whether this changes.
+- The **entire codebase is synchronous** *today* — no tokio/async-std
+  dependency, no `async fn` anywhere in `src/`. Starting state only — see the
+  standing constraint above; ticket 09 decides whether this changes.
+- Every CLI invocation is a **fresh, short-lived process**: load config → run
+  one command → exit. No daemon, no filesystem watcher, no long-running state
+  anywhere today.
+- `Note` parsing is a `pulldown-cmark` event stream plus a custom `logos`-based
+  lexer for inline fields/tags/task markers (`src/note/parser.rs`,
+  `src/note/parser/lexer.rs`); **single-pass, no incremental re-parse**.
+- **Source spans are almost entirely absent** from the `Note` AST today: links,
+  tags, inline fields, and frontmatter carry no position; only list items/tasks
+  carry a line-only (not byte-offset) position. `src/position.rs`
+  (`BytePos`/`SourceLine`, `LineIndex` at `src/position.rs:33`; the earlier
+  `src/note/parser/line.rs` citation was stale, corrected 2026-10-15 by 25;
+  `Heading` does carry a line, contrary to the earlier "only list items/tasks"
+  claim) already supply the plumbing to add spans; `pulldown-cmark` already
+  emits byte-offset spans per event today (currently discarded).
+- `WorkspaceIndex` (`src/index/entry.rs`) is an
+  **immutable, single-owned snapshot**, persisted across three `redb` tables
+  (`FILES`/`NOTES`/`LINKS`, no raw text, no spans), refreshed only via a manual
+  whole-tree mtime/size diff (`src/index/delta.rs`; metadata scan and note
+  parsing already parallel via `rayon`) — **no filesystem watching exists**.
+- `QueryService`/`QuerySet` already expect `Arc<WorkspaceIndex>` at the call
+  boundary; query parsing is hand-rolled recursive-descent over `logos`,
+  **`miette` is already fully span-aware** for query diagnostics
+  (`QuerySyntaxError`, `src/query/error.rs:134`) — the strongest existing
+  precedent for LSP-diagnostic-shaped errors in the codebase.
+- `SchemaService` is a load-once, in-memory-cached registry (Kahn's-topo-sort
+  `extends` inheritance); **no runtime field-value validator exists** — schema
+  validation only happens when schema *definitions* are parsed, never against
+  Note content.
+- Template rendering is
+  **inherently interactive and unsafe to execute for analysis**: minijinja
+  helpers (`ui.*`) synchronously block on live `DialogProvider` I/O mid-render
+  (No-Declaration Format); there is **no static-analysis capability** today (no
+  code path lists a template's referenced helpers/variables without fully
+  executing it) and **no root-template AST caching** (every render re-parses).
+- **rumdl already ships its own LSP** (`rumdl server`) with diagnostics, code
+  actions, formatting, fenced-code-block language completion, and
+  file-path/heading-anchor
+  **link completion plus hover/definition/references/rename** for Markdown
+  links, plus its own document/workspace symbol outline — with
+  `enableLinkCompletions` / `enableLinkNavigation` / **`enableSymbols`**
+  settings *explicitly documented* for ceding link intelligence and the heading
+  outline to "another language server (for example a PKM/notes LSP)" (see
+  [rumdl-boundary research](research/tool-rumdl-boundary.md)). Wikilinks are
+  **permanently, unconditionally out of rumdl's link-checking scope by design**
+  ("they name a vault entry rather than a path... the tool that renders them
+  resolves the name itself") — zero overlap to resolve there. rumdl's
+  link-*diagnostics* (`MD057`/`MD051`) are **not** gated by those LSP settings,
+  only by separate lint-rule config.
+- **The Rust LSP framework landscape has two separate axes, not one** — see
+  [Rust LSP framework crate research (corrected 2026-09-03)](research/07-rust-lsp-framework-crates.md):
+  on runtime demands, `tower-lsp-server`/`async-lsp` require an async runtime
+  end-to-end and cancel `$/cancelRequest` by dropping a `Future` (which does not
+  interrupt `spawn_blocking`'d synchronous work if the core stays sync), while
+  `lsp-server`+`lsp-types` (the pair rust-analyzer uses) is a minimal
+  synchronous crossbeam-channel API with fully manual cancellation and no async
+  requirement. On ecosystem adoption, `tower-lsp-server` (the
+  actively-maintained `tower-lsp-community` fork, not the abandoned original
+  `tower-lsp`) is the current de facto standard and most-recommended choice
+  across 2025/2026 tutorials and community discussion — `lsp-server`'s low-level
+  manual-everything shape is what rust-analyzer specifically chose for its own
+  unusual needs (it also built its own incremental query engine), not evidence
+  it's the broader default. Both axes are real input for ticket 09; the first
+  draft of this research over-weighted the runtime-demands axis and
+  under-reported the ecosystem-adoption axis, which is now corrected.
+- **rust-analyzer's Host/Snapshot split is a proven, real-world instance of the
+  map's prior hypothesis** — see
+  [rust-analyzer precedent research](research/tool-rust-analyzer-precedent.md):
+  `AnalysisHost` (mutable, transactional `apply_change`) / `Analysis`
+  (immutable, cheaply-cloned snapshot, lock-free concurrent reads) enables
+  "parse-once/project-many"; its VFS treats open editor buffers as the sole
+  source of truth for their own content (files are opaque IDs, no disk IO for
+  already-open files) — directly reusable for the live-buffer-vs-filesystem
+  decision regardless of whether Traces adopts salsa-style full incrementality.
 
 ## Decisions so far
 
-- [Research: Markdown Oxide capabilities & architecture](issues/01-research-markdown-oxide.md) — regex-only/no-AST, `tower-lsp`+`tokio`+`rayon`, in-memory only, ambiguity deferred to client, tag rename uses hierarchical prefix match but goto-definition uses exact match only; filesystem-watch triggers a full vault rebuild that overrides unsaved buffers (an anti-pattern to avoid). [Full findings](research/tool-markdown-oxide.md).
-- [Research: Marksman capabilities & architecture](issues/02-research-marksman.md) — F#/Markdig, actor-model concurrency, full re-parse per edit with incremental workspace-index-only updates; wikilink resolution (title vs filename) is user-configurable; documented "duplicate heading" diagnostic doesn't actually exist standalone in source. [Full findings](research/tool-marksman.md).
-- [Research: rumdl capability boundary and coexistence hooks](issues/03-research-rumdl-boundary.md) — three-setting coexistence contract (`enableLinkCompletions`/`enableLinkNavigation`/`enableSymbols`); wikilinks permanently out of scope by design; link diagnostics not gated by those settings; zero formatting overlap. [Full findings](research/tool-rumdl-boundary.md).
-- [Research: zk capabilities & architecture](issues/04-research-zk.md) — strictly single-root Notebook, no daily-note special-casing (composed from template groups + date placeholders), flat tag model with glob-simulated hierarchy, SQLite-backed incremental diff-indexing synced to unsaved buffers. [Full findings](research/tool-zk.md).
-- [Research: Microsoft markdown-language-service/server generic baseline](issues/05-research-ms-markdown-language-service.md) — canonical generic-Markdown capability bar (folding/selection-ranges/symbols/links/hover/definition/references/rename/completion/diagnostics) with semantic tokens and CodeLens both deliberately absent; clean protocol-agnostic-library-vs-LSP-adapter split; zero wikilink/PKM support; UTF-16 positions only. [Full findings](research/tool-ms-markdown-language-service.md).
-- [Research: rust-analyzer host/snapshot architecture precedent](issues/06-research-rust-analyzer-precedent.md) — Host/Snapshot split confirmed as a real, load-bearing pattern; salsa's core lesson (isolate local/volatile from global/stable state) is separable from adopting salsa itself; VFS/open-buffer-as-truth pattern is directly reusable; "parsing must never fail" invariant matters for Note parsing and template static analysis alike. [Full findings](research/tool-rust-analyzer-precedent.md).
-- [Research: Rust LSP framework/transport crate landscape](issues/07-research-rust-lsp-framework-crates.md) — two-axis finding, corrected 2026-09-03: on runtime demands, `tower-lsp-server`/`async-lsp` require an async runtime end-to-end and their automatic `$/cancelRequest` handling (dropping a `Future`) doesn't interrupt synchronous `spawn_blocking`'d work, while `lsp-server`+`lsp-types` is a minimal synchronous crossbeam-channel API with fully manual cancellation and zero async requirement; on ecosystem adoption, `tower-lsp-server` is the current de facto standard/most-recommended choice in the wider Rust LSP community, not `lsp-server` (rust-analyzer's own pick, for its own unusual reasons). Both axes are input for ticket 09's runtime-model decision; neither alone picks a winner. [Full findings](research/07-rust-lsp-framework-crates.md).
-- [Research: Obsidian Dataview/Templater/Metadata Menu/obsidian-tasks parity](issues/08-research-dataview-templater-metadatamenu-parity.md) — none of the four provide real LSP-shaped intelligence (completion-popup precedent only, zero diagnostics/hover/definition precedent); Templater's `tp.*` member-completion and Metadata Menu's `fileClass`-scoped value-completion are the closest structural precedents for tickets 22 and 20 respectively. Full findings merged into [research/21-query-language-intelligence.md](research/21-query-language-intelligence.md) (Part VII); original `research/08-…md` deleted.
-- [Research: performant Rust LSP runtime models beyond rust-analyzer](issues/35-research-performant-rust-lsp-runtime-models.md) — fired mid-grilling-session on ticket 09 after user pushback that rust-analyzer alone was too thin a precedent. Across `ty`, `ruff server`, Biome, and Taplo, zero precedent exists for making the core analysis engine itself `async fn`; the real split is fully-synchronous end-to-end (`ty`/`ruff server`, no non-trivial concurrent I/O beyond request/response) vs `tokio`+`tower-lsp-server` at the transport boundary only with a synchronous core underneath (Biome, chosen specifically because its LSP layer has real concurrent I/O — file-watch events, multi-client sessions). Taplo's hand-rolled async stub is a cautionary tale, not a counterexample — its own maintainer wanted to move toward Biome's shape. [Full findings](research/35-performant-rust-lsp-runtime-models.md).
-- [LSP framework/transport crate & runtime model](issues/09-lsp-framework-and-runtime-model.md) — `tower-lsp-server` for JSON-RPC/LSP transport (covers Content-Length framing natively); runtime scope is transport-loop-only (`tokio` confined to transport/dispatch + concurrent I/O like filesystem watching, core Index/Query/Schema/Template/parsing stays synchronous) — revised from an initial sync-only lean after ticket 35's research found this is the shape performant Rust LSPs use when they have non-trivial concurrent I/O beyond request/response (unlike `ty`/`ruff server`, which stay fully sync); whole-process-async not foreclosed if a concrete need surfaces later. Template LSP features start static-analysis-only (never invoke `ui.*` `DialogProvider` helpers), with a non-interactive `DialogProvider` kept open, not closed, for ticket 22. [Full ticket](issues/09-lsp-framework-and-runtime-model.md).
-- [Research: actor-model/event-driven architecture for the analysis host, and future MCP-server extensibility](issues/36-research-actor-model-and-mcp-extensibility.md) — fired mid-grilling-session on ticket 10 for thorough review of the rejected actor-model alternative, given a future MCP server is a real possibility. Actor model rejected: zero unique benefit for "one coordinator, N protocol frontends" (an `Arc`-swap facade already gives this for free via ordinary method calls) and it actively serializes what should be concurrent lock-free reads. Zero precedent among performant Rust LSPs; Marksman's actor model is F#-idiomatic, not Rust evidence. Confirms `Arc<WorkspaceIndex>` swap-on-refresh. [Full findings](research/36-actor-model-and-mcp-extensibility.md).
-- [Research: filesystem-watching in Rust, and whether Traces should own one beyond the LSP's needs](issues/37-research-filesystem-watching-beyond-lsp.md) — `notify`+`notify-debouncer-full` is the mature standard if/when needed, but doesn't earn its keep for ticket 10; zero precedent among Markdown Oxide/Marksman/zk/rust-analyzer for a server-bundled watcher alongside LSP-provided watching. Real future gaps identified for later (not ticket 10): a `traces watch` CLI mode (no daemon/watch mode exists today) and the future MCP server if its clients lack file-watching capability. [Full findings](research/37-filesystem-watching-beyond-lsp.md); precedent claim corrected 2026-10-21 — iwe is a server-bundled-watcher counterexample ([tool-iwe research](research/tool-iwe.md)), decision unchanged.
-- [Research: salsa/incremental-computation frameworks — timing and root cause of large-vault performance problems](issues/38-research-salsa-incremental-computation.md) — architecturally, adopting `Arc<WorkspaceIndex>` now doesn't foreclose salsa later (rust-analyzer's `AnalysisHost`/`Analysis` is the proven shell for housing a `salsa::Database`). More importantly: salsa is very likely not the fix for the large-vault pain motivating this project — Obsidian's and Markdown Oxide's failures trace to unindexed O(N) whole-vault scans (Dataview) and unbounded in-memory/no-persistence growth (Markdown Oxide), not lack of incremental recomputation. Flags that `QueryService::execute`'s existing linear scan (`run_from_store`/`matched_file_rows`, `src/query/service.rs:318-329`; citation corrected 2026-10-15 by 25) is structurally the same failure shape — ticket 33's job to evidence, not salsa's to fix. [Full findings](research/38-salsa-incremental-computation.md).
-- [Analysis host architecture & integration with IndexerService/QueryService/SchemaService](issues/10-analysis-host-and-index-integration.md) — `Arc<WorkspaceIndex>` behind a swap-on-refresh cell, shared read-only across concurrent handlers (actor model researched and rejected — ticket 36); refresh triggered by `workspace/didChangeWatchedFiles` client-side watching, no Traces-owned filesystem watcher adopted (ticket 37); `QueryService`/`SchemaService` wrapped by a thin analysis-host facade; salsa-style incremental query engine explicitly deferred to ticket 33, not adopted now (ticket 38) — architecturally free to defer (rust-analyzer's `AnalysisHost`/`Analysis` is the proven shell for it), and likely not the actual fix for the large-vault pain motivating this project, whose root cause traces to unindexed whole-vault scans and unbounded memory, not missing incrementality; flags `QueryService::execute`'s existing linear scan as sharing that exact failure shape for ticket 33 to evidence. [Full ticket](issues/10-analysis-host-and-index-integration.md).
-- [Research: source span/position/text model for the Note AST — first principles](issues/39-research-source-span-and-position-model.md) — fired to support ticket 11 after the user asked for research unconstrained by current architecture, not just a grounding pass. Key finding: `pulldown-cmark` already emits full byte ranges per event via `into_offset_iter()` (`src/note/parser.rs:104`) but only `range.start` survives, discarded for links/tags/headings/inline fields — extending the existing `Note` AST is both the smaller diff *and* the first-principles-correct answer (they didn't conflict). Parser stays `pulldown-cmark` (zero peer precedent for tree-sitter-markdown, web-confirmed not recommended where correctness matters); `ropey` adopted narrowly for live-buffer text (ticket 14); frontmatter spans need a dedicated raw-text re-scan since `yaml_serde` has zero span capability (empirically confirmed via rust-docs-mcp; superseded 2026-09-23 — `noyalib` `Spanned` after ticket 19's parser swap); spans stay transient, never persisted in redb. Surfaces a real gap ticket 11's wording didn't name: a first-class `Heading` AST node is missing entirely, not just span-less. [Full findings](research/39-source-span-position-model.md).
-- [Source span/position model for the Note AST](issues/11-source-span-and-position-model.md) — spans on the AST (extend `Link`, `Tag`, inline fields with `Range<BytePos>`; add flat `Heading` node with `level: u8`); `BytePos` narrows to `u32` with `From<u32>`/`TryFrom<usize>`; `LineIndex` moves to `src/position.rs`, widens to `pub(crate)`, gains `byte_to_utf16_cu`; two concrete conversion functions (LineIndex for file buffers, ropey for live buffers), no trait; frontmatter spans via `noyalib` `Spanned` (reconciled 2026-09-23 to ticket 19's parser swap; hand-rolled Level-2 scanner dropped); parser stays pulldown-cmark with full re-parse per edit; spans stay transient, never in redb; ropey scoped to live buffers only.
-- [Concurrency & cancellation model](issues/12-concurrency-and-cancellation-model.md) — tower-lsp-server with `concurrency_level(1)`: sequential dispatch eliminates ordering bug (#284), sync handlers run inline (blocking tokio worker, but N=1 so nothing else needs it), no `spawn_blocking` bridge needed; stale-result discard for `$/cancelRequest` (industry standard — no production Rust LSP implements cooperative cancel); refresh completes before next handler starts (sequential, N=1 natural); `$/progress` deferred (UX polish, not concurrency).
-- [LSP-specific persistence & caching strategy](issues/13-lsp-persistence-and-caching-strategy.md) — no new redb tables (existing 7 sufficient; ecosystem re-scans on startup; redb is warm-start cache); in-memory mutable index with editor buffer authoritative for open documents; expand `RefreshPlan` with single-file constructor (unified sync infrastructure for editor `didChange` + future filesystem watcher); debounce `didChange` at 50 to 100ms (superseded 2026-10-15 by 25: T1 fixed at 100ms). [Full research](research/13-lsp-persistence-caching-patterns.md).
-- [Live editor buffer vs filesystem overlay model](issues/14-live-buffer-vs-filesystem-overlay.md) — transient replacement (editor content replaces disk while open); `RwLock<HashMap<Url, BufferState>>` with `content: String` + `version: i32`, no `parsed_note` (computed on-demand); debounce 150ms/300ms (superseded 2026-10-15 by 25: T1 100ms, T2 ~50ms, spawn+generation counter, no in-handler sleep); `ContentResolver` facade for note/text access; per-request inlink adjustment with cached `LinkResolver` (requires `WorkspaceIndex::files()` accessor + mutable inlink reconstruction); `didSave` integrates into the refresh typestate (via the single-file `RefreshPlan` constructor rather than calling a method directly; not via `didChangeWatchedFiles`); unsaved files via `FileBase::new_buffer()` constructor; overlay layer maintains own `LinkResolver` for cross-overlay resolution. [Full research](research/14-buffer-overlay-model.md).
-- [Performance targets & strategy](issues/33-performance-targets-and-strategy.md) — cold start <2s at 20K files via `rayon` parallel scan; warm start <500ms; inverted index built now (gotodef <5ms, completion <20ms, find-refs <20ms); evictable LRU memory model with 3 tiers (always-resident metadata ~2MB, LRU AST cache, diagnostics results in a bounded ~10MB pull cache (amended 2026-10-15 by 25, was "transient")); <100MB idle, <500MB hard cap; schema definitions always resident for frontmatter intelligence; extend `index_refresh.rs` (decomposed from `index_lifecycle.rs`) + new `lsp_latency.rs` benchmark harness. Amended 2026-10-04 by 23 (task-row residency, missing `workspace/symbol` row, long-line reparse tension — see 33's Answer); amended 2026-10-22 by 27 (corrected nine-feature perf rows, vault-scale ladder 100/1k/10k/50k + 20k iwe anchor, two-tier REFERENCE_CEILING amending 26's constant, lsp-bench-shaped criterion suite required before rows are accepted). [Full research](research/33-lsp-performance-targets.md), [best practices](research/x-lsp-performance-best-practices.md), [crate analysis](research/x-performance-crates.md).
-- [Links & references: wikilinks, aliases, heading/block refs, embeds, backlinks, images](issues/15-links-and-references-model.md) — wikilink resolution purely structural over the link target (full path, relative path, filename, or basename; the `|` side is display-only and frontmatter `aliases`/`title` never resolve — amended 2026-09-23, title-slug/alias steps and their config knob revoked); heading references use GitHub-style slugger with reactive ambiguity for duplicates (rumdl owns standard-link anchors, Traces owns wikilink heading anchors); block references out of scope (ticket separately); embeds: definition navigates, hover shows preview where editor supports; images: phased (go-to-definition + existence validation first, defer base64 preview); ambiguity: no diagnostic (client disambiguates), zero matches = Information severity with "Create note" code action, configurable severity escalation; reference-style links full parity; rumdl coexistence: Traces owns wikilinks, rumdl owns standard links (zero overlap by design). Amended 2026-10-15 by 25: cross-file `file.md#heading` anchors are unowned by rumdl (same-document `#frag` only, MD051) and claimed by Traces (suppress-when-target-missing); standard-link existence including image targets ceded to MD057 (code action dropped, `diagnostics.standard_links` flag retired, `.rumdl.toml` guidance primary); `UnresolvedLinkPolicy` enum deleted (per-code O1 override keys instead); zero-match severities escalate via per-code keys. New crates: `camino`, `fuzzy-matcher`. [Full research](research/15-links-and-references.md).
-- [Tags & hierarchical tags LSP intelligence](issues/16-tags-and-hierarchical-tags.md) — completion triggered by `#` with syntax guards and full `TextEdit` ranges; definition returns `None`; references uses hierarchical matching via `Tag::is_contained_in`; hover displays occurrence counts and child sub-tag breakdowns; rename cascades prefixes via `replacen` with YAML frontmatter syntax awareness; document symbols omit tags; workspace symbols expose unique tags; parse-time unification of frontmatter and body tags into `Note.tags()`.
-- [Footnotes & callouts](issues/17-footnotes-and-callouts.md) — footnotes in scope: enable `ENABLE_FOOTNOTES`, build inverted index (definitions + references HashMaps), full 7-operation set (go-to-def, find-refs, undefined-ref diagnostics, completion, hover, rename as file-local find-replace, optional unused-def diagnostics); spans from `into_offset_iter()`, transient. Callouts in scope limited: detect via `BlockQuote` start handler + first-line scan, 13 canonical types with alias resolution + config extension (`[callouts] extra_types`), completion + folding-range data for ticket 27; diagnostics skipped (Obsidian behavior: unknown types valid, custom types via CSS make any list incomplete); amended 2026-10-22 by 27 (callout fold mapping: foldable = NOT `+`; `is_foldable` bool flagged for three-state widening). [Full research](research/17-footnotes-and-callouts.md).
-- [Metadata/frontmatter & inline-field intelligence](issues/19-frontmatter-and-inline-field-intelligence.md) — replace `serde_yaml` with `noyalib` (core API `from_str_with_config` with a shared `ParserConfig::serde_yaml_compat()`, `Spanned<T>` for byte ranges; YAML 1.2 — the earlier "`YamlVersion::V1_1` for Dataview compat" claim is corrected, see note-parse ticket 02, "Rationale: YAML 1.2, not 1.1"); `ByteSpan(Range<BytePos>)` newtype per ticket 11 (`u32` offsets); three-layer completion (schema > global > inferred) with `FieldKey` canonical dedup, explicit data structure and <20ms performance budget; fileClass wins on conflicts with resolution matrix (type/required/multi/exclude); `$ref` targets deferred to workspace-wide rename; schema-bound hover with type+constraints+attribution, vault-inferred hover with hybrid tentative/authoritative; link hover with cross-IDE safe markdown (bold, italic, inline code, fenced code, lists, links) + in-memory content preview cache; trigger chars `[` and `:` with context-dependent handling + CodeRegion exclusion + exact regex for `:` validation; YAML diagnostics Warning (Error for root-level), inline-field diagnostics only for lexer-identified malformed fields; rename note-local + FileClass-schema own fields only; type-aware follows Dataview cascade, unscoped = informational only (scoped = ticket 20). Prerequisites: ticket 11 changes (BytePos u32, LineIndex move, lexer spans) must land first.
-- [Schema- and File-Class-aware language intelligence](issues/20-schema-and-fileclass-intelligence.md) — 20 decisions locked via grilling + stress testing. **Validator:** standalone `SchemaValidator` struct, `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`, frontmatter-only (no inline fields, no file-existence). **Scope:** type-correctness + range/select/date + required + multi enforcement. Date = syntax-only (chrono, not jiff); file = type + multi only. **Severity:** two-tier (Information for non-canonical unknowns, Warning for typo matches via `suggest_field()`); three-tier select (strict/skip/N/A); Warning for invalid select, List-on-non-multi. **Diagnostics:** single `source: "traces"` + hierarchical `schema.*` codes (amended 2026-10-15 by 25; was `traces-schema`) + `code` field; `relatedInformation` for inherited fields. **Intelligence:** go-to-definition jumps to originating schema (origin on `SchemaFieldDef`); file-field completion enumerates vault index + DocumentStore overlays, cap 100; hover shows field list + metadata + description + suggested-but-unset + ancestor chain; timing = on-open + T2 ~50ms publish lane (amended by 25; was 300ms) + on-save. **Model:** `Frontmatter` gains parallel `#[serde(skip)] spans` map (`ByteSpan = Range<BytePos>`); `SchemaFieldDef` gains `origin: Option<SchemaName>` + `description: Option<String>`; manual `PartialEq` on both types excluding metadata fields; `Schema` gains `parent_order: Vec<SchemaName>` for resolution chain display. **Config:** `[schemas.diagnostics]` with `enabled` + `debounce_ms`. **Prereqs:** tickets 11 (spans) and 19 (noyalib) must land first. [Designs](research/20-designs.md), [research](research/20-schema-fileclass-intelligence.md) (includes stress test results in Part VIII).
-- [Query-language intelligence](issues/21-query-language-intelligence.md) — 13 decisions locked (D1–D13) via grilling + 3 rounds of stress testing (8 subagent tasks). **Detection:** depth-counter over `{{`/`}}` delimiters (O(N), handles multi-line). **Cursor-in-query:** boolean flag from depth counter; false = template completions, true = query completions. **Completion (Phase 1):** tags after `#`, file classes after `@`, field names in filter LHS, operators, select options + booleans on RHS (lexer token classification); `textEdit` with explicit range for all completions. **Trigger chars:** `#` and `@` (requirements input for T24). **Diagnostics (Phase 1):** forward `QuerySyntaxError` spans directly via `LineIndex`; three severities (unknown class with close match = Warning, unknown class no match = Information, unknown field = Information); T2 ~50ms publish lane (amended 2026-10-15 by 25; was 300ms). **Hover (Phase 1):** tag count + class instance count (via `unique_tags()`/`unique_file_classes()` on IndexStore); field type + constraints from `SchemaFieldDef`. **Prerequisites:** `IndexStore::unique_tags()`, `IndexStore::unique_file_classes()`, `SchemaService::suggest_class()`. **Phase 2 (deferred):** fenced blocks, tag fuzzy-matching for diagnostics, trigger chars `(` and `"`, execution-dependent hover, `completionItem/resolve`, pull diagnostics. **Cross-ticket:** T24 owns shared completion-generation function + trigger character reconciliation; T25 owns severity calibration policy + three-tier debounce model. [Full research](research/21-query-language-intelligence.md) (603 lines, Parts I–XIII).
-- [Daily notes & date-based references](issues/18-daily-notes-and-date-references.md) — LSP-aware daily notes: configurable matching (`file`/`folder`/`both`/`path`) per granularity; `[periodic]` config with short names (`day`/`week`/`month`/`quarter`/`year`), optional `format` (defaults per granularity), `folder`, `template`, `match`; hybrid completion (algorithmic ±7 days + on-disk, capped); custom NL date parser for v1 (~150 lines, zero deps); diagnostic-driven creation (definition null, hover informational, code action on diagnostic only); past-date-only diagnostics for unresolved links; targets `FileEntry` (not `FileRecord`); reuses `DateValue`, `LinkResolver`, inverted index, `RefreshPlan`. [Full research](research/18-daily-notes-and-date-references.md).
-- [Template-language intelligence](issues/22-template-language-intelligence.md) — 24 decisions locked across four grilling rounds + 14 stress passes. **Static analysis:** `machinery::parse` behind an `unstable_machinery` gate (exact-pin `=2.24.0`, golden-span tests, `_`-arm ban), never execute templates in the LSP; shared engine-adjacent analysis module at `src/template/analysis.rs` (protocol-free invariant; placement = ticket-34 input); metadata = derived names + hand-authored docs, filter/test enumeration probe-filtered through `find` (offered ⇒ find-resolvable). **Completion/hover:** ambiguous stems dropped via `retain(find)` in shared `list_available` (CLI delta, sign-off); tiered hover `Doc`/`Identified`/`None` with kind-verified rule (which tiers render = 26's). **Diagnostics (phase 1):** syntax + name-resolution + typo + undefined-variable via a scope-correct span tracker (~100–150 lines; name set demoted to gate/test oracle), Information proposed; span-precedence ladder (AST span → `Error::range()` → `0..len` tripwire); live-debounced single-lane publisher (β: FIFO `Compute/Clear/Opened`, single-publisher-per-URI; `Amends 12 §1` and `Amends 14 §2` applied by 25 (2026-10-15) with 22's scope-limiting superseded: 14 §2 superseded outright, β generalized to all diagnostics; 09 note; timing resolved by 25: T1 100ms, T2 ~50ms). **Include/extends:** existence via `find`, buffer-authoritative content when content reading lands, overlay-aware discovery (virtual-child rule; `find`+`list_available` adopt together; CLI `Option`-overlay `None` seam). **Construction (Q23(a′)):** eager attempt at `initialize`, non-fatal, empty-schema-registry fallback with stored-`Err` state exposure and a three-rung failure ladder (config-absent ⇒ parse-only); one `reset_engine()` (v1 sticky-until-restart, schema-dir watch owed to 31); `window/showMessage` + `logMessage`/`tracing::warn!`; `ConstructionPolicy` seam so CLI keeps its tested fail-closed (CLI delta, sign-off). **Wiring:** edges exactly 24/25/26←22; **no** edge to 27 (flagged line applied to its Question, Q24(b)) or 34 (inputs line, Q8) — policy: edges = answerable-today blockers, flagged lines = optional/deferred inputs. [Full research](research/22-template-intelligence.md) (637 lines, §0–§9).
-- [Research: occurrence-span persistence — `Spanned<T>` spans across the redb boundary](issues/40-research-spanned-occurrence-persistence.md) — fired from note-parse ticket 04 after its span design (mandatory span + `serde(skip)` + "store-loaded spans decode 0..0" prose invariant) was withdrawn as a type-system lie. Two honest options verified with exact mechanics: **B** (persist spans, plain serde derives — zero test churn, derived span-inclusive `Eq`/`Ord` stay honest, needs §8 amended) vs **C** (`span: Option<ByteSpan>` — keeps §8, but decoded `None` fails the whole-`Note` round-trip asserts, forcing value-only equality, which contradicts span-inclusive `Ord` and rewrites both ordering pins at `src/position.rs:853`/`:863`, plus `Option` plumbing). Turn on whether range consumers ever read store-assembled notes or always get re-parsed files (26/27 + 13/14 serving mode). Current lean: B (pre-release voids §8's format-bump cost). Decision deferred to [Occurrence-span persistence decision](issues/41-occurrence-span-persistence.md), was blocked on 26/27 (both now resolved; 27 resolved 2026-10-22: 41 unblocked, 27's demand is transient spans only, so 41-C honest-absence is acceptable from 27's side). [Full findings](research/40-spanned-occurrence-persistence.md).
-- [Task & other PKM-specific semantics](issues/23-task-and-pkm-semantics.md) — decisions locked across grilling + four adversarial stress passes. **Ownership seams:** 23 owns product content — mid-typing `- [` checkbox completion (offer iff marker-state `Incomplete`, config-order `sort_text`, no removal item); date-value completion for `📅 ` AND `[due:: ` (same `NoteFieldValue::Date`; seam = 19 position / 23 candidates+content / 24 dispatch); content-gated hover (raw-scan mechanism — Exclude-lexing skips plain-bullet glyphs; gate = marker state, includes filtered Checkboxes); diagnostics existence + relative severity (**23 proposes, 25 decides** — set: A1 Hint; B1/B2/B3-conflicting/B5/B6-default-off/D1/D2 Warning; C1 Warning/C2/C4/C5/C6 Information; **B4 dropped**; code+link exclusion on raw scans; Done/Cancelled excluded); S3 outline content (Array=18 hideable-from-String-15 headings, ancestor-stack nesting — never `Note::tasks()`+ depth, bool rollup v1 / counts v2, `clean_text()` names, 1k/5k node caps, serve via 14's ContentResolver); status-cycle invariant (cycle order = config order = sort_text); conditional workspace/symbol picker (resolves open call A3: `Amends 33` residency + unfilled target row, cap+ranking → 27/29, full-Location fallback → 29, no-cancellation makes cap+residency hard requirements). **Deferred:** 24 dispatch/triggers, 25 severity taxonomy/publish/debounce/push-vs-pull, 26 markup kind, 27 symbol mechanics/coexistence, 29 capability gating, 31 `[tasks.diagnostics]` shape (deny_unknown_fields), 18 `today` primitive (C1/C2 blocked), 32 rumdl non-overlap, 34 visibility widening. **Perf (`Amends 33`):** resident/line-local = ignore-the-budget on measured substrate; tension surfaced per map:33 — 51.2KB long-line reparse 18.6ms > 33's <10ms (bench self-flagged anomaly, root-cause owed to implementation spec; param is line *length* not count); load floor 15.7–19.6ms baseline / 21.9–28.9ms current; `[tasks]` config change ≈48/90/466ms @1K/5K/20K (build+persist), detection sweep 15–50ms. **Wiring:** `Blocked by: 23` added to 24/25/26/27. [Full ticket](issues/23-task-and-pkm-semantics.md).
-
-- [Completion architecture: context detection & dispatch](issues/24-completion-architecture.md) — six decisions locked via one grilling round + four adversarial stress passes + a Helix/Neovim/nvim-cmp ordering sweep (findings dispositioned in [research §11](research/24-completion-architecture.md), the authoritative record). **Dispatch**: layered hybrid (region → line predicates → first-match; one per-`(uri,version)` content snapshot shared across handlers; strict body-`:` guard; bare-`[` seeding; C11 daily-note dates claimed). **Triggers**: hardcoded `[ # : @ . ^ > /`, zero config machinery, ≤0.3 ms degenerate-path contract on every request, `|` via target-time alias items, `/` `[[`-guarded, query entry = Invoked + `#`/`@` inside `{{ }}`. **Resolve**: eager docs to measured size N / defer only long prose (kills Zed's serial resolve bursts), ≤1 ms p95 + 20-burst ≤20 ms owed to 33, server deadline + fail-open required. **Wikilink insert**: paired-range gated snippet `[[T|${1:}]]$0` with state-aware plain track — the zero-snippet draft was refuted (snippetSupport true in all five primaries; stock-Neovim is the primary PKM demographic). **Frontmatter**: keys-before (19) / values-after as a key-shape-owned region (16/20/`[[`→15/decline), `AfterKey{key}` emission. **Ranking**: accept client re-sort bound to sortText+array-order-at-empty-input, preselect-where-honored, and a filterText word-initial builder invariant; nvim-cmp carved out. Handoffs to 15/16/18/19/20/23/29/31/32/33/34 in research §11.3.
-
-- [Definition, references, hover, rename & workspace-edit behavior](issues/26-definition-references-hover-rename.md) — resolved by four grilling rounds, each followed by a three-track stress test (conflict audit, internet benchmark audit, codegraph design audit; consolidated record in [research Parts VII-X](research/26-definition-references-hover-rename.md)). **Nav spine**: one protocol-free core facade: `Occurrence{kind, span}` with payload-in-variant kinds (Wikilink/Embed/FrontmatterLink/Heading/Tag/FieldKey/...), `NavTarget` with `name_range` contained in `scope_range`, three-state `Resolution{Unresolved|Unique|Ambiguous{StemTie|HeadingAnchor|PathTie}}`, `NavContext` bundle; no behavior trait, enum dispatch; folder-distance nearest stays `Unique`, equal-distance ties are `Ambiguous`; `nav::locate` scopes navigation entities only (24's dispatcher, 23's raw scan, 21/22 classifiers keep their own logic, all feeding ONE renderer). **Ambiguity choke point**: check lives in the spine's `*_at` entry points; two-tier refusal taxonomy (`Ok(null)` = off-entity/non-renamable kind/alias side/confinement; `-32803 RequestFailed` = ambiguity or illegal `new_name`, written into 16, scope = rename/prepare only, never references); consumer matrix (definition returns all uncapped, hover bounded list, references capped union, prepare/rename refuse, documentHighlight never errors); only link-shaped occurrences plus DailyDate can be Ambiguous. **References**: occurrence-resolved union at `references_at` (never file-set union: cross-rewrite corruption), dedup by (path, span), 5,000 soft cap scoped structurally to the references response path only (`EditSet` never truncated), bounded canonical-order collection, `window/logMessage` truncation notice, `partialResultToken` upgrade path for 29; stem-tie union best-effort (multi-target inlink edges = future ticket), heading-tie union complete. **WorkspaceEdit**: protocol-free `EditSet` in core, edge alone owns Uri/TextEdit/capability gate; two-tier serializer (`documentChanges` iff advertised OR ops present, for Neovim); `Some(v)` for open / `null` for closed, never 0 as sentinel; ops gated on `resourceOperations`, offered in prepare when applicable; full pre-validation (no client rolls back); `isRefactoring` on cascades, no change annotations v1; 26 owns server-initiated `RenameFile` (order: old-path edits, rename, new-path edits), 28 owns client-initiated will*Files + delete. **Hover**: negotiated Markdown with stripped-PlainText fallback, one shared renderer + per-entity producers over 24's snapshot, 19's safe subset + strikethrough, headings banned (schema-bound field name renders bold, not H2), always set `range` when spans exist, three-state template rendering (Doc+Identified render, None suppressed, construction failure gets a degradation banner), producer-owned caps (footnote preview, inlinks, previews), wikilink producer = title + resolved path + bounded preview + inlink count from 19's preview cache, budgets tightened to <2ms target / <1ms stretch. **prepareRename/rename**: advertised iff `prepareSupport`, uniform `{range, placeholder}` (body tag `#` in range, frontmatter `#` out), rename re-validates eligibility, per-kind matrix (heading rewrites title + ALL anchors incl. same-doc `[[#h]]` and `(#h)` fragments, footnote file-local, DailyDate refuses regardless of target existence, RefLabel rename added, alias/display side refuses, case-only file rename = zero-edit `RenameFile`), `new_name` legality per kind, -32803 with human messages. **Encoding**: negotiate utf-8-if-offered-else-utf-16 (closes 11's open question), one total `convert` module at the protocol boundary doubling as the miette bridge; 11's ropey branch deleted (14's `BufferState` is String-backed). **Comparison keys**: single `match_key` helper (NFC, then `char::to_lowercase`, then trailing NFC; path keys fold `\` to `/`; byte-level for non-UTF-8) with **byte-exact-first / fold-fallback in every tier**, fold-tier ties and exact-path fold collisions -> `Ambiguous{PathTie}` (never raw-sorted-first), applied at index-build and query boundaries only, watcher paths normalized at intake, original spellings in all output; new direct dep `unicode-normalization 0.1`; NFKC rejected everywhere, slug generation byte-exact GitHub locked, Unicode fixture set owed to 25. **Concurrency/perf**: `concurrency_level(1)` kept, rename is the sole handler permitted >100ms with workDone `$/progress` (amends 12, sides with 33); rename byte-tiered under 33's binding row; find-refs read as ≤5,000 results; prepare <5ms. Resolution wrote Amended-by-26 blocks into 11, 12, 14, 15, 16, 18, 19, 21, 22, 25, 33 and Inputs-from-26 blocks into 27, 28, 29, 30, 32, 34, 41; glossary terms added: Occurrence, NavTarget, Resolution, Ambiguity, Comparison Key (never "normalized path"), Folder Distance, Slug (use "inlinks", not "backlinks"). Newly unblocked: 28. [Full ticket](issues/26-definition-references-hover-rename.md).
-
-- [Structural/editor intelligence](issues/27-structural-symbols-and-editor-intelligence.md): resolved 2026-10-22 after a fully independent pass-2 re-research (Phase-D hardening via parallel stress-test, benchmark, codegraph design-review, and ecosystem-convention subagents), and the user-confirmed locked set D1'-D16' ([research pass 2](research/27-structural-symbols-editor-intelligence-pass2.md), Part XII). **All nine capabilities IN**, staged three waves; key inversion: 11 and 26 are NOT prerequisites for document-scope features (the LSP-side walk `walk(src) -> DocStructure`, cached per `(uri, version)`, produces exact spans from `into_offset_iter()`; transient spans never enter the postcard-persisted Note, 11 §8). Outline = headings + Array-kind task section children (Traces-original; root/preamble tasks on a document-root pseudo-symbol); folding E-lite on the raw walk (callout mapping "foldable = NOT `+`" amended to 17); selection S1 + invariant property test; documentLink Option A eager, resolveProvider:false, exact spans, ambiguous = first-candidate + tooltip (Neovim-invisible limitation documented), unresolved dropped (three-way handoff to 25/15/26 + off-severity silent-hole documented); semantic tokens two-valued Wave 1 (`unresolved`), three-valued Wave 2 (26-gated); refresh as debounced server-to-client requests via a shared 25-mirror helper gated on refreshSupport; CodeLens staged C→A with zero-reference suppression; four code-action kinds; VS Code duplication = accept + document + config gates (kind-dodge and auto-cession rejected); capability lifecycle = static initialize-time `[lsp]` gates (lens default false) + runtime-disable semantics; corrected perf rows/vault ladder/REFERENCE_CEILING filed to 33; record blocks filed to twelve related tickets (nine primary records, sign-offs to 15/26, runtime-toggle input to 31). Recorded consideration: a future Note-type split (index-optimized vs editor-aware) is compatible by design, `DocStructure` being the transient editor-aware citizen; input to a separate arch-design task. [Full ticket](issues/27-structural-symbols-and-editor-intelligence.md).
+- [Research: Markdown Oxide capabilities & architecture](issues/01-research-markdown-oxide.md)
+  — regex-only/no-AST, `tower-lsp`+`tokio`+`rayon`, in-memory only, ambiguity
+  deferred to client, tag rename uses hierarchical prefix match but
+  goto-definition uses exact match only; filesystem-watch triggers a full vault
+  rebuild that overrides unsaved buffers (an anti-pattern to avoid).
+  [Full findings](research/tool-markdown-oxide.md).
+- [Research: Marksman capabilities & architecture](issues/02-research-marksman.md)
+  — F#/Markdig, actor-model concurrency, full re-parse per edit with incremental
+  workspace-index-only updates; wikilink resolution (title vs filename) is
+  user-configurable; documented "duplicate heading" diagnostic doesn't actually
+  exist standalone in source. [Full findings](research/tool-marksman.md).
+- [Research: rumdl capability boundary and coexistence hooks](issues/03-research-rumdl-boundary.md)
+  — three-setting coexistence contract
+  (`enableLinkCompletions`/`enableLinkNavigation`/`enableSymbols`); wikilinks
+  permanently out of scope by design; link diagnostics not gated by those
+  settings; zero formatting overlap.
+  [Full findings](research/tool-rumdl-boundary.md).
+- [Research: zk capabilities & architecture](issues/04-research-zk.md) —
+  strictly single-root Notebook, no daily-note special-casing (composed from
+  template groups + date placeholders), flat tag model with glob-simulated
+  hierarchy, SQLite-backed incremental diff-indexing synced to unsaved buffers.
+  [Full findings](research/tool-zk.md).
+- [Research: Microsoft markdown-language-service/server generic baseline](issues/05-research-ms-markdown-language-service.md)
+  — canonical generic-Markdown capability bar
+  (folding/selection-ranges/symbols/links/hover/definition/references/rename/completion/diagnostics)
+  with semantic tokens and CodeLens both deliberately absent; clean
+  protocol-agnostic-library-vs-LSP-adapter split; zero wikilink/PKM support;
+  UTF-16 positions only.
+  [Full findings](research/tool-ms-markdown-language-service.md).
+- [Research: rust-analyzer host/snapshot architecture precedent](issues/06-research-rust-analyzer-precedent.md)
+  — Host/Snapshot split confirmed as a real, load-bearing pattern; salsa's core
+  lesson (isolate local/volatile from global/stable state) is separable from
+  adopting salsa itself; VFS/open-buffer-as-truth pattern is directly reusable;
+  "parsing must never fail" invariant matters for Note parsing and template
+  static analysis alike.
+  [Full findings](research/tool-rust-analyzer-precedent.md).
+- [Research: Rust LSP framework/transport crate landscape](issues/07-research-rust-lsp-framework-crates.md)
+  — two-axis finding, corrected 2026-09-03: on runtime demands,
+  `tower-lsp-server`/`async-lsp` require an async runtime end-to-end and their
+  automatic `$/cancelRequest` handling (dropping a `Future`) doesn't interrupt
+  synchronous `spawn_blocking`'d work, while `lsp-server`+`lsp-types` is a
+  minimal synchronous crossbeam-channel API with fully manual cancellation and
+  zero async requirement; on ecosystem adoption, `tower-lsp-server` is the
+  current de facto standard/most-recommended choice in the wider Rust LSP
+  community, not `lsp-server` (rust-analyzer's own pick, for its own unusual
+  reasons). Both axes are input for ticket 09's runtime-model decision; neither
+  alone picks a winner.
+  [Full findings](research/07-rust-lsp-framework-crates.md).
+- [Research: Obsidian Dataview/Templater/Metadata Menu/obsidian-tasks parity](issues/08-research-dataview-templater-metadatamenu-parity.md)
+  — none of the four provide real LSP-shaped intelligence (completion-popup
+  precedent only, zero diagnostics/hover/definition precedent); Templater's
+  `tp.*` member-completion and Metadata Menu's `fileClass`-scoped
+  value-completion are the closest structural precedents for tickets 22 and 20
+  respectively. Full findings merged into
+  [research/21-query-language-intelligence.md](research/21-query-language-intelligence.md)
+  (Part VII); original `research/08-…md` deleted.
+- [Research: performant Rust LSP runtime models beyond rust-analyzer](issues/35-research-performant-rust-lsp-runtime-models.md)
+  — fired mid-grilling-session on ticket 09 after user pushback that
+  rust-analyzer alone was too thin a precedent. Across `ty`, `ruff server`,
+  Biome, and Taplo, zero precedent exists for making the core analysis engine
+  itself `async fn`; the real split is fully-synchronous end-to-end
+  (`ty`/`ruff server`, no non-trivial concurrent I/O beyond request/response) vs
+  `tokio`+`tower-lsp-server` at the transport boundary only with a synchronous
+  core underneath (Biome, chosen specifically because its LSP layer has real
+  concurrent I/O — file-watch events, multi-client sessions). Taplo's
+  hand-rolled async stub is a cautionary tale, not a counterexample — its own
+  maintainer wanted to move toward Biome's shape.
+  [Full findings](research/35-performant-rust-lsp-runtime-models.md).
+- [LSP framework/transport crate & runtime model](issues/09-lsp-framework-and-runtime-model.md)
+  — `tower-lsp-server` for JSON-RPC/LSP transport (covers Content-Length framing
+  natively); runtime scope is transport-loop-only (`tokio` confined to
+  transport/dispatch + concurrent I/O like filesystem watching, core
+  Index/Query/Schema/Template/parsing stays synchronous) — revised from an
+  initial sync-only lean after ticket 35's research found this is the shape
+  performant Rust LSPs use when they have non-trivial concurrent I/O beyond
+  request/response (unlike `ty`/`ruff server`, which stay fully sync);
+  whole-process-async not foreclosed if a concrete need surfaces later. Template
+  LSP features start static-analysis-only (never invoke `ui.*` `DialogProvider`
+  helpers), with a non-interactive `DialogProvider` kept open, not closed, for
+  ticket 22. [Full ticket](issues/09-lsp-framework-and-runtime-model.md).
+- [Research: actor-model/event-driven architecture for the analysis host, and future MCP-server extensibility](issues/36-research-actor-model-and-mcp-extensibility.md)
+  — fired mid-grilling-session on ticket 10 for thorough review of the rejected
+  actor-model alternative, given a future MCP server is a real possibility.
+  Actor model rejected: zero unique benefit for "one coordinator, N protocol
+  frontends" (an `Arc`-swap facade already gives this for free via ordinary
+  method calls) and it actively serializes what should be concurrent lock-free
+  reads. Zero precedent among performant Rust LSPs; Marksman's actor model is
+  F#-idiomatic, not Rust evidence. Confirms `Arc<WorkspaceIndex>`
+  swap-on-refresh.
+  [Full findings](research/36-actor-model-and-mcp-extensibility.md).
+- [Research: filesystem-watching in Rust, and whether Traces should own one beyond the LSP's needs](issues/37-research-filesystem-watching-beyond-lsp.md)
+  — `notify`+`notify-debouncer-full` is the mature standard if/when needed, but
+  doesn't earn its keep for ticket 10; zero precedent among Markdown
+  Oxide/Marksman/zk/rust-analyzer for a server-bundled watcher alongside
+  LSP-provided watching. Real future gaps identified for later (not ticket 10):
+  a `traces watch` CLI mode (no daemon/watch mode exists today) and the future
+  MCP server if its clients lack file-watching capability.
+  [Full findings](research/37-filesystem-watching-beyond-lsp.md); precedent
+  claim corrected 2026-10-21 — iwe is a server-bundled-watcher counterexample
+  ([tool-iwe research](research/tool-iwe.md)), decision unchanged.
+- [Research: salsa/incremental-computation frameworks — timing and root cause of large-vault performance problems](issues/38-research-salsa-incremental-computation.md)
+  — architecturally, adopting `Arc<WorkspaceIndex>` now doesn't foreclose salsa
+  later (rust-analyzer's `AnalysisHost`/`Analysis` is the proven shell for
+  housing a `salsa::Database`). More importantly: salsa is very likely not the
+  fix for the large-vault pain motivating this project — Obsidian's and Markdown
+  Oxide's failures trace to unindexed O(N) whole-vault scans (Dataview) and
+  unbounded in-memory/no-persistence growth (Markdown Oxide), not lack of
+  incremental recomputation. Flags that `QueryService::execute`'s existing
+  linear scan (`run_from_store`/`matched_file_rows`,
+  `src/query/service.rs:318-329`; citation corrected 2026-10-15 by 25) is
+  structurally the same failure shape — ticket 33's job to evidence, not salsa's
+  to fix. [Full findings](research/38-salsa-incremental-computation.md).
+- [Analysis host architecture & integration with IndexerService/QueryService/SchemaService](issues/10-analysis-host-and-index-integration.md)
+  — `Arc<WorkspaceIndex>` behind a swap-on-refresh cell, shared read-only across
+  concurrent handlers (actor model researched and rejected — ticket 36); refresh
+  triggered by `workspace/didChangeWatchedFiles` client-side watching, no
+  Traces-owned filesystem watcher adopted (ticket 37);
+  `QueryService`/`SchemaService` wrapped by a thin analysis-host facade;
+  salsa-style incremental query engine explicitly deferred to ticket 33, not
+  adopted now (ticket 38) — architecturally free to defer (rust-analyzer's
+  `AnalysisHost`/`Analysis` is the proven shell for it), and likely not the
+  actual fix for the large-vault pain motivating this project, whose root cause
+  traces to unindexed whole-vault scans and unbounded memory, not missing
+  incrementality; flags `QueryService::execute`'s existing linear scan as
+  sharing that exact failure shape for ticket 33 to evidence.
+  [Full ticket](issues/10-analysis-host-and-index-integration.md).
+- [Research: source span/position/text model for the Note AST — first principles](issues/39-research-source-span-and-position-model.md)
+  — fired to support ticket 11 after the user asked for research unconstrained
+  by current architecture, not just a grounding pass. Key finding:
+  `pulldown-cmark` already emits full byte ranges per event via
+  `into_offset_iter()` (`src/note/parser.rs:104`) but only `range.start`
+  survives, discarded for links/tags/headings/inline fields — extending the
+  existing `Note` AST is both the smaller diff *and* the
+  first-principles-correct answer (they didn't conflict). Parser stays
+  `pulldown-cmark` (zero peer precedent for tree-sitter-markdown, web-confirmed
+  not recommended where correctness matters); `ropey` adopted narrowly for
+  live-buffer text (ticket 14); frontmatter spans need a dedicated raw-text
+  re-scan since `yaml_serde` has zero span capability (empirically confirmed via
+  rust-docs-mcp; superseded 2026-09-23 — `noyalib` `Spanned` after ticket 19's
+  parser swap); spans stay transient, never persisted in redb. Surfaces a real
+  gap ticket 11's wording didn't name: a first-class `Heading` AST node is
+  missing entirely, not just span-less.
+  [Full findings](research/39-source-span-position-model.md).
+- [Source span/position model for the Note AST](issues/11-source-span-and-position-model.md)
+  — spans on the AST (extend `Link`, `Tag`, inline fields with `Range<BytePos>`;
+  add flat `Heading` node with `level: u8`); `BytePos` narrows to `u32` with
+  `From<u32>`/`TryFrom<usize>`; `LineIndex` moves to `src/position.rs`, widens
+  to `pub(crate)`, gains `byte_to_utf16_cu`; two concrete conversion functions
+  (LineIndex for file buffers, ropey for live buffers), no trait; frontmatter
+  spans via `noyalib` `Spanned` (reconciled 2026-09-23 to ticket 19's parser
+  swap; hand-rolled Level-2 scanner dropped); parser stays pulldown-cmark with
+  full re-parse per edit; spans stay transient, never in redb; ropey scoped to
+  live buffers only.
+- [Concurrency & cancellation model](issues/12-concurrency-and-cancellation-model.md)
+  — tower-lsp-server with `concurrency_level(1)`: sequential dispatch eliminates
+  ordering bug (#284), sync handlers run inline (blocking tokio worker, but N=1
+  so nothing else needs it), no `spawn_blocking` bridge needed; stale-result
+  discard for `$/cancelRequest` (industry standard — no production Rust LSP
+  implements cooperative cancel); refresh completes before next handler starts
+  (sequential, N=1 natural); `$/progress` deferred (UX polish, not concurrency).
+- [LSP-specific persistence & caching strategy](issues/13-lsp-persistence-and-caching-strategy.md)
+  — no new redb tables (existing 7 sufficient; ecosystem re-scans on startup;
+  redb is warm-start cache); in-memory mutable index with editor buffer
+  authoritative for open documents; expand `RefreshPlan` with single-file
+  constructor (unified sync infrastructure for editor `didChange` + future
+  filesystem watcher); debounce `didChange` at 50 to 100ms (superseded
+  2026-10-15 by 25: T1 fixed at 100ms).
+  [Full research](research/13-lsp-persistence-caching-patterns.md).
+- [Live editor buffer vs filesystem overlay model](issues/14-live-buffer-vs-filesystem-overlay.md)
+  — transient replacement (editor content replaces disk while open);
+  `RwLock<HashMap<Url, BufferState>>` with `content: String` + `version: i32`,
+  no `parsed_note` (computed on-demand); debounce 150ms/300ms (superseded
+  2026-10-15 by 25: T1 100ms, T2 ~50ms, spawn+generation counter, no in-handler
+  sleep); `ContentResolver` facade for note/text access; per-request inlink
+  adjustment with cached `LinkResolver` (requires `WorkspaceIndex::files()`
+  accessor + mutable inlink reconstruction); `didSave` integrates into the
+  refresh typestate (via the single-file `RefreshPlan` constructor rather than
+  calling a method directly; not via `didChangeWatchedFiles`); unsaved files via
+  `FileBase::new_buffer()` constructor; overlay layer maintains own
+  `LinkResolver` for cross-overlay resolution.
+  [Full research](research/14-buffer-overlay-model.md).
+- [Performance targets & strategy](issues/33-performance-targets-and-strategy.md)
+  — cold start <2s at 20K files via `rayon` parallel scan; warm start <500ms;
+  inverted index built now (gotodef <5ms, completion <20ms, find-refs <20ms);
+  evictable LRU memory model with 3 tiers (always-resident metadata ~2MB, LRU
+  AST cache, diagnostics results in a bounded ~10MB pull cache (amended
+  2026-10-15 by 25, was "transient")); <100MB idle, <500MB hard cap; schema
+  definitions always resident for frontmatter intelligence; extend
+  `index_refresh.rs` (decomposed from `index_lifecycle.rs`) + new
+  `lsp_latency.rs` benchmark harness. Amended 2026-10-04 by 23 (task-row
+  residency, missing `workspace/symbol` row, long-line reparse tension — see
+  33's Answer); amended 2026-10-22 by 27 (corrected nine-feature perf rows,
+  vault-scale ladder 100/1k/10k/50k + 20k iwe anchor, two-tier REFERENCE_CEILING
+  amending 26's constant, lsp-bench-shaped criterion suite required before rows
+  are accepted). [Full research](research/33-lsp-performance-targets.md),
+  [best practices](research/x-lsp-performance-best-practices.md),
+  [crate analysis](research/x-performance-crates.md).
+- [Links & references: wikilinks, aliases, heading/block refs, embeds, backlinks, images](issues/15-links-and-references-model.md)
+  — wikilink resolution purely structural over the link target (full path,
+  relative path, filename, or basename; the `|` side is display-only and
+  frontmatter `aliases`/`title` never resolve — amended 2026-09-23,
+  title-slug/alias steps and their config knob revoked); heading references use
+  GitHub-style slugger with reactive ambiguity for duplicates (rumdl owns
+  standard-link anchors, Traces owns wikilink heading anchors); block references
+  out of scope (ticket separately); embeds: definition navigates, hover shows
+  preview where editor supports; images: phased (go-to-definition + existence
+  validation first, defer base64 preview); ambiguity: no diagnostic (client
+  disambiguates), zero matches = Information severity with "Create note" code
+  action, configurable severity escalation; reference-style links full parity;
+  rumdl coexistence: Traces owns wikilinks, rumdl owns standard links (zero
+  overlap by design). Amended 2026-10-15 by 25: cross-file `file.md#heading`
+  anchors are unowned by rumdl (same-document `#frag` only, MD051) and claimed
+  by Traces (suppress-when-target-missing); standard-link existence including
+  image targets ceded to MD057 (code action dropped,
+  `diagnostics.standard_links` flag retired, `.rumdl.toml` guidance primary);
+  `UnresolvedLinkPolicy` enum deleted (per-code O1 override keys instead);
+  zero-match severities escalate via per-code keys. New crates: `camino`,
+  `fuzzy-matcher`. [Full research](research/15-links-and-references.md).
+- [Tags & hierarchical tags LSP intelligence](issues/16-tags-and-hierarchical-tags.md)
+  — completion triggered by `#` with syntax guards and full `TextEdit` ranges;
+  definition returns `None`; references uses hierarchical matching via
+  `Tag::is_contained_in`; hover displays occurrence counts and child sub-tag
+  breakdowns; rename cascades prefixes via `replacen` with YAML frontmatter
+  syntax awareness; document symbols omit tags; workspace symbols expose unique
+  tags; parse-time unification of frontmatter and body tags into `Note.tags()`.
+- [Footnotes & callouts](issues/17-footnotes-and-callouts.md) — footnotes in
+  scope: enable `ENABLE_FOOTNOTES`, build inverted index (definitions +
+  references HashMaps), full 7-operation set (go-to-def, find-refs,
+  undefined-ref diagnostics, completion, hover, rename as file-local
+  find-replace, optional unused-def diagnostics); spans from
+  `into_offset_iter()`, transient. Callouts in scope limited: detect via
+  `BlockQuote` start handler + first-line scan, 13 canonical types with alias
+  resolution + config extension (`[callouts] extra_types`), completion +
+  folding-range data for ticket 27; diagnostics skipped (Obsidian behavior:
+  unknown types valid, custom types via CSS make any list incomplete); amended
+  2026-10-22 by 27 (callout fold mapping: foldable = NOT `+`; `is_foldable` bool
+  flagged for three-state widening).
+  [Full research](research/17-footnotes-and-callouts.md).
+- [Metadata/frontmatter & inline-field intelligence](issues/19-frontmatter-and-inline-field-intelligence.md)
+  — replace `serde_yaml` with `noyalib` (core API `from_str_with_config` with a
+  shared `ParserConfig::serde_yaml_compat()`, `Spanned<T>` for byte ranges; YAML
+  1.2 — the earlier "`YamlVersion::V1_1` for Dataview compat" claim is
+  corrected, see note-parse ticket 02, "Rationale: YAML 1.2, not 1.1");
+  `ByteSpan(Range<BytePos>)` newtype per ticket 11 (`u32` offsets); three-layer
+  completion (schema > global > inferred) with `FieldKey` canonical dedup,
+  explicit data structure and <20ms performance budget; fileClass wins on
+  conflicts with resolution matrix (type/required/multi/exclude); `$ref` targets
+  deferred to workspace-wide rename; schema-bound hover with
+  type+constraints+attribution, vault-inferred hover with hybrid
+  tentative/authoritative; link hover with cross-IDE safe markdown (bold,
+  italic, inline code, fenced code, lists, links) + in-memory content preview
+  cache; trigger chars `[` and `:` with context-dependent handling + CodeRegion
+  exclusion + exact regex for `:` validation; YAML diagnostics Warning (Error
+  for root-level), inline-field diagnostics only for lexer-identified malformed
+  fields; rename note-local + FileClass-schema own fields only; type-aware
+  follows Dataview cascade, unscoped = informational only (scoped = ticket 20).
+  Prerequisites: ticket 11 changes (BytePos u32, LineIndex move, lexer spans)
+  must land first.
+- [Schema- and File-Class-aware language intelligence](issues/20-schema-and-fileclass-intelligence.md)
+  — 20 decisions locked via grilling + stress testing. **Validator:** standalone
+  `SchemaValidator` struct, `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`,
+  frontmatter-only (no inline fields, no file-existence). **Scope:**
+  type-correctness + range/select/date + required + multi enforcement. Date =
+  syntax-only (chrono, not jiff); file = type + multi only. **Severity:**
+  two-tier (Information for non-canonical unknowns, Warning for typo matches via
+  `suggest_field()`); three-tier select (strict/skip/N/A); Warning for invalid
+  select, List-on-non-multi. **Diagnostics:** single `source: "traces"` +
+  hierarchical `schema.*` codes (amended 2026-10-15 by 25; was
+  `traces-schema`) + `code` field; `relatedInformation` for inherited fields.
+  **Intelligence:** go-to-definition jumps to originating schema (origin on
+  `SchemaFieldDef`); file-field completion enumerates vault index +
+  DocumentStore overlays, cap 100; hover shows field list + metadata +
+  description + suggested-but-unset + ancestor chain; timing = on-open + T2
+  ~50ms publish lane (amended by 25; was 300ms) + on-save. **Model:**
+  `Frontmatter` gains parallel `#[serde(skip)] spans` map
+  (`ByteSpan = Range<BytePos>`); `SchemaFieldDef` gains
+  `origin: Option<SchemaName>` + `description: Option<String>`; manual
+  `PartialEq` on both types excluding metadata fields; `Schema` gains
+  `parent_order: Vec<SchemaName>` for resolution chain display. **Config:**
+  `[schemas.diagnostics]` with `enabled` + `debounce_ms`. **Prereqs:** tickets
+  11 (spans) and 19 (noyalib) must land first.
+  [Designs](research/20-designs.md),
+  [research](research/20-schema-fileclass-intelligence.md) (includes stress test
+  results in Part VIII).
+- [Query-language intelligence](issues/21-query-language-intelligence.md) — 13
+  decisions locked (D1–D13) via grilling + 3 rounds of stress testing (8
+  subagent tasks). **Detection:** depth-counter over `{{`/`}}` delimiters (O(N),
+  handles multi-line). **Cursor-in-query:** boolean flag from depth counter;
+  false = template completions, true = query completions.
+  **Completion (Phase 1):** tags after `#`, file classes after `@`, field names
+  in filter LHS, operators, select options + booleans on RHS (lexer token
+  classification); `textEdit` with explicit range for all completions.
+  **Trigger chars:** `#` and `@` (requirements input for T24).
+  **Diagnostics (Phase 1):** forward `QuerySyntaxError` spans directly via
+  `LineIndex`; three severities (unknown class with close match = Warning,
+  unknown class no match = Information, unknown field = Information); T2 ~50ms
+  publish lane (amended 2026-10-15 by 25; was 300ms). **Hover (Phase 1):** tag
+  count + class instance count (via `unique_tags()`/`unique_file_classes()` on
+  IndexStore); field type + constraints from `SchemaFieldDef`.
+  **Prerequisites:** `IndexStore::unique_tags()`,
+  `IndexStore::unique_file_classes()`, `SchemaService::suggest_class()`.
+  **Phase 2 (deferred):** fenced blocks, tag fuzzy-matching for diagnostics,
+  trigger chars `(` and `"`, execution-dependent hover,
+  `completionItem/resolve`, pull diagnostics. **Cross-ticket:** T24 owns shared
+  completion-generation function + trigger character reconciliation; T25 owns
+  severity calibration policy + three-tier debounce model.
+  [Full research](research/21-query-language-intelligence.md) (603 lines, Parts
+  I–XIII).
+- [Daily notes & date-based references](issues/18-daily-notes-and-date-references.md)
+  — LSP-aware daily notes: configurable matching (`file`/`folder`/`both`/`path`)
+  per granularity; `[periodic]` config with short names
+  (`day`/`week`/`month`/`quarter`/`year`), optional `format` (defaults per
+  granularity), `folder`, `template`, `match`; hybrid completion (algorithmic ±7
+  days + on-disk, capped); custom NL date parser for v1 (~150 lines, zero deps);
+  diagnostic-driven creation (definition null, hover informational, code action
+  on diagnostic only); past-date-only diagnostics for unresolved links; targets
+  `FileEntry` (not `FileRecord`); reuses `DateValue`, `LinkResolver`, inverted
+  index, `RefreshPlan`.
+  [Full research](research/18-daily-notes-and-date-references.md).
+- [Template-language intelligence](issues/22-template-language-intelligence.md)
+  — 24 decisions locked across four grilling rounds + 14 stress passes.
+  **Static analysis:** `machinery::parse` behind an `unstable_machinery` gate
+  (exact-pin `=2.24.0`, golden-span tests, `_`-arm ban), never execute templates
+  in the LSP; shared engine-adjacent analysis module at
+  `src/template/analysis.rs` (protocol-free invariant; placement = ticket-34
+  input); metadata = derived names + hand-authored docs, filter/test enumeration
+  probe-filtered through `find` (offered ⇒ find-resolvable).
+  **Completion/hover:** ambiguous stems dropped via `retain(find)` in shared
+  `list_available` (CLI delta, sign-off); tiered hover `Doc`/`Identified`/`None`
+  with kind-verified rule (which tiers render = 26's).
+  **Diagnostics (phase 1):** syntax + name-resolution + typo +
+  undefined-variable via a scope-correct span tracker (~100–150 lines; name set
+  demoted to gate/test oracle), Information proposed; span-precedence ladder
+  (AST span → `Error::range()` → `0..len` tripwire); live-debounced single-lane
+  publisher (β: FIFO `Compute/Clear/Opened`, single-publisher-per-URI;
+  `Amends 12 §1` and `Amends 14 §2` applied by 25 (2026-10-15) with 22's
+  scope-limiting superseded: 14 §2 superseded outright, β generalized to all
+  diagnostics; 09 note; timing resolved by 25: T1 100ms, T2 ~50ms).
+  **Include/extends:** existence via `find`, buffer-authoritative content when
+  content reading lands, overlay-aware discovery (virtual-child rule;
+  `find`+`list_available` adopt together; CLI `Option`-overlay `None` seam).
+  **Construction (Q23(a′)):** eager attempt at `initialize`, non-fatal,
+  empty-schema-registry fallback with stored-`Err` state exposure and a
+  three-rung failure ladder (config-absent ⇒ parse-only); one `reset_engine()`
+  (v1 sticky-until-restart, schema-dir watch owed to 31); `window/showMessage` +
+  `logMessage`/`tracing::warn!`; `ConstructionPolicy` seam so CLI keeps its
+  tested fail-closed (CLI delta, sign-off). **Wiring:** edges exactly
+  24/25/26←22; **no** edge to 27 (flagged line applied to its Question, Q24(b))
+  or 34 (inputs line, Q8) — policy: edges = answerable-today blockers, flagged
+  lines = optional/deferred inputs.
+  [Full research](research/22-template-intelligence.md) (637 lines, §0–§9).
+- [Research: occurrence-span persistence — `Spanned<T>` spans across the redb boundary](issues/40-research-spanned-occurrence-persistence.md)
+  — fired from note-parse ticket 04 after its span design (mandatory span +
+  `serde(skip)` + "store-loaded spans decode 0..0" prose invariant) was
+  withdrawn as a type-system lie. Two honest options verified with exact
+  mechanics: **B** (persist spans, plain serde derives — zero test churn,
+  derived span-inclusive `Eq`/`Ord` stay honest, needs §8 amended) vs **C**
+  (`span: Option<ByteSpan>` — keeps §8, but decoded `None` fails the
+  whole-`Note` round-trip asserts, forcing value-only equality, which
+  contradicts span-inclusive `Ord` and rewrites both ordering pins at
+  `src/position.rs:853`/`:863`, plus `Option` plumbing). Turn on whether range
+  consumers ever read store-assembled notes or always get re-parsed files
+  (26/27 + 13/14 serving mode). Current lean: B (pre-release voids §8's
+  format-bump cost). Decision deferred to
+  [Occurrence-span persistence decision](issues/41-occurrence-span-persistence.md),
+  was blocked on 26/27 (both now resolved; 27 resolved 2026-10-22: 41 unblocked,
+  27's demand is transient spans only, so 41-C honest-absence is acceptable from
+  27's side). [Full findings](research/40-spanned-occurrence-persistence.md).
+- [Task & other PKM-specific semantics](issues/23-task-and-pkm-semantics.md) —
+  decisions locked across grilling + four adversarial stress passes.
+  **Ownership seams:** 23 owns product content — mid-typing `- [` checkbox
+  completion (offer iff marker-state `Incomplete`, config-order `sort_text`, no
+  removal item); date-value completion for `📅` AND `[due::` (same
+  `NoteFieldValue::Date`; seam = 19 position / 23 candidates+content / 24
+  dispatch); content-gated hover (raw-scan mechanism — Exclude-lexing skips
+  plain-bullet glyphs; gate = marker state, includes filtered Checkboxes);
+  diagnostics existence + relative severity (**23 proposes, 25 decides** — set:
+  A1 Hint; B1/B2/B3-conflicting/B5/B6-default-off/D1/D2 Warning; C1
+  Warning/C2/C4/C5/C6 Information; **B4 dropped**; code+link exclusion on raw
+  scans; Done/Cancelled excluded); S3 outline content (Array=18
+  hideable-from-String-15 headings, ancestor-stack nesting — never
+  `Note::tasks()`+ depth, bool rollup v1 / counts v2, `clean_text()` names,
+  1k/5k node caps, serve via 14's ContentResolver); status-cycle invariant
+  (cycle order = config order = sort_text); conditional workspace/symbol picker
+  (resolves open call A3: `Amends 33` residency + unfilled target row,
+  cap+ranking → 27/29, full-Location fallback → 29, no-cancellation makes
+  cap+residency hard requirements). **Deferred:** 24 dispatch/triggers, 25
+  severity taxonomy/publish/debounce/push-vs-pull, 26 markup kind, 27 symbol
+  mechanics/coexistence, 29 capability gating, 31 `[tasks.diagnostics]` shape
+  (deny_unknown_fields), 18 `today` primitive (C1/C2 blocked), 32 rumdl
+  non-overlap, 34 visibility widening. **Perf (`Amends 33`):**
+  resident/line-local = ignore-the-budget on measured substrate; tension
+  surfaced per map:33 — 51.2KB long-line reparse 18.6ms > 33's <10ms (bench
+  self-flagged anomaly, root-cause owed to implementation spec; param is line
+  *length* not count); load floor 15.7–19.6ms baseline / 21.9–28.9ms current;
+  `[tasks]` config change ≈48/90/466ms @1K/5K/20K (build+persist), detection
+  sweep 15–50ms. **Wiring:** `Blocked by: 23` added to 24/25/26/27.
+  [Full ticket](issues/23-task-and-pkm-semantics.md).
+- [Completion architecture: context detection & dispatch](issues/24-completion-architecture.md)
+  — six decisions locked via one grilling round + four adversarial stress
+  passes + a Helix/Neovim/nvim-cmp ordering sweep (findings dispositioned in
+  [research §11](research/24-completion-architecture.md), the authoritative
+  record). **Dispatch**: layered hybrid (region → line predicates → first-match;
+  one per-`(uri,version)` content snapshot shared across handlers; strict
+  body-`:` guard; bare-`[` seeding; C11 daily-note dates claimed). **Triggers**:
+  hardcoded `[ # : @ . ^ > /`, zero config machinery, ≤0.3 ms degenerate-path
+  contract on every request, `|` via target-time alias items, `/` `[[`-guarded,
+  query entry = Invoked + `#`/`@` inside `{{ }}`. **Resolve**: eager docs to
+  measured size N / defer only long prose (kills Zed's serial resolve bursts),
+  ≤1 ms p95 + 20-burst ≤20 ms owed to 33, server deadline + fail-open required.
+  **Wikilink insert**: paired-range gated snippet `[[T|${1:}]]$0` with
+  state-aware plain track — the zero-snippet draft was refuted (snippetSupport
+  true in all five primaries; stock-Neovim is the primary PKM demographic).
+  **Frontmatter**: keys-before (19) / values-after as a key-shape-owned region
+  (16/20/`[[`→15/decline), `AfterKey{key}` emission. **Ranking**: accept client
+  re-sort bound to sortText+array-order-at-empty-input, preselect-where-honored,
+  and a filterText word-initial builder invariant; nvim-cmp carved out. Handoffs
+  to 15/16/18/19/20/23/29/31/32/33/34 in research §11.3.
+- [Definition, references, hover, rename & workspace-edit behavior](issues/26-definition-references-hover-rename.md)
+  — resolved by four grilling rounds, each followed by a three-track stress test
+  (conflict audit, internet benchmark audit, codegraph design audit;
+  consolidated record in
+  [research Parts VII-X](research/26-definition-references-hover-rename.md)).
+  **Nav spine**: one protocol-free core facade: `Occurrence{kind, span}` with
+  payload-in-variant kinds
+  (Wikilink/Embed/FrontmatterLink/Heading/Tag/FieldKey/...), `NavTarget` with
+  `name_range` contained in `scope_range`, three-state
+  `Resolution{Unresolved|Unique|Ambiguous{StemTie|HeadingAnchor|PathTie}}`,
+  `NavContext` bundle; no behavior trait, enum dispatch; folder-distance nearest
+  stays `Unique`, equal-distance ties are `Ambiguous`; `nav::locate` scopes
+  navigation entities only (24's dispatcher, 23's raw scan, 21/22 classifiers
+  keep their own logic, all feeding ONE renderer). **Ambiguity choke point**:
+  check lives in the spine's `*_at` entry points; two-tier refusal taxonomy
+  (`Ok(null)` = off-entity/non-renamable kind/alias side/confinement;
+  `-32803 RequestFailed` = ambiguity or illegal `new_name`, written into 16,
+  scope = rename/prepare only, never references); consumer matrix (definition
+  returns all uncapped, hover bounded list, references capped union,
+  prepare/rename refuse, documentHighlight never errors); only link-shaped
+  occurrences plus DailyDate can be Ambiguous. **References**:
+  occurrence-resolved union at `references_at` (never file-set union:
+  cross-rewrite corruption), dedup by (path, span), 5,000 soft cap scoped
+  structurally to the references response path only (`EditSet` never truncated),
+  bounded canonical-order collection, `window/logMessage` truncation notice,
+  `partialResultToken` upgrade path for 29; stem-tie union best-effort
+  (multi-target inlink edges = future ticket), heading-tie union complete.
+  **WorkspaceEdit**: protocol-free `EditSet` in core, edge alone owns
+  Uri/TextEdit/capability gate; two-tier serializer (`documentChanges` iff
+  advertised OR ops present, for Neovim); `Some(v)` for open / `null` for
+  closed, never 0 as sentinel; ops gated on `resourceOperations`, offered in
+  prepare when applicable; full pre-validation (no client rolls back);
+  `isRefactoring` on cascades, no change annotations v1; 26 owns
+  server-initiated `RenameFile` (order: old-path edits, rename, new-path edits),
+  28 owns client-initiated will*Files + delete. **Hover**: negotiated Markdown
+  with stripped-PlainText fallback, one shared renderer + per-entity producers
+  over 24's snapshot, 19's safe subset + strikethrough, headings banned
+  (schema-bound field name renders bold, not H2), always set `range` when spans
+  exist, three-state template rendering (Doc+Identified render, None suppressed,
+  construction failure gets a degradation banner), producer-owned caps (footnote
+  preview, inlinks, previews), wikilink producer = title + resolved path +
+  bounded preview + inlink count from 19's preview cache, budgets tightened to
+  <2ms target / <1ms stretch. **prepareRename/rename**: advertised iff
+  `prepareSupport`, uniform `{range, placeholder}` (body tag `#` in range,
+  frontmatter `#` out), rename re-validates eligibility, per-kind matrix
+  (heading rewrites title + ALL anchors incl. same-doc `[[#h]]` and `(#h)`
+  fragments, footnote file-local, DailyDate refuses regardless of target
+  existence, RefLabel rename added, alias/display side refuses, case-only file
+  rename = zero-edit `RenameFile`), `new_name` legality per kind, -32803 with
+  human messages. **Encoding**: negotiate utf-8-if-offered-else-utf-16 (closes
+  11's open question), one total `convert` module at the protocol boundary
+  doubling as the miette bridge; 11's ropey branch deleted (14's `BufferState`
+  is String-backed). **Comparison keys**: single `match_key` helper (NFC, then
+  `char::to_lowercase`, then trailing NFC; path keys fold `\` to `/`; byte-level
+  for non-UTF-8) with **byte-exact-first / fold-fallback in every tier**,
+  fold-tier ties and exact-path fold collisions -> `Ambiguous{PathTie}` (never
+  raw-sorted-first), applied at index-build and query boundaries only, watcher
+  paths normalized at intake, original spellings in all output; new direct dep
+  `unicode-normalization 0.1`; NFKC rejected everywhere, slug generation
+  byte-exact GitHub locked, Unicode fixture set owed to 25.
+  **Concurrency/perf**: `concurrency_level(1)` kept, rename is the sole handler
+  permitted >100ms with workDone `$/progress` (amends 12, sides with 33); rename
+  byte-tiered under 33's binding row; find-refs read as ≤5,000 results; prepare
+  <5ms. Resolution wrote Amended-by-26 blocks into 11, 12, 14, 15, 16, 18, 19,
+  21, 22, 25, 33 and Inputs-from-26 blocks into 27, 28, 29, 30, 32, 34, 41;
+  glossary terms added: Occurrence, NavTarget, Resolution, Ambiguity, Comparison
+  Key (never "normalized path"), Folder Distance, Slug (use "inlinks", not
+  "backlinks"). Newly unblocked: 28.
+  [Full ticket](issues/26-definition-references-hover-rename.md).
+- [Structural/editor intelligence](issues/27-structural-symbols-and-editor-intelligence.md):
+  resolved 2026-10-22 after a fully independent pass-2 re-research (Phase-D
+  hardening via parallel stress-test, benchmark, codegraph design-review, and
+  ecosystem-convention subagents), and the user-confirmed locked set D1'-D16'
+  ([research pass 2](research/27-structural-symbols-editor-intelligence-pass2.md),
+  Part XII). **All nine capabilities IN**, staged three waves; key inversion: 11
+  and 26 are NOT prerequisites for document-scope features (the LSP-side walk
+  `walk(src) -> DocStructure`, cached per `(uri, version)`, produces exact spans
+  from `into_offset_iter()`; transient spans never enter the postcard-persisted
+  Note, 11 §8). Outline = headings + Array-kind task section children
+  (Traces-original; root/preamble tasks on a document-root pseudo-symbol);
+  folding E-lite on the raw walk (callout mapping "foldable = NOT `+`" amended
+  to 17); selection S1 + invariant property test; documentLink Option A eager,
+  resolveProvider:false, exact spans, ambiguous = first-candidate + tooltip
+  (Neovim-invisible limitation documented), unresolved dropped (three-way
+  handoff to 25/15/26 + off-severity silent-hole documented); semantic tokens
+  two-valued Wave 1 (`unresolved`), three-valued Wave 2 (26-gated); refresh as
+  debounced server-to-client requests via a shared 25-mirror helper gated on
+  refreshSupport; CodeLens staged C→A with zero-reference suppression; four
+  code-action kinds; VS Code duplication = accept + document + config gates
+  (kind-dodge and auto-cession rejected); capability lifecycle = static
+  initialize-time `[lsp]` gates (lens default false) + runtime-disable
+  semantics; corrected perf rows/vault ladder/REFERENCE_CEILING filed to 33;
+  record blocks filed to twelve related tickets (nine primary records, sign-offs
+  to 15/26, runtime-toggle input to 31). Recorded consideration: a future
+  Note-type split (index-optimized vs editor-aware) is compatible by design,
+  `DocStructure` being the transient editor-aware citizen; input to a separate
+  arch-design task.
+  [Full ticket](issues/27-structural-symbols-and-editor-intelligence.md).
 
 ## Not yet specified
 
-- **Testing/validation strategy for the finished design** — how the eventual implementation gets checked against LSP-conformance expectations and the product-parity bar (Markdown Oxide's PKM set, the generic baseline from ticket 05) is out of this planning effort's destination (a *settled design*, not a test plan) unless it turns out a design decision is genuinely unresolvable without it. Revisit if a ticket surfaces a concrete need.
-- **Depth of CodeLens/code-action integration between an unresolved-link quick-fix and Template instantiation** (e.g. "create this note from a template" acting on a broken `[[link]]`) — depends on both ticket 22 (template intelligence) and ticket 28 (file operations) settling first; too fine-grained to ticket precisely until then. Ticket 18 narrowed this for the daily-note case: creation is diagnostic + code action only (hover informational, definition returns `None`), not hover-triggered — the general pattern is now partially settled but the cross-ticket integration surface remains dependent on 22 + 28 (22 now resolved 2026-09-30 — template enumeration/path-validation is available to 18 and 28; only 28 remains).
-- **Block references (`^block-id`)** — explicitly out of scope in ticket 15 (deferred to its own ticket, not yet written); no resolution semantics, completion, or go-to-definition behavior specified anywhere in the map (reconciled 2026-09-23).
-- **Anything ticket 09 (framework/runtime) or ticket 10 (analysis host) settles that invalidates the ticket graph below** — e.g. if the chosen framework forces a materially different host shape than assumed, several downstream tickets (12, 21, 26, 29, 34) may need to be revised or re-split once resolved. Both are now resolved; no downstream ticket needed revision — all were already written unbiased to the outcomes reached. Newly unblocked: 12 (concurrency), 14 (live-buffer overlay), 21 (query-language intelligence), 30 (multi-root), 34 (packaging). Ticket [Source span/position model for the Note AST](issues/11-source-span-and-position-model.md) is now resolved — `Heading` node confirmed as flat-with-level; `BytePos` narrowed to `u32`; `LineIndex` moves to `position.rs`; two concrete conversion functions (no trait); frontmatter spans via `noyalib` `Spanned` (reconciled 2026-09-23; hand-rolled Level-2 scanner dropped); spans transient. Newly unblocked by ticket 11: 13 (LSP persistence/caching), 15 (links/references), 19 (frontmatter/inline-field intelligence). Ticket [Concurrency & cancellation model](issues/12-concurrency-and-cancellation-model.md) is now resolved — tower-lsp-server `concurrency_level(1)` confirmed as correct model for sync core; stale-result discard for cancellation; sequential refresh; no `$/progress` initially. Ticket [LSP-specific persistence & caching strategy](issues/13-lsp-persistence-and-caching-strategy.md) is now resolved — no new redb tables (7 tables sufficient, ecosystem re-scans on startup); in-memory mutable index with editor buffer authoritative; expand `RefreshPlan` with single-file constructor for unified sync; debounce 50–100ms (provisional — ticket 25 owns final tiers; reconciled 2026-09-23). Ticket [Performance targets & strategy](issues/33-performance-targets-and-strategy.md) is now resolved — cold start <2s at 20K via rayon parallel scan; warm start <500ms; inverted index built now (gotodef <5ms, completion <20ms, find-refs <20ms); evictable LRU memory model (always-resident metadata ~2MB + LRU AST cache + transient diagnostics); <100MB idle, <500MB hard cap; schema definitions always resident for frontmatter intelligence; extend index_refresh.rs (index_lifecycle.rs decomposed into index_*.rs; reconciled 2026-09-23) + new lsp_latency.rs benchmark harness. No tickets list 33 as a blocker. Ticket [Links & references: wikilinks, aliases, heading/block refs, embeds, backlinks, images](issues/15-links-and-references-model.md) is now resolved — purely structural wikilink resolution (full path, relative path, filename, basename; title-slug/alias steps + config knob revoked, amended 2026-09-23); GitHub-style slugger for heading references with reactive ambiguity; block references out of scope; embeds: definition navigates, hover shows preview; images: phased (go-to-definition first, defer base64 preview); ambiguity: no diagnostic for multiple matches, Information for zero matches, "Create note" code action, configurable severity escalation; reference-style links full parity; rumdl coexistence: Traces owns wikilinks, rumdl owns standard links. New crates: camino, fuzzy-matcher. Newly unblocked: 27 (structural/symbols). Tickets 24, 25, 26 remain blocked by 16, 19, 22. Ticket [Metadata/frontmatter & inline-field intelligence](issues/19-frontmatter-and-inline-field-intelligence.md) is now resolved — replace `serde_yaml` with `noyalib` (drop-in, `Spanned<T>`, `YamlVersion::V1_1`); `ByteSpan(Range<BytePos>)` per ticket 11; three-layer completion (schema > global > inferred) with explicit data structure and performance note; fileClass wins with resolution matrix; `$ref` targets deferred; schema-bound + vault-inferred hover; link hover with cross-IDE safe markdown (exact subset defined); trigger chars `[` and `:` with exact regex; YAML diagnostics Warning/Error split; inline-field diagnostics for lexer-identified malformation; rename note-local + FileClass-schema own fields only; type-aware unscoped only. Prerequisites: ticket 11 changes must land first. Newly unblocked: 20 (schema/fileclass intelligence). Ticket [Query-language intelligence](issues/21-query-language-intelligence.md) is now resolved — 13 decisions locked (D1–D13) via grilling + stress testing; Phase 1 scope: completion (tags, classes, fields, operators, select options), diagnostics (forward QuerySyntaxError spans, three severities), hover (tag counts, class counts, field type+constraints); prerequisites: `unique_tags()`, `unique_file_classes()`, `suggest_class()`. Newly unblocked: 24 (completion architecture), 25 (diagnostics architecture). Ticket [Template-language intelligence](issues/22-template-language-intelligence.md) is now resolved — 24 decisions locked (four grilling rounds + 14 stress passes): static analysis via gated `machinery::parse` (never execute), derived-names/hand-authored-docs metadata, phase-1 diagnostics incl. undefined-variable spans, overlay-aware template discovery, eager non-fatal construction at `initialize` with empty-registry fallback (Q23(a′)); edges exactly 24/25/26←22, flagged lines (no edges) to 27/34. Newly unblocked: 24, 25 (fully), 26 (definition/references/hover/rename).
+- **Testing/validation strategy for the finished design** — how the eventual
+  implementation gets checked against LSP-conformance expectations and the
+  product-parity bar (Markdown Oxide's PKM set, the generic baseline from ticket
+  05) is out of this planning effort's destination (a *settled design*, not a
+  test plan) unless it turns out a design decision is genuinely unresolvable
+  without it. Revisit if a ticket surfaces a concrete need.
+- **Depth of CodeLens/code-action integration between an unresolved-link
+  quick-fix and Template instantiation** (e.g. "create this note from a
+  template" acting on a broken `[[link]]`) — depends on both ticket 22 (template
+  intelligence) and ticket 28 (file operations) settling first; too fine-grained
+  to ticket precisely until then. Ticket 18 narrowed this for the daily-note
+  case: creation is diagnostic + code action only (hover informational,
+  definition returns `None`), not hover-triggered — the general pattern is now
+  partially settled but the cross-ticket integration surface remains dependent
+  on 22 + 28 (22 now resolved 2026-09-30 — template enumeration/path-validation
+  is available to 18 and 28; only 28 remains).
+- **Block references (`^block-id`)** — explicitly out of scope in ticket 15
+  (deferred to its own ticket, not yet written); no resolution semantics,
+  completion, or go-to-definition behavior specified anywhere in the map
+  (reconciled 2026-09-23).
+- **Anything ticket 09 (framework/runtime) or ticket 10 (analysis host) settles
+  that invalidates the ticket graph below** — e.g. if the chosen framework
+  forces a materially different host shape than assumed, several downstream
+  tickets (12, 21, 26, 29, 34) may need to be revised or re-split once resolved.
+  Both are now resolved; no downstream ticket needed revision — all were already
+  written unbiased to the outcomes reached. Newly unblocked: 12 (concurrency),
+  14 (live-buffer overlay), 21 (query-language intelligence), 30 (multi-root),
+  34 (packaging). Ticket
+  [Source span/position model for the Note AST](issues/11-source-span-and-position-model.md)
+  is now resolved — `Heading` node confirmed as flat-with-level; `BytePos`
+  narrowed to `u32`; `LineIndex` moves to `position.rs`; two concrete conversion
+  functions (no trait); frontmatter spans via `noyalib` `Spanned` (reconciled
+  2026-09-23; hand-rolled Level-2 scanner dropped); spans transient. Newly
+  unblocked by ticket 11: 13 (LSP persistence/caching), 15 (links/references),
+  19 (frontmatter/inline-field intelligence). Ticket
+  [Concurrency & cancellation model](issues/12-concurrency-and-cancellation-model.md)
+  is now resolved — tower-lsp-server `concurrency_level(1)` confirmed as correct
+  model for sync core; stale-result discard for cancellation; sequential
+  refresh; no `$/progress` initially. Ticket
+  [LSP-specific persistence & caching strategy](issues/13-lsp-persistence-and-caching-strategy.md)
+  is now resolved — no new redb tables (7 tables sufficient, ecosystem re-scans
+  on startup); in-memory mutable index with editor buffer authoritative; expand
+  `RefreshPlan` with single-file constructor for unified sync; debounce 50–100ms
+  (provisional — ticket 25 owns final tiers; reconciled 2026-09-23). Ticket
+  [Performance targets & strategy](issues/33-performance-targets-and-strategy.md)
+  is now resolved — cold start <2s at 20K via rayon parallel scan; warm start
+  <500ms; inverted index built now (gotodef <5ms, completion <20ms, find-refs
+  <20ms); evictable LRU memory model (always-resident metadata ~2MB + LRU AST
+  cache + transient diagnostics); <100MB idle, <500MB hard cap; schema
+  definitions always resident for frontmatter intelligence; extend
+  index_refresh.rs (index_lifecycle.rs decomposed into index_*.rs; reconciled
+  2026-09-23) + new lsp_latency.rs benchmark harness. No tickets list 33 as a
+  blocker. Ticket
+  [Links & references: wikilinks, aliases, heading/block refs, embeds, backlinks, images](issues/15-links-and-references-model.md)
+  is now resolved — purely structural wikilink resolution (full path, relative
+  path, filename, basename; title-slug/alias steps + config knob revoked,
+  amended 2026-09-23); GitHub-style slugger for heading references with reactive
+  ambiguity; block references out of scope; embeds: definition navigates, hover
+  shows preview; images: phased (go-to-definition first, defer base64 preview);
+  ambiguity: no diagnostic for multiple matches, Information for zero matches,
+  "Create note" code action, configurable severity escalation; reference-style
+  links full parity; rumdl coexistence: Traces owns wikilinks, rumdl owns
+  standard links. New crates: camino, fuzzy-matcher. Newly unblocked: 27
+  (structural/symbols). Tickets 24, 25, 26 remain blocked by 16, 19, 22. Ticket
+  [Metadata/frontmatter & inline-field intelligence](issues/19-frontmatter-and-inline-field-intelligence.md)
+  is now resolved — replace `serde_yaml` with `noyalib` (drop-in, `Spanned<T>`,
+  `YamlVersion::V1_1`); `ByteSpan(Range<BytePos>)` per ticket 11; three-layer
+  completion (schema > global > inferred) with explicit data structure and
+  performance note; fileClass wins with resolution matrix; `$ref` targets
+  deferred; schema-bound + vault-inferred hover; link hover with cross-IDE safe
+  markdown (exact subset defined); trigger chars `[` and `:` with exact regex;
+  YAML diagnostics Warning/Error split; inline-field diagnostics for
+  lexer-identified malformation; rename note-local + FileClass-schema own fields
+  only; type-aware unscoped only. Prerequisites: ticket 11 changes must land
+  first. Newly unblocked: 20 (schema/fileclass intelligence). Ticket
+  [Query-language intelligence](issues/21-query-language-intelligence.md) is now
+  resolved — 13 decisions locked (D1–D13) via grilling + stress testing; Phase 1
+  scope: completion (tags, classes, fields, operators, select options),
+  diagnostics (forward QuerySyntaxError spans, three severities), hover (tag
+  counts, class counts, field type+constraints); prerequisites: `unique_tags()`,
+  `unique_file_classes()`, `suggest_class()`. Newly unblocked: 24 (completion
+  architecture), 25 (diagnostics architecture). Ticket
+  [Template-language intelligence](issues/22-template-language-intelligence.md)
+  is now resolved — 24 decisions locked (four grilling rounds + 14 stress
+  passes): static analysis via gated `machinery::parse` (never execute),
+  derived-names/hand-authored-docs metadata, phase-1 diagnostics incl.
+  undefined-variable spans, overlay-aware template discovery, eager non-fatal
+  construction at `initialize` with empty-registry fallback (Q23(a′)); edges
+  exactly 24/25/26←22, flagged lines (no edges) to 27/34. Newly unblocked: 24,
+  25 (fully), 26 (definition/references/hover/rename).
 
 ## Out of scope
 

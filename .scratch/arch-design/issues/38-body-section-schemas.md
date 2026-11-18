@@ -17,9 +17,8 @@ Decide scope first (decision 1). Decisions 2 to 5, 7 and 10 to 12 cover
 architecture. They change contracts that other tickets fix.
 Decisions 6, 8 and 9 add schema grammar and product surface.
 
-Decisions:
-Use [ticket 36's decision-record
-rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
+Decisions: Use
+[ticket 36's decision-record rules](./36-reconcile-decisions-and-audit-coverage.md#decision-records-and-evidence-gates).
 Keep decision evidence separate from implementation gates.
 
 1. Decide the scope.

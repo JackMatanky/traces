@@ -1,14 +1,34 @@
 # Criterion Durable Store (`.criterion`) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+> superpowers:subagent-driven-development (recommended) or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use
+> checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make it structurally impossible for any tool (a `mise run clean`, a raw `cargo clean`, cargo-sweep, a CI cache wipe, muscle memory) to delete Criterion benchmark history (1.9 GB, 116k `estimates.json` files, all named critcmp baselines).
+**Goal:** Make it structurally impossible for any tool (a `mise run clean`, a
+raw `cargo clean`, cargo-sweep, a CI cache wipe, muscle memory) to delete
+Criterion benchmark history (1.9 GB, 116k `estimates.json` files, all named
+critcmp baselines).
 
-**Architecture:** Benchmark history moves out of `target/` into a durable store `<repo>/.criterion/` (repo root, same volume, gitignored). `target/criterion` becomes a *relative symlink* (`../.criterion`) that Criterion and `critcmp` read/write through transparently. Any cleaner may delete the link; no one can delete the data through it. A shared helper (`.mise/scripts/criterion_store.sh`) owns the link contract: migrate stray real directories into the store, park "fork" trees (real dir reappearing after a raw `cargo clean`) non-destructively outside `target/`, and recreate the link after cleans. The existing mv-aside/trap dance in `clean/_default`, which has a data-destroying failure path (`trap` does `mv … || true` then unconditional `rm -rf` of the only copy), is deleted entirely: `clean` now has nothing to restore, by construction.
+**Architecture:** Benchmark history moves out of `target/` into a durable store
+`<repo>/.criterion/` (repo root, same volume, gitignored). `target/criterion`
+becomes a *relative symlink* (`../.criterion`) that Criterion and `critcmp`
+read/write through transparently. Any cleaner may delete the link; no one can
+delete the data through it. A shared helper (`.mise/scripts/criterion_store.sh`)
+owns the link contract: migrate stray real directories into the store, park
+"fork" trees (real dir reappearing after a raw `cargo clean`) non-destructively
+outside `target/`, and recreate the link after cleans. The existing
+mv-aside/trap dance in `clean/_default`, which has a data-destroying failure
+path (`trap` does `mv … || true` then unconditional `rm -rf` of the only copy),
+is deleted entirely: `clean` now has nothing to restore, by construction.
 
-**Tech Stack:** Bash 3.2-compatible (macOS `/bin/bash`), mise file tasks (`#MISE`/`#USAGE` headers), sandbox regression selftest with a stubbed `cargo`.
+**Tech Stack:** Bash 3.2-compatible (macOS `/bin/bash`), mise file tasks
+(`#MISE`/`#USAGE` headers), sandbox regression selftest with a stubbed `cargo`.
 
-**Why (history):** Pre-2026-09-25 `[tasks.clean]` was an unconditional `cargo clean` that destroyed all baselines; oldest surviving criterion data is 2026-09-24. The Sep-25 mv-aside fix protects only one code path and can still destroy data on restore failure. This plan removes the entire class of failure.
+**Why (history):** Pre-2026-09-25 `[tasks.clean]` was an unconditional
+`cargo clean` that destroyed all baselines; oldest surviving criterion data is
+2026-09-24. The Sep-25 mv-aside fix protects only one code path and can still
+destroy data on restore failure. This plan removes the entire class of failure.
 
 ---
 
@@ -26,27 +46,43 @@
 
 ## Contract (invariants every task must uphold)
 
-1. `.criterion/` at repo root is the **only** copy of benchmark history. Nothing in any task ever deletes it.
-2. `<target>/criterion` is always a relative symlink whose text climbs one `..` per target-dir level (`../.criterion` for `target`, `../../.criterion` for `out/release`): relative text survives repo moves. Absolute target dirs and `..` components are refused by the helper.
-3. A real (non-symlink) directory at `target/criterion` is either migrated into the store (first time) or parked as `.criterion.fork.<UTC>` at repo root (fork; outside `target/` so the ensuing `cargo clean` cannot eat it), always non-destructive, always with a warning.
+1. `.criterion/` at repo root is the **only** copy of benchmark history. Nothing
+   in any task ever deletes it.
+2. `<target>/criterion` is always a relative symlink whose text climbs one `..`
+   per target-dir level (`../.criterion` for `target`, `../../.criterion` for
+   `out/release`): relative text survives repo moves. Absolute target dirs and
+   `..` components are refused by the helper.
+3. A real (non-symlink) directory at `target/criterion` is either migrated into
+   the store (first time) or parked as `.criterion.fork.<UTC>` at repo root
+   (fork; outside `target/` so the ensuing `cargo clean` cannot eat it), always
+   non-destructive, always with a warning.
 4. Dry-run modes never mutate the filesystem.
-5. `bench` snapshots replace an existing same-name baseline; they never nest into it.
+5. `bench` snapshots replace an existing same-name baseline; they never nest
+   into it.
 
 ## Accepted caveats (document, don't fix)
 
-- **Git worktrees** get their own untracked `.criterion/` (gitignored); first `bench`/`clean` there migrates that worktree's fresh criterion tree. History is not shared across worktrees.
-- **`cargo sweep --max-size` sizing** (walkdir, no nested-symlink follow) no longer counts criterion toward the target size, arguably a fix: the 1.9 GB store can no longer make the size floor unreachable.
-- **`bench:model` invoked directly** (`mise run bench:model`) does not run the guard; it reads `target/criterion` (works through the link when present). First `bench` or `bench:report` restores the link after a raw clean.
-- `critcmp` and Criterion resolve through the symlink (walkdir follows a symlinked root; `std::fs` path components follow). Verified in Task 5 with the real 1.9 GB tree.
+- **Git worktrees** get their own untracked `.criterion/` (gitignored); first
+  `bench`/`clean` there migrates that worktree's fresh criterion tree. History
+  is not shared across worktrees.
+- **`cargo sweep --max-size` sizing** (walkdir, no nested-symlink follow) no
+  longer counts criterion toward the target size, arguably a fix: the 1.9 GB
+  store can no longer make the size floor unreachable.
+- **`bench:model` invoked directly** (`mise run bench:model`) does not run the
+  guard; it reads `target/criterion` (works through the link when present).
+  First `bench` or `bench:report` restores the link after a raw clean.
+- `critcmp` and Criterion resolve through the symlink (walkdir follows a
+  symlinked root; `std::fs` path components follow). Verified in Task 5 with the
+  real 1.9 GB tree.
 
 ---
 
 ### Task 1: Store helper + selftest (store-contract tests T1-T5, T8-T13)
 
 **Files:**
+
 - Create: `.mise/scripts/criterion_store.sh`
 - Create: `.mise/tasks/selftest`
-
 - [ ] **Step 1: Write the failing selftest**
 
 Create `.mise/tasks/selftest` (executable: `chmod +x`):
@@ -367,7 +403,9 @@ main "$@"
 - [ ] **Step 2: Run selftest; verify it fails (helper missing)**
 
 Run: `mise run selftest` (or `MISE_PROJECT_ROOT=$PWD bash .mise/tasks/selftest`)
-Expected: non-zero exit. The suite aborts under `set -e` when T1's `run_ensure` sources the not-yet-existing `.mise/scripts/criterion_store.sh` (bash prints `No such file or directory`). Red satisfied.
+Expected: non-zero exit. The suite aborts under `set -e` when T1's `run_ensure`
+sources the not-yet-existing `.mise/scripts/criterion_store.sh` (bash prints
+`No such file or directory`). Red satisfied.
 
 - [ ] **Step 3: Create the store helper**
 
@@ -615,8 +653,8 @@ criterion_dry_run_note() {
 
 - [ ] **Step 4: Run selftest; verify T1-T5 pass**
 
-Run: `mise run selftest`
-Expected output ending: `selftest: 30 passed, 0 failed` (T1×4, T2×2, T3×3, T4×1, T5×2, T8×3, T9×3, T10×3, T11×2, T12×5, T13×2), exit 0.
+Run: `mise run selftest` Expected output ending: `selftest: 30 passed, 0 failed`
+(T1×4, T2×2, T3×3, T4×1, T5×2, T8×3, T9×3, T10×3, T11×2, T12×5, T13×2), exit 0.
 
 - [ ] **Step 5: Shellcheck both new files**
 
@@ -635,12 +673,14 @@ git commit -m "feat(mise): durable criterion store helper with sandbox selftest"
 ### Task 2: Rewrite `clean/_default`, delete the trap dance, adopt the store
 
 **Files:**
-- Modify: `.mise/tasks/clean/_default` (USAGE `--all` long_help; replace `exec_target_clean`)
-- Modify: `.mise/tasks/selftest` (append T6 + T2b)
 
+- Modify: `.mise/tasks/clean/_default` (USAGE `--all` long_help; replace
+  `exec_target_clean`)
+- Modify: `.mise/tasks/selftest` (append T6 + T2b)
 - [ ] **Step 1: Write the failing test (T6, dry-run must not mutate)**
 
-Append to `.mise/tasks/selftest` (before `main()` call, add invocation in `main`):
+Append to `.mise/tasks/selftest` (before `main()` call, add invocation in
+`main`):
 
 ```bash
 #######################################
@@ -692,20 +732,27 @@ test_clean_full_preserves_history() {
 }
 ```
 
-Add `test_clean_dry_run_no_mutation` and `test_clean_full_preserves_history` to `main()`.
+Add `test_clean_dry_run_no_mutation` and `test_clean_full_preserves_history` to
+`main()`.
 
 - [ ] **Step 2: Run selftest; verify red against current clean**
 
 Run: `mise run selftest`
 Expected: non-zero exit with at least these FAILs against the unmodified clean:
-- `FAIL - T6 no CACHEDIR.TAG written` (current code writes the tag unconditionally, even on the dry-run path),
-- `FAIL - T2b link restored after clean` (current mv-aside dance restores a REAL directory, not the symlink).
 
-Any red outcome satisfies this checkpoint; Step 5's green is the load-bearing gate.
+- `FAIL - T6 no CACHEDIR.TAG written` (current code writes the tag
+  unconditionally, even on the dry-run path),
+- `FAIL - T2b link restored after clean` (current mv-aside dance restores a REAL
+  directory, not the symlink).
+
+Any red outcome satisfies this checkpoint; Step 5's green is the load-bearing
+gate.
 
 - [ ] **Step 3: Replace `exec_target_clean` in `.mise/tasks/clean/_default`**
 
-Delete the entire current `exec_target_clean` (lines ~140-233: size gate stays, but `criterion_dir`/`has_criterion`/`backup_tmp`/`trap`/restore block all go). Replace with:
+Delete the entire current `exec_target_clean` (lines ~140-233: size gate stays,
+but `criterion_dir`/`has_criterion`/`backup_tmp`/`trap`/restore block all go).
+Replace with:
 
 ```bash
 #######################################
@@ -810,17 +857,20 @@ exec_target_clean() {
 
 In the `#USAGE flag "--all"` block, replace:
 
-```
+```text
 #USAGE   Wipes the entire Cargo target directory and all quality report files. Explicitly preserves historical benchmark results in `target/criterion/`.
 ```
 
 with:
 
-```
+```text
 #USAGE   Wipes the entire Cargo target directory and all quality report files. Benchmark history is NEVER deleted: it lives in `.criterion/` at the repo root, and `target/criterion` is a symlink into it (recreated after the clean).
 ```
 
-Also update the file-header comment block (the `# Clean the Cargo target directly…` lines above `plan_clean_target=true`) to add: `# Benchmark history is protected by the durable store contract in .mise/scripts/criterion_store.sh.`
+Also update the file-header comment block (the
+`# Clean the Cargo target directly…` lines above `plan_clean_target=true`) to
+add:
+`# Benchmark history is protected by the durable store contract in .mise/scripts/criterion_store.sh.`
 
 - [ ] **Step 5: Run selftest; verify all green**
 
@@ -844,9 +894,10 @@ git commit -m "refactor(mise): clean guarantees criterion history via store cont
 ### Task 3: Guard `bench/_default` + fix `snapshot_baseline` nesting
 
 **Files:**
-- Modify: `.mise/tasks/bench/_default` (source helper after `set -euo pipefail`; ensure in `main()`; replace `snapshot_baseline` body)
-- Modify: `.mise/tasks/selftest` (append T7)
 
+- Modify: `.mise/tasks/bench/_default` (source helper after `set -euo pipefail`;
+  ensure in `main()`; replace `snapshot_baseline` body)
+- Modify: `.mise/tasks/selftest` (append T7)
 - [ ] **Step 1: Write the failing test (T7: replace-not-nest, with stub cargo)**
 
 Append to `.mise/tasks/selftest` (register in `main()`):
@@ -908,12 +959,18 @@ EOF
 
 - [ ] **Step 2: Run selftest; verify red against current bench code**
 
-Run: `mise run selftest`
-Expected: non-zero exit with at least one of these FAILs against the unmodified bench:
-- `FAIL - T7 bench runs exit zero` (current code has no store guard; sandbox/git/env paths may error), and/or
-- `FAIL - T7 baseline dir replaced, not nested` + `FAIL - T7 store link intact for critcmp` (no store exists yet; the actual nesting happens under `target/criterion/`, which the fixed code will observe in the store instead).
+Run: `mise run selftest` Expected: non-zero exit with at least one of these
+FAILs against the unmodified bench:
 
-Any red outcome satisfies this checkpoint; Step 5's green is the load-bearing gate.
+- `FAIL - T7 bench runs exit zero` (current code has no store guard;
+  sandbox/git/env paths may error), and/or
+- `FAIL - T7 baseline dir replaced, not nested` +
+  `FAIL - T7 store link intact for critcmp` (no store exists yet; the actual
+  nesting happens under `target/criterion/`, which the fixed code will observe
+  in the store instead).
+
+Any red outcome satisfies this checkpoint; Step 5's green is the load-bearing
+gate.
 
 - [ ] **Step 3: Guard `bench/_default`**
 
@@ -936,7 +993,9 @@ At the top of `main()` (before `collect_bench_files`), insert:
 
 - [ ] **Step 4: Fix `snapshot_baseline`**
 
-Replace the `while` loop body (the `cp -R` at `bench/_default:283-286`) with replace-not-nest semantics, and walk the STORE directly (find on a symlinked root has portability sharp edges; the store path is unambiguous):
+Replace the `while` loop body (the `cp -R` at `bench/_default:283-286`) with
+replace-not-nest semantics, and walk the STORE directly (find on a symlinked
+root has portability sharp edges; the store path is unambiguous):
 
 ```bash
 snapshot_baseline() {
@@ -959,13 +1018,22 @@ snapshot_baseline() {
 }
 ```
 
-Update the function's doc-comment Globals line to mention `CRITERION_STORE` (from the sourced helper).
+Update the function's doc-comment Globals line to mention `CRITERION_STORE`
+(from the sourced helper).
 
 - [ ] **Step 4.5: Guard the snapshot name against path traversal**
 
-Task 3 introduced `rm -rf "${dest}"` where `dest="${parent_dir}/${baseline_name}"`. `resolve_baseline_name` currently echoes an explicit `-r <name>` verbatim, so a name like `../sib` or `../..` escapes the baseline dir and can delete a sibling (or the store parent); this is a traversal the store contract (nothing deletes the store) forbids. This did not exist before this task (`cp -R` polluted but could not delete), so it is a delta-introduced escalation that must be closed before merge.
+Task 3 introduced `rm -rf "${dest}"` where
+`dest="${parent_dir}/${baseline_name}"`. `resolve_baseline_name` currently
+echoes an explicit `-r <name>` verbatim, so a name like `../sib` or `../..`
+escapes the baseline dir and can delete a sibling (or the store parent); this is
+a traversal the store contract (nothing deletes the store) forbids. This did not
+exist before this task (`cp -R` polluted but could not delete), so it is a
+delta-introduced escalation that must be closed before merge.
 
-(a) Add to `.mise/scripts/criterion_store.sh` (after `criterion_link_text`), mirroring `require_nonneg_int`'s fail-fast `exit 2` shape (`size_gate.sh:26-33`):
+(a) Add to `.mise/scripts/criterion_store.sh` (after `criterion_link_text`),
+mirroring `require_nonneg_int`'s fail-fast `exit 2` shape
+(`size_gate.sh:26-33`):
 
 ```bash
 #######################################
@@ -999,9 +1067,14 @@ require_safe_baseline_name() {
 }
 ```
 
-Note: the slash check is redundant with the component loop only when a slash is present; keeping it explicit also rejects a leading/trailing slash that the `..` loop alone would not. An empty name never reaches this function (`snapshot_baseline` returns early on empty; `resolve_baseline_name` only routes non-`true`, non-empty `-r` values here).
+Note: the slash check is redundant with the component loop only when a slash is
+present; keeping it explicit also rejects a leading/trailing slash that the `..`
+loop alone would not. An empty name never reaches this function
+(`snapshot_baseline` returns early on empty; `resolve_baseline_name` only routes
+non-`true`, non-empty `-r` values here).
 
-(b) In `.mise/tasks/bench/_default` `resolve_baseline_name`, call the guard in the explicit-name branch before returning the name:
+(b) In `.mise/tasks/bench/_default` `resolve_baseline_name`, call the guard in
+the explicit-name branch before returning the name:
 
 ```bash
   # Explicit `-r <name>`; bare `-r` parses as the literal `true` and falls
@@ -1013,7 +1086,9 @@ Note: the slash check is redundant with the component loop only when a slash is 
   fi
 ```
 
-The auto-name branch is safe already: `branch="${branch//\//-}"` (line 245) strips slashes, git short-sha is hex, and `..` cannot occur in a branch+sha concatenation.
+The auto-name branch is safe already: `branch="${branch//\//-}"` (line 245)
+strips slashes, git short-sha is hex, and `..` cannot occur in a branch+sha
+concatenation.
 
 - [ ] **Step 5: Run selftest; verify all green**
 
@@ -1022,7 +1097,8 @@ Expected: `selftest: 45 passed, 0 failed` (39 + T7×6), exit 0.
 
 - [ ] **Step 6: Shellcheck**
 
-Run: `shellcheck .mise/scripts/criterion_store.sh .mise/tasks/bench/_default .mise/tasks/selftest`
+Run:
+`shellcheck .mise/scripts/criterion_store.sh .mise/tasks/bench/_default .mise/tasks/selftest`
 Expected: no findings.
 
 - [ ] **Step 7: Commit**
@@ -1037,15 +1113,24 @@ git commit -m "fix(mise): bench guards criterion store; snapshot replaces instea
 ### Task 4: Guard `bench/report`
 
 **Files:**
+
 - Modify: `.mise/tasks/bench/report`
 
-Note: `bench/_default` already declares `#MISE depends_post = ["bench:report"]`, so the report runs even when the bench run fails; with this guard, both entry points self-heal the link after any clean.
+Note: `bench/_default` already declares `#MISE depends_post = ["bench:report"]`,
+so the report runs even when the bench run fails; with this guard, both entry
+points self-heal the link after any clean.
 
-**Task 4 forward caveats (from Task 1 final review):** the existing `bench/report` arg defaults to a *criterion dir* (`target/criterion`), not a *target dir*; never pass it to `ensure_criterion_store` (it would compute depth 2 and create `target/criterion/criterion`). Call `ensure_criterion_store` with no args here (target dir stays `target`). Also: this task must not add a `#MISE dir="{{cwd}}"` header (the Case 0 cwd guard would then refuse every run).
+**Task 4 forward caveats (from Task 1 final review):** the existing
+`bench/report` arg defaults to a *criterion dir* (`target/criterion`), not a
+*target dir*; never pass it to `ensure_criterion_store` (it would compute depth
+2 and create `target/criterion/criterion`). Call `ensure_criterion_store` with
+no args here (target dir stays `target`). Also: this task must not add a
+`#MISE dir="{{cwd}}"` header (the Case 0 cwd guard would then refuse every run).
 
 - [ ] **Step 1: Ensure the link before summarizing**
 
-Replace the opening of `main()` (report:177-178: `main() {` and `if ! has_criterion_output; then`) with:
+Replace the opening of `main()` (report:177-178: `main() {` and
+`if ! has_criterion_output; then`) with:
 
 ```bash
 main() {
@@ -1058,11 +1143,13 @@ main() {
   if ! has_criterion_output; then
 ```
 
-(Do not paste this as an insert-in-place: the snippet already contains the two lines it replaces; a literal insert would nest a duplicate `main() {`.)
+(Do not paste this as an insert-in-place: the snippet already contains the two
+lines it replaces; a literal insert would nest a duplicate `main() {`.)
 
 - [ ] **Step 2: Sanity-run in a T5-style sandbox**
 
 Run:
+
 ```bash
 REPO="$PWD"
 SBX=$(mktemp -d); mkdir -p "$SBX"/{src,benches,.mise/scripts,target/criterion/g1/100/new}
@@ -1072,7 +1159,9 @@ cp .mise/scripts/criterion_store.sh "$SBX/.mise/scripts/"
 echo '{}' > "$SBX/target/criterion/g1/100/new/estimates.json"
 ( cd "$SBX" && MISE_PROJECT_ROOT="$SBX" bash "$REPO/.mise/tasks/bench/report" )
 ```
-Expected: `## Benchmark Summary` with `- g1: 1 size` and the footer, read through the auto-created link (report migrates the real dir to store first).
+
+Expected: `## Benchmark Summary` with `- g1: 1 size` and the footer, read
+through the auto-created link (report migrates the real dir to store first).
 
 - [ ] **Step 3: Shellcheck + commit**
 
@@ -1088,14 +1177,15 @@ git commit -m "feat(mise): bench:report restores criterion link after cleans"
 ### Task 5: `.gitignore`, live migration, full verification
 
 **Files:**
+
 - Modify: `.gitignore`
 - Live data: `target/criterion` → `.criterion` + symlink
-
 - [ ] **Step 1: Gitignore the store**
 
-In `.gitignore`, directly after the `/target` line in the "Build & Compilation" block, add:
+In `.gitignore`, directly after the `/target` line in the "Build & Compilation"
+block, add:
 
-```
+```text
 # --- Durable Criterion benchmark history (symlinked as target/criterion) --- #
 /.criterion/
 /.criterion.fork.*
@@ -1116,7 +1206,9 @@ PRE_JSON=$(find target/criterion -name estimates.json | wc -l | tr -d ' ')
 PRE_BASE=$(critcmp --baselines 2>/dev/null | wc -l | tr -d ' ')
 echo "dirs=$PRE_DIRS json=$PRE_JSON baselines=$PRE_BASE"
 ```
-Expected (2026-10-18 census): `dirs=118394 json=116313 baselines=13`. Keep these numbers for Step 5.
+
+Expected (2026-10-18 census): `dirs=118394 json=116313 baselines=13`. Keep these
+numbers for Step 5.
 
 - [ ] **Step 4: Migrate (same-volume instant renames)**
 
@@ -1126,6 +1218,7 @@ mv target/criterion .criterion
 ln -s ../.criterion target/criterion
 ls -la target/criterion
 ```
+
 Expected: `target/criterion -> ../.criterion`.
 
 - [ ] **Step 5: Verify integrity + tool transparency**
@@ -1138,16 +1231,25 @@ test "$PRE_DIRS" = "$POST_DIRS" && test "$PRE_JSON" = "$POST_JSON" && test "$PRE
 du -sh .criterion          # ~1.9G
 test -f target/criterion/report/index.html && echo HTML-VISIBLE-VIA-LINK
 ```
-Expected: `CENSUS-OK`, `~1.9G`, `HTML-VISIBLE-VIA-LINK`, critcmp reads identical baseline count through the symlink.
+
+Expected: `CENSUS-OK`, `~1.9G`, `HTML-VISIBLE-VIA-LINK`, critcmp reads identical
+baseline count through the symlink.
 
 - [ ] **Step 6: Live dry-run (must be a pure preview)**
 
-Run: `mise run clean --dry-run` (confirm prompt: `clean` declares `#MISE confirm`, so answer it; confirm guards only the run body per docs/refs/mise_tasks/07_configuration.md:356-358).
-Expected: cargo's "would remove" lines plus:
-```
+Run: `mise run clean --dry-run` (confirm prompt: `clean` declares
+`#MISE confirm`, so answer it; confirm guards only the run body per
+docs/refs/mise_tasks/07_configuration.md:356-358). Expected: cargo's "would
+remove" lines plus:
+
+```text
 clean: benchmark history lives in .criterion/ and is never deleted
 ```
-and afterwards `test -d .criterion && test -L target/criterion`, nothing moved. (Note: unlike the sandbox T6, the live dry-run may print the "would restore" line only when the link is absent; with the link present it prints just the contract line.)
+
+and afterwards `test -d .criterion && test -L target/criterion`, nothing moved.
+(Note: unlike the sandbox T6, the live dry-run may print the "would restore"
+line only when the link is absent; with the link present it prints just the
+contract line.)
 
 - [ ] **Step 7: Full verification battery**
 
@@ -1159,15 +1261,20 @@ mise tasks | grep -E '^(clean|bench|selftest)'   # tasks still parse
 critcmp --baselines | head              # history reachable
 git status --short                      # only intended files staged/changed
 ```
+
 Expected: all green; `git status` shows no `.criterion` (gitignored).
 
 - [ ] **Step 8: Manual smoke (optional but recommended)**
 
-`mise run bench --mode quick -f <smallest-bench>` then `critcmp --baselines | tail`, a new `main-<sha>[-dirty]-quick` baseline appears *inside the store* (`ls .criterion/<group>/<size>/`), and `target/criterion` is still a symlink after the run.
+`mise run bench --mode quick -f <smallest-bench>` then
+`critcmp --baselines | tail`, a new `main-<sha>[-dirty]-quick` baseline appears
+*inside the store* (`ls .criterion/<group>/<size>/`), and `target/criterion` is
+still a symlink after the run.
 
 - [ ] **Step 9: Final commit (if Step 8 changed nothing tracked)**
 
-No commit needed for data (untracked/ignored). If Step 8 revealed doc tweaks, fold them here:
+No commit needed for data (untracked/ignored). If Step 8 revealed doc tweaks,
+fold them here:
 
 ```bash
 git add -u && git commit -m "docs(mise): criterion store contract notes" || true
@@ -1177,6 +1284,22 @@ git add -u && git commit -m "docs(mise): criterion store contract notes" || true
 
 ## Self-Review
 
-1. **Spec coverage:** never-delete guarantee (symlink structure + guards, Tasks 1-4); `.criterion` name (Task 5 migration); dry-run purity (T6, `criterion_dry_run_note`); snapshot nesting fix (Task 3); regression tripwire (`selftest` task); gitignore; live migration with byte-count verification; doc/long_help updates (Task 2 Step 4). Covered.
+1. **Spec coverage:** never-delete guarantee (symlink structure + guards, Tasks
+   1-4); `.criterion` name (Task 5 migration); dry-run purity (T6,
+   `criterion_dry_run_note`); snapshot nesting fix (Task 3); regression tripwire
+   (`selftest` task); gitignore; live migration with byte-count verification;
+   doc/long_help updates (Task 2 Step 4). Covered.
 2. **Placeholders:** none, every step carries complete code or exact commands.
-3. **Name consistency:** `ensure_criterion_store`, `criterion_link_ok`, `criterion_link_path`, `criterion_link_text`, `criterion_dry_run_note`, `CRITERION_STORE`, `CRITERION_TARGET_DIR` are defined once in the helper and used identically by clean, bench, report, and selftest, and `require_safe_baseline_name` is defined once in the helper and called by `resolve_baseline_name` before the name reaches `snapshot_baseline`'s `rm -rf`. Target dir is passed as a positional argument (or left to the `CRITERION_TARGET_DIR` default); no link path is expanded at source time; link text is depth-aware and normalized (`./target` == `target`; absolute, `..`, and repo-root target dirs refused); `ensure` refuses to run outside `MISE_PROJECT_ROOT`. `run_ensure`/`seed_criterion`/`new_sandbox` are defined once in Task 1 and reused by later tasks' tests. Assertion totals: 30 (Task 1), 39 (Task 2), 45 (Task 3, Task 5 battery).
+3. **Name consistency:** `ensure_criterion_store`, `criterion_link_ok`,
+   `criterion_link_path`, `criterion_link_text`, `criterion_dry_run_note`,
+   `CRITERION_STORE`, `CRITERION_TARGET_DIR` are defined once in the helper and
+   used identically by clean, bench, report, and selftest, and
+   `require_safe_baseline_name` is defined once in the helper and called by
+   `resolve_baseline_name` before the name reaches `snapshot_baseline`'s
+   `rm -rf`. Target dir is passed as a positional argument (or left to the
+   `CRITERION_TARGET_DIR` default); no link path is expanded at source time;
+   link text is depth-aware and normalized (`./target` == `target`; absolute,
+   `..`, and repo-root target dirs refused); `ensure` refuses to run outside
+   `MISE_PROJECT_ROOT`. `run_ensure`/`seed_criterion`/`new_sandbox` are defined
+   once in Task 1 and reused by later tasks' tests. Assertion totals: 30 (Task
+   1), 39 (Task 2), 45 (Task 3, Task 5 battery).

@@ -10,7 +10,8 @@ This research summary preserves risk caveats rather than claiming full STE.
 
 The [repository layout manual][git-layout] permits a plain text `.git` file:
 
-> containing `gitdir: <path>` to point at the real directory that has the repository.
+> containing `gitdir: <path>` to point at the real directory that has the
+> repository.
 
 It names this mechanism a *gitfile*. Submodules and worktrees use it. The manual
 explains that removing a submodule working tree must not lose its repository.
@@ -70,7 +71,8 @@ as a cache that speeds subsequent builds. For exported `.d` dependency files:
 
 > The paths in the file are absolute by default.
 
-The [`build.dep-info-basedir` documentation][cargo-basedir] describes conversion:
+The [`build.dep-info-basedir` documentation][cargo-basedir] describes
+conversion:
 
 > convert absolute paths to relative paths
 
@@ -120,8 +122,9 @@ the vault; it cannot place metadata on an unrelated external disk.
 Regardless of policy, exclude the opened metadata directory by filesystem
 identity, including aliases reached through another name. Text case conversion
 is not a filesystem-equivalence test. The supplied APFS `.traceſ` observation
-establishes a macOS counterexample, not Windows or Linux behavior. This exclusion
-is not deduplication of all note aliases and is not a complete mount sandbox.
+establishes a macOS counterexample, not Windows or Linux behavior. This
+exclusion is not deduplication of all note aliases and is not a complete mount
+sandbox.
 
 Reject loops, dangling links, non-directory targets, and uncheckable confinement
 with actionable errors. Do not remove their targets as a repair action. A target

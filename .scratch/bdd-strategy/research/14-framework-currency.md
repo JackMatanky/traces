@@ -1,6 +1,10 @@
 # Framework Currency and Upstream Maintenance Research
 
-Layout note (2026-11-05): this record is older than the move of the scenarios to `tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read `mod steps` and `tests/features/steps/`. Where it names a flat feature file, read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is current.
+Layout note (2026-11-05): this record is older than the move of the scenarios to
+`tests/features.rs`. Where it names `mod bdd` or `tests/e2e/bdd/`, read
+`mod steps` and `tests/features/steps/`. Where it names a flat feature file,
+read the capability folder. Section 5 of `.scratch/bdd-testing/spec.md` is
+current.
 
 - Date: 2026-11-03
 - Target ticket: Ticket 14 (Adoption roadmap)
@@ -160,8 +164,8 @@ Sources tried and found useless:
 
 - `[G14]` Upstream added mold linker configuration for Linux development in PR
   907. This change does not affect downstream crate consumers. Source:
-  `https://api.github.com/repos/leynos/rstest-bdd/commits/4d585b789dcc8f070c3c7b7cb141388a65afcbe5`
-  (accessed 2026-11-03, primary, confidence: high).
+       `https://api.github.com/repos/leynos/rstest-bdd/commits/4d585b789dcc8f070c3c7b7cb141388a65afcbe5`
+       (accessed 2026-11-03, primary, confidence: high).
 
 - `[G15]` Cucumber-rs remains at version 0.23.0 (published 2026-04-23). Issue
   370 for cargo-nextest remains open and blocked by architectural differences.
@@ -185,8 +189,8 @@ Sources tried and found useless:
 - `[G19]` Step function definitions differ across frameworks. `rstest-bdd`
   injects arguments directly into step functions. `cucumber-rs` requires a
   shared `&mut World` argument. Plain tests call helper functions directly.
-  Source: `.scratch/bdd-strategy/research/rust-bdd-crate-comparison.md` (accessed
-  2026-11-03, primary, confidence: high).
+  Source: `.scratch/bdd-strategy/research/rust-bdd-crate-comparison.md`
+  (accessed 2026-11-03, primary, confidence: high).
 
 ## 4. Disagreements
 

@@ -202,8 +202,8 @@ shortcuts (`--todo`, `--done`, `--status <char>`), sorting, and table output.
   `Note.tasks()`.
 - Non-task checkboxes retain completion state for display and outline querying,
   while Task list items carry status, optional priority, and task dates.
-- `Note.tasks()` returns a zero-allocation iterator over List Items whose kind is
-  Task.
+- `Note.tasks()` returns a zero-allocation iterator over List Items whose kind
+  is Task.
 - `Note.list_items()` returns a zero-allocation iterator over all List Items.
 - In accordance with ADR 0005, `Note` stores list items in a flat, contiguous
   `Box<[ListItem]>` in strict document order. Each item stores `depth: u8` and

@@ -27,10 +27,10 @@ A configured directory containing templates, checked locally
 
 #### Template Resolution
 
-The lookup precedence resolving template names by directory order: local template
-directory before global template directory. Within each directory, exact relative
-path match wins over extensionless stem match.
-*Avoid*: template lookup, search
+The lookup precedence resolving template names by directory order: local
+template directory before global template directory. Within each directory,
+exact relative path match wins over extensionless stem match. *Avoid*: template
+lookup, search
 
 #### Template Variable
 

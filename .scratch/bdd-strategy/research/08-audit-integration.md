@@ -101,15 +101,19 @@ gated by `feature = "test-utils"`. ## 1. Facade Measurement and Usage
 | `renders_class_expanded_source_selectors_through_the_schema_graph` | Proves `@class*` transitive inheritance resolves in template queries via `FileClassExpander`. | In-process seam between `schema` DAG, `index`, `query`, and `template`. | Twin in E2E: `tests/e2e/query.rs:30`. | High risk: `FileClassExpander` seam is deleted in ticket 20. | Strong exact output check (`2-1-0-1-1`). | KEEP-as-integration |
 | `index_cache_does_not_persist_across_independent_renders` | Proves reused `TemplateService` observes filesystem edits between consecutive renders. | In-process stateful lifecycle and caching seam test. | No unit or e2e twin (E2E spawns fresh processes). | High risk: ticket 28 and 30. | Strong two-stage assertion. | KEEP-as-integration |
 
-*Note: `template_render.rs` contains 14 test functions, but `template_weekday_rejects_out_of_range_day_index` expands to 4 test cases via `rstest`, yielding 17 runnable test items.*
+*Note: `template_render.rs` contains 14 test functions, but
+`template_weekday_rejects_out_of_range_day_index` expands to 4 test cases via
+`rstest`, yielding 17 runnable test items.*
 
 ---
 
 ## 4. Synthesis: Does a Distinct Integration Layer Still Earn Its Keep?
 
-**Yes, but strictly as an in-process multi-component seam and storage fidelity layer. It is not a place for unit tests or spawned-CLI substitutes.**
+**Yes, but strictly as an in-process multi-component seam and storage fidelity
+layer. It is not a place for unit tests or spawned-CLI substitutes.**
 
-The in-process integration layer proves guarantees that unit tests and E2E cannot prove:
+The in-process integration layer proves guarantees that unit tests and E2E
+cannot prove:
 
 1. **Redb persistence and recovery invariance**: Direct corruption of the
    on-disk database file and check of recovery through wipe-and-rebuild

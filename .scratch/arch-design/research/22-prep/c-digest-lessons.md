@@ -1,19 +1,33 @@
 # Digest Lessons: Configuration Ownership, Lifecycle, and Boundary Precedent
 
-**Scope and Provenance.** This survey mines local source digests in `docs/digests/` to extract architectural precedent for wayfinder ticket 22 (sub-questions a–g). Every claim is tagged: `[V]` verified against digest line references, `[H]` architectural inference / synthesis, `[P]` proposal for grilling. Line references cite lines in the digest files under `docs/digests/`.
+**Scope and Provenance.** This survey mines local source digests in
+`docs/digests/` to extract architectural precedent for wayfinder ticket 22
+(sub-questions a–g). Every claim is tagged: `[V]` verified against digest line
+references, `[H]` architectural inference / synthesis, `[P]` proposal for
+grilling. Line references cite lines in the digest files under `docs/digests/`.
 
 ---
 
 ## 1. Summary of Digests with No Evidence
 
-The following examined digest sources contained **no direct architectural evidence** on configuration ownership, typed typestates, trust gating, or caching/scaffolding boundaries:
+The following examined digest sources contained
+**no direct architectural evidence** on configuration ownership, typed
+typestates, trust gating, or caching/scaffolding boundaries:
 
-- `docs/digests/rust_zoni-obsidian-export-digest.txt`: Pure CLI filter tool; opts are CLI args (`PathBuf`), no persistent config file or trust gate.
-- `docs/digests/rust_cryptogladi-obsidian-parser-digest.txt`: Leaf AST markdown parser; no configuration model or workspace lifecycle.
-- `docs/digests/rust_adamisrael-obsidian-rs-digest.txt`: Minimal API client skeleton.
-- `docs/digests/obsidian_platers-obsidian-linter-digest.txt`: Standard Obsidian plugin settings object; does not model tasks/trust/caching beyond UI toggle serialization.
-- `docs/digests/vim_ymich9963-mdnotes-nvim-digest.txt`: Lua editor integration; relies on ambient vim global state.
-- `docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt`: Analyzed in research 21; holds basic LSP settings map initialized on startup, no dedicated trust or multi-stage typestate pipeline.
+- `docs/digests/rust_zoni-obsidian-export-digest.txt`: Pure CLI filter tool;
+  opts are CLI args (`PathBuf`), no persistent config file or trust gate.
+- `docs/digests/rust_cryptogladi-obsidian-parser-digest.txt`: Leaf AST markdown
+  parser; no configuration model or workspace lifecycle.
+- `docs/digests/rust_adamisrael-obsidian-rs-digest.txt`: Minimal API client
+  skeleton.
+- `docs/digests/obsidian_platers-obsidian-linter-digest.txt`: Standard Obsidian
+  plugin settings object; does not model tasks/trust/caching beyond UI toggle
+  serialization.
+- `docs/digests/vim_ymich9963-mdnotes-nvim-digest.txt`: Lua editor integration;
+  relies on ambient vim global state.
+- `docs/digests/lsp_feel-ix-343-markdown-oxide-src-digest.txt`: Analyzed in
+  research 21; holds basic LSP settings map initialized on startup, no dedicated
+  trust or multi-stage typestate pipeline.
 
 ---
 
@@ -21,7 +35,8 @@ The following examined digest sources contained **no direct architectural eviden
 
 ### Aspect 1: Where Task-Status / Emoji / Tag-Filter Settings are Owned
 
-*Informs sub-question (a): why `task.rs`/`tag.rs`/`field.rs` live at root; where `TaskStatusMap`, tag filters, status/emoji parsing belong.*
+*Informs sub-question (a): why `task.rs`/`tag.rs`/`field.rs` live at root; where
+`TaskStatusMap`, tag filters, status/emoji parsing belong.*
 
 | Tool | Digest & Approx. Line | Architectural Mechanism | Evidence Tag | Informs Sub-question & Position on Keep-as-is |
 |---|---|---|---|---|
@@ -32,7 +47,8 @@ The following examined digest sources contained **no direct architectural eviden
 
 ### Aspect 2: Config Dependency Direction
 
-*Informs sub-question (b): upward `note -> config` edge; primitives vs typed parser-config.*
+*Informs sub-question (b): upward `note -> config` edge; primitives vs typed
+parser-config.*
 
 | Tool | Digest & Approx. Line | Architectural Mechanism | Evidence Tag | Informs Sub-question & Position on Keep-as-is |
 |---|---|---|---|---|
@@ -44,7 +60,8 @@ The following examined digest sources contained **no direct architectural eviden
 
 ### Aspect 3: Config Fingerprint / Cache Invalidation
 
-*Informs sub-question (c): residual `ConfigDigests` vs `IndexFingerprint`; whole-config hash vs consumed-subset hash.*
+*Informs sub-question (c): residual `ConfigDigests` vs `IndexFingerprint`;
+whole-config hash vs consumed-subset hash.*
 
 | Tool | Digest & Approx. Line | Architectural Mechanism | Evidence Tag | Informs Sub-question & Position on Keep-as-is |
 |---|---|---|---|---|
@@ -55,7 +72,8 @@ The following examined digest sources contained **no direct architectural eviden
 
 ### Aspect 4: Trust Gates and Command Execution
 
-*Informs sub-question (d): twin `TrustStore`/`TrackerStore` over `FilePathTracker`; two-store ordering invariant.*
+*Informs sub-question (d): twin `TrustStore`/`TrackerStore` over
+`FilePathTracker`; two-store ordering invariant.*
 
 | Tool | Digest & Approx. Line | Architectural Mechanism | Evidence Tag | Informs Sub-question & Position on Keep-as-is |
 |---|---|---|---|---|
@@ -103,16 +121,37 @@ The following examined digest sources contained **no direct architectural eviden
 
 ### What Transfers Directly `[H]`
 
-1. **Typestate Validation (`rumdl`):** The `ConfigFile<Loaded>` -> `ConfigFile<Validated>` typestate pattern prevents unvalidated TOML/CLI combinations from leaking into the core runtime. Traces should adopt this for config parsing.
-2. **Decoupled Parser Options (`liwe`/`zk`):** Parsers must never import top-level workspace config. Instead, the parser takes a minimal, leaf-defined struct (e.g. `NoteParserConfig` or primitive flags) populated by the host adapter.
-3. **Core Scaffolding Engine with CLI Dialog (`zk`):** Default template and configuration contents belong to a core/workspace module so headless or programmatic consumers can scaffold workspaces; the interactive terminal wizard belongs exclusively to `cli::init`.
-4. **Discarding Dormant Fingerprints (`rumdl`):** Hashing should only cover the exact subset of configuration values that alter index outputs. Root and template directory digests with zero consumers should be retired or folded into `IndexFingerprint`.
+1. **Typestate Validation (`rumdl`):** The `ConfigFile<Loaded>` ->
+   `ConfigFile<Validated>` typestate pattern prevents unvalidated TOML/CLI
+   combinations from leaking into the core runtime. Traces should adopt this for
+   config parsing.
+2. **Decoupled Parser Options (`liwe`/`zk`):** Parsers must never import
+   top-level workspace config. Instead, the parser takes a minimal, leaf-defined
+   struct (e.g. `NoteParserConfig` or primitive flags) populated by the host
+   adapter.
+3. **Core Scaffolding Engine with CLI Dialog (`zk`):** Default template and
+   configuration contents belong to a core/workspace module so headless or
+   programmatic consumers can scaffold workspaces; the interactive terminal
+   wizard belongs exclusively to `cli::init`.
+4. **Discarding Dormant Fingerprints (`rumdl`):** Hashing should only cover the
+   exact subset of configuration values that alter index outputs. Root and
+   template directory digests with zero consumers should be retired or folded
+   into `IndexFingerprint`.
 
 ### What Does Not Transfer `[H]`
 
-1. **Implicit Trust of Repository Config (`zk`/`Templater`):** Single-user CLI tools (`zk`) and Obsidian plugins (`Templater`) execute shell commands or `eval` scripts without cryptographic grants or tracking. Traces operates under `ADR-0002` (mandatory user consent, SHA-256 fingerprint tracking, separate `TrustStore`/`TrackerStore` in `redb`).
-2. **Ambient Global Singletons (`Obsidian Tasks`):** Obsidian Tasks' reliance on `StatusRegistry.getInstance()` and `GlobalFilter.getInstance()` introduces hidden global state that complicates multi-root or parallel execution. Traces requires explicit workspace-scoped injection.
-3. **Global Static Path Caches (`obx`):** `OnceLock<PathBuf>` for directories prevents in-process test isolation and multi-root LSP operation. Traces snapshots host environment per workspace context.
+1. **Implicit Trust of Repository Config (`zk`/`Templater`):** Single-user CLI
+   tools (`zk`) and Obsidian plugins (`Templater`) execute shell commands or
+   `eval` scripts without cryptographic grants or tracking. Traces operates
+   under `ADR-0002` (mandatory user consent, SHA-256 fingerprint tracking,
+   separate `TrustStore`/`TrackerStore` in `redb`).
+2. **Ambient Global Singletons (`Obsidian Tasks`):** Obsidian Tasks' reliance on
+   `StatusRegistry.getInstance()` and `GlobalFilter.getInstance()` introduces
+   hidden global state that complicates multi-root or parallel execution. Traces
+   requires explicit workspace-scoped injection.
+3. **Global Static Path Caches (`obx`):** `OnceLock<PathBuf>` for directories
+   prevents in-process test isolation and multi-root LSP operation. Traces
+   snapshots host environment per workspace context.
 
 ---
 

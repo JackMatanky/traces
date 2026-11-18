@@ -1,6 +1,8 @@
 # Prior Decisions, Constraints, and Handoffs Bearing on Ticket 20
 
-- **Topic:** Architectural audit of settled decisions, constraints, downstream couplings, and unresolved loops for Wayfinder Ticket 20 (Schema Note Typing and Validation).
+- **Topic:** Architectural audit of settled decisions, constraints, downstream
+  couplings, and unresolved loops for Wayfinder Ticket 20 (Schema Note Typing
+  and Validation).
 - **Status:** Complete research synthesis.
 - **Deliverable:** `.scratch/arch-design/research/20-prep/d-prior-decisions.md`.
 
@@ -8,7 +10,8 @@
 
 ## 1. Constraint Table (Decisions Bearing on Ticket 20)
 
-Ticket 20 must honour all settled invariant and architectural decisions from tickets 01–19, ADRs, and map directives:
+Ticket 20 must honour all settled invariant and architectural decisions from
+tickets 01–19, ADRs, and map directives:
 
 | ID | Source | Settled Rule / Quote | Direct Invariant Consequence for Ticket 20 |
 |---|---|---|---|
@@ -58,26 +61,57 @@ Ticket 20 must resolve what it produces and hands off to all downstream tickets:
 ## 3. Cross-Ticket Inconsistencies & Open Loops
 
 1. **The "Frontmatter String Override" Illusion:**
-   - *Tension:* Ticket 19 ruled: *"Frontmatter classification stays schema-free and quote-insensitive... A frontmatter value that must stay text uses the schema override (ticket 20)"* [V: `issues/19:102-106`]. But Ticket 18 mandated: *"note-boundary classification rules owned by note parser, one precedence order"* [V: `issues/18:522-523`].
-   - *The Trap:* If note frontmatter parsing is strictly schema-free, the parser eagerly converts `title: 2026-07-29` into `NoteFieldValue::Date`. How can a schema "override" this to text without: (a) passing `SchemaService` into `NoteParser` (violating schema-free note parsing and Tier 4/5 DAG decoupling), (b) mutating stored note values post-parse, or (c) applying a late query-time projection? Ticket 20 must reconcile this contradiction.
+   - *Tension:* Ticket 19 ruled: *"Frontmatter classification stays schema-free
+     and quote-insensitive... A frontmatter value that must stay text uses the
+     schema override (ticket 20)"* [V: `issues/19:102-106`]. But Ticket 18
+     mandated: *"note-boundary classification rules owned by note parser, one
+     precedence order"* [V: `issues/18:522-523`].
+   - *The Trap:* If note frontmatter parsing is strictly schema-free, the parser
+     eagerly converts `title: 2026-07-29` into `NoteFieldValue::Date`. How can a
+     schema "override" this to text without: (a) passing `SchemaService` into
+     `NoteParser` (violating schema-free note parsing and Tier 4/5 DAG
+     decoupling), (b) mutating stored note values post-parse, or (c) applying a
+     late query-time projection? Ticket 20 must reconcile this contradiction.
 2. **Select String vs Link Matching Redundancy:**
-   - *Tension:* Ticket 18 recorded: *"Select values that name links stay strings; ticket 20 interprets them at the consumer boundary with the shared wikilink parser"* [V: `issues/18:481-482`]. But Ticket 19 recorded: *"A `Link` row adopts a literal as its folded target... This settles schema select string vs `Link` matching for ticket 20"* [V: `issues/19:122-124`].
-   - *The Loop:* Ticket 19 already solved select-string matching via adaptive query literals (`due == "[[Project A]]"` matches `Link("Project A")`). Does Ticket 20 need to do anything further, or is Ticket 18's handoff to 20 completely moot?
+   - *Tension:* Ticket 18 recorded: *"Select values that name links stay
+     strings; ticket 20 interprets them at the consumer boundary with the shared
+     wikilink parser"* [V: `issues/18:481-482`]. But Ticket 19 recorded: *"A
+     `Link` row adopts a literal as its folded target... This settles schema
+     select string vs `Link` matching for ticket 20"* [V: `issues/19:122-124`].
+   - *The Loop:* Ticket 19 already solved select-string matching via adaptive
+     query literals (`due == "[[Project A]]"` matches `Link("Project A")`). Does
+     Ticket 20 need to do anything further, or is Ticket 18's handoff to 20
+     completely moot?
 3. **ADR-0006 "Inert" Flags vs Active Validation:**
-   - *Tension:* ADR-0006 explicitly documented: *"required/multi are declared now but inert until the deferred MCP guardrail stage"* [V: `docs/adr/0006:110-111`] and *"The schema supplies values only; the template author picks the interactive ui.* function"* [V: `docs/adr/0006:76-77`].
-   - *The Loop:* Ticket 20 reopens this: should `required` and `multi` be validated against notes today (advisory diagnostics), or do they remain inert until an editor/LSP/MCP milestone?
+   - *Tension:* ADR-0006 explicitly documented: *"required/multi are declared
+     now but inert until the deferred MCP guardrail stage"* [V:
+     `docs/adr/0006:110-111`] and *"The schema supplies values only; the
+     template author picks the interactive ui.* function"* [V:
+     `docs/adr/0006:76-77`].
+   - *The Loop:* Ticket 20 reopens this: should `required` and `multi` be
+     validated against notes today (advisory diagnostics), or do they remain
+     inert until an editor/LSP/MCP milestone?
 4. **Index Invalidation Cliff vs Incremental Watchers:**
-   - *Tension:* If Ticket 20 chooses index-time schema typing (e.g. coercing note fields into schema-typed variants in Redb), any edit to a schema file invalidates all notes of that class in Redb.
-   - *The Loop:* Landed drift detection (`207cc3fb`) invalidates the *entire* index on config drift [`issues/25:18-20`]. Adding schema hashes to `IndexFingerprint` would turn schema edits into full-vault rebuild cliffs.
+   - *Tension:* If Ticket 20 chooses index-time schema typing (e.g. coercing
+     note fields into schema-typed variants in Redb), any edit to a schema file
+     invalidates all notes of that class in Redb.
+   - *The Loop:* Landed drift detection (`207cc3fb`) invalidates the *entire*
+     index on config drift [`issues/25:18-20`]. Adding schema hashes to
+     `IndexFingerprint` would turn schema edits into full-vault rebuild cliffs.
 5. **Topological Tier Inversion for Note Validation:**
-   - *Tension:* `src/schema` (Tier 4) has zero imports of `src/note` (Tier 5) [V: `survey/schema.md:37; survey/cross-cutting.md:117-118`].
-   - *The Loop:* If `src/schema` owns `validate(&Note, &Schema)`, Tier 4 must import Tier 5, inverting the architectural DAG. If `src/note` owns validation, Tier 5 imports Tier 4. If neither, where does the validator live?
+   - *Tension:* `src/schema` (Tier 4) has zero imports of `src/note` (Tier 5)
+     [V: `survey/schema.md:37; survey/cross-cutting.md:117-118`].
+   - *The Loop:* If `src/schema` owns `validate(&Note, &Schema)`, Tier 4 must
+     import Tier 5, inverting the architectural DAG. If `src/note` owns
+     validation, Tier 5 imports Tier 4. If neither, where does the validator
+     live?
 
 ---
 
 ## 4. The 'Graduates Fog' List (Map: Schema Internals)
 
-Map `map.md:234-240` lists 6 unsharpened items under "Schema internals" that cannot be settled until Ticket 20 fixes what schema produces:
+Map `map.md:234-240` lists 6 unsharpened items under "Schema internals" that
+cannot be settled until Ticket 20 fixes what schema produces:
 
 | Fog Item | Size / Location | What Ticket 20 MUST Settle | What Can Wait Until After Ticket 20 |
 |---|---|---|---|
@@ -92,24 +126,62 @@ Map `map.md:234-240` lists 6 unsharpened items under "Schema internals" that can
 
 ## 5. The User's Likely Preferences (Inferred from Earlier Steers)
 
-The user's decisions across tickets 16–19 establish clear, consistent architectural instincts:
+The user's decisions across tickets 16–19 establish clear, consistent
+architectural instincts:
 
 1. **Advisory over Gating / Lenient Open-World Vaults:**
-   - *Actual words:* In Ticket 18 (out-of-range integers), agreed to *"frontmatter-only config copy with `integer_overflow_errors` off, so an integer above `u64::MAX` becomes an approximate `Float` and does not discard the whole frontmatter block"* [V: `issues/18:436, 494-496`].
-   - *Actual words:* In Ticket 19 (filter error handling), agreed to the error-mode principle: *"classification failure keeps the string; explicit casts (`date()`, `dur()`) fail to `Null`; filters never error at evaluation; arithmetic on mismatched kinds is `Null`. Advisory stderr notices"* [V: `issues/19:159-163`]. Explicitly rejected *"erroring filters (hostile to open-world vaults)"* [V: `issues/19:68-69`].
-   - *Inference for 20 [H]:* The user will firmly **reject** ingestion-time gating or index-blocking schema validation. They will strongly favour **advisory diagnostics** (warnings on stderr or LSP diagnostics) that never prevent notes from being indexed or queried.
+   - *Actual words:* In Ticket 18 (out-of-range integers), agreed to
+     *"frontmatter-only config copy with `integer_overflow_errors` off, so an
+     integer above `u64::MAX` becomes an approximate `Float` and does not
+     discard the whole frontmatter block"* [V: `issues/18:436, 494-496`].
+   - *Actual words:* In Ticket 19 (filter error handling), agreed to the
+     error-mode principle: *"classification failure keeps the string; explicit
+     casts (`date()`, `dur()`) fail to `Null`; filters never error at
+     evaluation; arithmetic on mismatched kinds is `Null`. Advisory stderr
+     notices"* [V: `issues/19:159-163`]. Explicitly rejected
+     *"erroring filters (hostile to open-world vaults)"* [V: `issues/19:68-69`].
+   - *Inference for 20 [H]:* The user will firmly **reject** ingestion-time
+     gating or index-blocking schema validation. They will strongly favour
+     **advisory diagnostics** (warnings on stderr or LSP diagnostics) that never
+     prevent notes from being indexed or queried.
 2. **Delete / Simplify over Speculative Keep:**
-   - *Actual words:* In Ticket 18, eliminated `FieldValueRef` and duplicate visitor hierarchies: *"FieldValueRef is always immediately owned (zero-copy gain is nil), the chain costs about 41 percent of frontmatter parse time... rejected"* [V: `issues/18:456-458`].
-   - *Actual words:* In Ticket 19, deleted sort-time sniffing: *"The sort-time sniffing (`TextShape::classify` in `SortKey`) is deleted, and `List`/`Object` stop being mapped to `Null`"* [V: `issues/19:85-87`].
-   - *Actual words:* In Ticket 18, rejected caller counts as the sole metric for deleting end-user features: *"Caller counts alone were rejected as evidence for deleting capabilities, since the crate has end users and a public surface"* [V: `issues/18:332-333`].
-   - *Inference for 20 [H]:* The user will favor eliminating the 2.0k-line `fields/select.rs` external file cache complexity if it is shown to be accidental complexity, but will protect user-visible schema capabilities.
+   - *Actual words:* In Ticket 18, eliminated `FieldValueRef` and duplicate
+     visitor hierarchies: *"FieldValueRef is always immediately owned (zero-copy
+     gain is nil), the chain costs about 41 percent of frontmatter parse time...
+     rejected"* [V: `issues/18:456-458`].
+   - *Actual words:* In Ticket 19, deleted sort-time sniffing: *"The sort-time
+     sniffing (`TextShape::classify` in `SortKey`) is deleted, and
+     `List`/`Object` stop being mapped to `Null`"* [V: `issues/19:85-87`].
+   - *Actual words:* In Ticket 18, rejected caller counts as the sole metric for
+     deleting end-user features: *"Caller counts alone were rejected as evidence
+     for deleting capabilities, since the crate has end users and a public
+     surface"* [V: `issues/18:332-333`].
+   - *Inference for 20 [H]:* The user will favor eliminating the 2.0k-line
+     `fields/select.rs` external file cache complexity if it is shown to be
+     accidental complexity, but will protect user-visible schema capabilities.
 3. **Compatibility Freedom & Sole Consumer:**
-   - *Actual words:* In Ticket 16: *"The user is the only consumer. No published release, no external Rust crate depends on the library. Every surface is therefore at most Migratable unless it would break the user's own vault files"* [V: `issues/16:24-25`]. Rust library surface is Free [`16:45`].
-   - *Inference for 20 [H]:* The user is completely unconcerned with preserving internal Rust APIs in `src/schema/`. They care about not breaking existing Markdown files and keeping `.traces/schemas/*.toml` files clean.
+   - *Actual words:* In Ticket 16: *"The user is the only consumer. No published
+     release, no external Rust crate depends on the library. Every surface is
+     therefore at most Migratable unless it would break the user's own vault
+     files"* [V: `issues/16:24-25`]. Rust library surface is Free [`16:45`].
+   - *Inference for 20 [H]:* The user is completely unconcerned with preserving
+     internal Rust APIs in `src/schema/`. They care about not breaking existing
+     Markdown files and keeping `.traces/schemas/*.toml` files clean.
 4. **Workspace Split & Decoupling:**
-   - *Actual words:* Steer recorded on 2026-10-18: *"consider evolving the codebase toward a workspace layout, starting by separating the CLI into its own crate... reduce visibility wherever possible and limit `pub` to outward-facing components"* [V: `map.md:33-39; issues/16:47`].
-   - *Actual words:* In Ticket 18 (domain boundaries): *"Keep schema declarations, note source occurrences, query projections, and template-facing representations separate where their responsibilities differ... schema field types do not silently reinterpret literals. Any such interpretation must be explicit at the consumer boundary"* [V: `issues/18:63-65, 159-161`].
-   - *Inference for 20 [H]:* The user will resist any design that tightly couples `schema` to `note` or `index`. They prefer clean, layered interfaces (like `FileClassExpander`) that facilitate a multi-crate workspace split.
+   - *Actual words:* Steer recorded on 2026-10-18: *"consider evolving the
+     codebase toward a workspace layout, starting by separating the CLI into its
+     own crate... reduce visibility wherever possible and limit `pub` to
+     outward-facing components"* [V: `map.md:33-39; issues/16:47`].
+   - *Actual words:* In Ticket 18 (domain boundaries): *"Keep schema
+     declarations, note source occurrences, query projections, and
+     template-facing representations separate where their responsibilities
+     differ... schema field types do not silently reinterpret literals. Any such
+     interpretation must be explicit at the consumer boundary"* [V:
+     `issues/18:63-65, 159-161`].
+   - *Inference for 20 [H]:* The user will resist any design that tightly
+     couples `schema` to `note` or `index`. They prefer clean, layered
+     interfaces (like `FileClassExpander`) that facilitate a multi-crate
+     workspace split.
 
 ---
 
@@ -117,61 +189,136 @@ The user's decisions across tickets 16–19 establish clear, consistent architec
 
 ### Spine Question 1: What is the operational remit of Schemas regarding notes?
 
-- **Option A (Keep as is / Passive Metadata Provider):** Schemas define field definitions used strictly as passive metadata for templates (supplying select value lists via `schema.get("class").field("prop")`), template reflection (`ui.select`), and query class hierarchy expansion (`@class*` via `FileClassExpander`). Zero note validation; note frontmatter and inline fields remain 100% open-world and schemaless.
-- **Option B (On-Demand Advisory Validation Pass — Recommended):** Notes parse and index unconditionally. An independent validator pass (`validate(note, schema) -> Vec<SchemaDiagnostic>`) evaluates note frontmatter/inline fields against resolved schema definitions on demand (for CLI `traces check` / `traces lint` and LSP `textDocument/publishDiagnostics`). Emits structured diagnostics with source byte spans. Never blocks indexing or query execution.
-- **Option C (Ingestion-Time Gating / Typed Store):** Notes are validated against schemas during indexing. Notes with schema violations are rejected from Redb or have non-conforming fields nulled. (Breaks open-world tolerance, tightly couples `index` to `schema`, turns schema edits into index wipe cliffs).
-- **Option D (Query-Time Schema Projection):** Stored notes remain raw; queries use schema definitions to dynamically project and cast fields (e.g. coercing strings to schema-declared types during query execution).
+- **Option A (Keep as is / Passive Metadata Provider):** Schemas define field
+  definitions used strictly as passive metadata for templates (supplying select
+  value lists via `schema.get("class").field("prop")`), template reflection
+  (`ui.select`), and query class hierarchy expansion (`@class*` via
+  `FileClassExpander`). Zero note validation; note frontmatter and inline fields
+  remain 100% open-world and schemaless.
+- **Option B (On-Demand Advisory Validation Pass — Recommended):** Notes parse
+  and index unconditionally. An independent validator pass
+  (`validate(note, schema) -> Vec<SchemaDiagnostic>`) evaluates note
+  frontmatter/inline fields against resolved schema definitions on demand (for
+  CLI `traces check` / `traces lint` and LSP `textDocument/publishDiagnostics`).
+  Emits structured diagnostics with source byte spans. Never blocks indexing or
+  query execution.
+- **Option C (Ingestion-Time Gating / Typed Store):** Notes are validated
+  against schemas during indexing. Notes with schema violations are rejected
+  from Redb or have non-conforming fields nulled. (Breaks open-world tolerance,
+  tightly couples `index` to `schema`, turns schema edits into index wipe
+  cliffs).
+- **Option D (Query-Time Schema Projection):** Stored notes remain raw; queries
+  use schema definitions to dynamically project and cast fields (e.g. coercing
+  strings to schema-declared types during query execution).
 - *Downstream Blockers:* **Blocks Tickets 23, 24, 25, 26, 31, 32, 33, 35.**
 
 ### Question 2: How does the "Frontmatter String Override" operate, and who owns it?
 
-*(Ticket 19:104-106 promised: "A frontmatter value that must stay text uses the schema override (ticket 20)")*
+*(Ticket 19:104-106 promised: "A frontmatter value that must stay text uses the
+schema override (ticket 20)")*
 
-- **Option A (No Runtime Override; Quote-Insensitive Frontmatter Stands):** Frontmatter dates always classify to `Date`/`DateTime`. If an author wants a string, they write an inline field with quotes (`title:: "2026-07-29"`), or write a non-date string. Schema field definitions do not mutate runtime values. (Keeps note parser 100% schema-free).
-- **Option B (Query-Time Projection Override):** Note parsing remains schema-free and stores `Date`. During query plan compilation, if a note's schema declares the field as `type = "input"` (string), the query binder projects the value as `String` (or compares it using string semantics).
-- **Option C (Parse-Time Schema Sniffing — Rejected Direction):** Pass `SchemaService` into `NoteParser`. If a schema declares the field as string, lexical date sniffing is skipped. (Violates 18 & 19 schema-free note parsing; couples note parser to schema).
-- **Option D (Advisory Diagnostic Only):** The value remains a `Date` at runtime; the advisory validator warns: `"Field 'title' has schema type 'input' but contains Date '2026-07-29'"`.
+- **Option A (No Runtime Override; Quote-Insensitive Frontmatter Stands):**
+  Frontmatter dates always classify to `Date`/`DateTime`. If an author wants a
+  string, they write an inline field with quotes (`title:: "2026-07-29"`), or
+  write a non-date string. Schema field definitions do not mutate runtime
+  values. (Keeps note parser 100% schema-free).
+- **Option B (Query-Time Projection Override):** Note parsing remains
+  schema-free and stores `Date`. During query plan compilation, if a note's
+  schema declares the field as `type = "input"` (string), the query binder
+  projects the value as `String` (or compares it using string semantics).
+- **Option C (Parse-Time Schema Sniffing — Rejected Direction):** Pass
+  `SchemaService` into `NoteParser`. If a schema declares the field as string,
+  lexical date sniffing is skipped. (Violates 18 & 19 schema-free note parsing;
+  couples note parser to schema).
+- **Option D (Advisory Diagnostic Only):** The value remains a `Date` at
+  runtime; the advisory validator warns:
+  `"Field 'title' has schema type 'input' but contains Date '2026-07-29'"`.
 - *Downstream Blockers:* **Blocks Tickets 23, 24, 26.**
 
 ### Question 3: Which module owns the validator and where does the diagnostic type live?
 
-- **Option A (`schema::validate`):** `src/schema/` owns `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`. Inverts the DAG (Tier 4 `schema` must import Tier 5 `note`).
-- **Option B (Independent Analysis / Lint Module):** An independent module (e.g. `src/analysis/` or `src/lint/`) sitting at Tier 8+ above `note` and `schema` imports both and implements validation. Keeps `schema` and `note` decoupled.
-- **Option C (`note::validate`):** `src/note/` imports `Schema` and validates itself.
-- **Option D (No Validator):** If Option A of Q1 is selected, no validator or diagnostic type exists.
-- *Downstream Blockers:* **Blocks Tickets 32 (Diagnostic Architecture), 33 (Crate Topology).**
+- **Option A (`schema::validate`):** `src/schema/` owns
+  `validate(&Note, &Schema) -> Vec<SchemaDiagnostic>`. Inverts the DAG (Tier 4
+  `schema` must import Tier 5 `note`).
+- **Option B (Independent Analysis / Lint Module):** An independent module (e.g.
+  `src/analysis/` or `src/lint/`) sitting at Tier 8+ above `note` and `schema`
+  imports both and implements validation. Keeps `schema` and `note` decoupled.
+- **Option C (`note::validate`):** `src/note/` imports `Schema` and validates
+  itself.
+- **Option D (No Validator):** If Option A of Q1 is selected, no validator or
+  diagnostic type exists.
+- *Downstream Blockers:*
+  **Blocks Tickets 32 (Diagnostic Architecture), 33 (Crate Topology).**
 
 ### Question 4: What is the boundary between Schema Field Types and Template `ui` Prompts?
 
-*(Ticket 20 asks: "typed-field representation shared with templates (`ui` prompts) and query?")*
+*(Ticket 20 asks: "typed-field representation shared with templates (`ui`
+prompts) and query?")*
 
-- **Option A (Strictly Decoupled Values-Only — ADR-0006 Baseline):** Schema fields supply values/options only (`field.values()`). The template author explicitly chooses the interactive function (`ui.select(...)`, `ui.text(...)`). Schemas have zero knowledge of `ui` prompt types.
-- **Option B (Schema Prompt Helper):** Schema fields declare an optional prompt preference; templates can call `field.prompt()` as a convenience wrapper dispatching to `ui.*`.
-- **Option C (Unified FieldDef Enum Across Subsystems):** A heavy, shared enum merging schema types, template prompt widgets, and query filter affinities.
+- **Option A (Strictly Decoupled Values-Only — ADR-0006 Baseline):** Schema
+  fields supply values/options only (`field.values()`). The template author
+  explicitly chooses the interactive function (`ui.select(...)`,
+  `ui.text(...)`). Schemas have zero knowledge of `ui` prompt types.
+- **Option B (Schema Prompt Helper):** Schema fields declare an optional prompt
+  preference; templates can call `field.prompt()` as a convenience wrapper
+  dispatching to `ui.*`.
+- **Option C (Unified FieldDef Enum Across Subsystems):** A heavy, shared enum
+  merging schema types, template prompt widgets, and query filter affinities.
 - *Downstream Blockers:* **Blocks Ticket 28 (Template Boundary).**
 
 ### Question 5: What is the fate of external select-values files and `fields/select.rs`?
 
 *(Map "Graduates fog" item 1)*
 
-- **Option A (Keep as-is):** Retain external `.toml`/`.json` file caching, path confinement, and 5 nested error types in `fields/select.rs` (~2.0k LoC) for large external taxonomies.
-- **Option B (Retire External Select Files — Simplify):** Select fields support only inline string/object lists in `.traces/schemas/*.toml`. Large option datasets are queried via `file` fields (`from_class` / index queries). Deletes ~1,500 LoC and 3 error enums.
-- **Option C (Simplify External Loading):** Retain external file references, but strip custom caching and path-confinement gymnastics; read them via standard Serde at `SchemaService::load` time.
+- **Option A (Keep as-is):** Retain external `.toml`/`.json` file caching, path
+  confinement, and 5 nested error types in `fields/select.rs` (~2.0k LoC) for
+  large external taxonomies.
+- **Option B (Retire External Select Files — Simplify):** Select fields support
+  only inline string/object lists in `.traces/schemas/*.toml`. Large option
+  datasets are queried via `file` fields (`from_class` / index queries). Deletes
+  ~1,500 LoC and 3 error enums.
+- **Option C (Simplify External Loading):** Retain external file references, but
+  strip custom caching and path-confinement gymnastics; read them via standard
+  Serde at `SchemaService::load` time.
 - *Downstream Blockers:* **Blocks Ticket 30 (Path & Capability).**
 
 ---
 
 ## 7. Not Verified
 
-1. **Impact of removing external select files on real user vaults:** [H] It is hypothesized that few vaults use external `.json`/`.toml` select dictionaries, but this has not been surveyed across user vault repositories.
-2. **Performance of on-demand validation over 50k notes:** [H] Running `validate(&Note, &Schema)` across 50,000 notes in memory using Rayon is estimated at <50ms, but has not been benchmarked.
-3. **Template authors' reliance on ADR-0006 `required`/`multi`:** [H] ADR-0006 documented these as inert, but whether any existing templates inspect `field.required` or `field.multi` reflects unverified template usage.
+1. **Impact of removing external select files on real user vaults:** [H] It is
+   hypothesized that few vaults use external `.json`/`.toml` select
+   dictionaries, but this has not been surveyed across user vault repositories.
+2. **Performance of on-demand validation over 50k notes:** [H] Running
+   `validate(&Note, &Schema)` across 50,000 notes in memory using Rayon is
+   estimated at <50ms, but has not been benchmarked.
+3. **Template authors' reliance on ADR-0006 `required`/`multi`:** [H] ADR-0006
+   documented these as inert, but whether any existing templates inspect
+   `field.required` or `field.multi` reflects unverified template usage.
 
 ---
 
 ## 8. Questions This Raises for the Grilling
 
-1. *The String Override Paradox:* In Ticket 19 you decided that frontmatter classification is quote-insensitive and schema-free, but noted that a frontmatter value staying text would use the "schema override (ticket 20)". Since note parsing cannot depend on schemas without inverting the module DAG and slowing down ingest, how should this override behave? Should it simply be an advisory diagnostic, a query-time string projection, or do we accept that frontmatter dates are always dates?
-2. *Advisory vs Passive:* `src/schema` is 12,000 lines of code, but currently does zero validation of notes. Are you committed to introducing an on-demand advisory validation pass (for `traces check` and LSP), or would you rather keep schemas as passive template/query metadata providers and avoid building a note validation engine altogether?
-3. *Select Files Pruning:* `src/schema/fields/select.rs` accounts for 2,032 lines (>16% of the schema subsystem) just to support external `.toml` and `.json` option dictionaries with custom caching and path confinement. Can we delete external select files and require select options to be inline lists in the schema TOML?
-4. *Prompt Coupling:* ADR-0006 ruled that schemas supply values only, leaving template authors to pick `ui.*` functions. Ticket 20 raises whether schemas should own a typed-field representation shared with `ui` prompts. Do you want schemas to dictate UI prompt behavior, or keep schemas strictly decoupled from UI dialogs?
+1. *The String Override Paradox:* In Ticket 19 you decided that frontmatter
+   classification is quote-insensitive and schema-free, but noted that a
+   frontmatter value staying text would use the "schema override (ticket 20)".
+   Since note parsing cannot depend on schemas without inverting the module DAG
+   and slowing down ingest, how should this override behave? Should it simply be
+   an advisory diagnostic, a query-time string projection, or do we accept that
+   frontmatter dates are always dates?
+2. *Advisory vs Passive:* `src/schema` is 12,000 lines of code, but currently
+   does zero validation of notes. Are you committed to introducing an on-demand
+   advisory validation pass (for `traces check` and LSP), or would you rather
+   keep schemas as passive template/query metadata providers and avoid building
+   a note validation engine altogether?
+3. *Select Files Pruning:* `src/schema/fields/select.rs` accounts for 2,032
+   lines (>16% of the schema subsystem) just to support external `.toml` and
+   `.json` option dictionaries with custom caching and path confinement. Can we
+   delete external select files and require select options to be inline lists in
+   the schema TOML?
+4. *Prompt Coupling:* ADR-0006 ruled that schemas supply values only, leaving
+   template authors to pick `ui.*` functions. Ticket 20 raises whether schemas
+   should own a typed-field representation shared with `ui` prompts. Do you want
+   schemas to dictate UI prompt behavior, or keep schemas strictly decoupled
+   from UI dialogs?

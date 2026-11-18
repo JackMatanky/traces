@@ -57,8 +57,8 @@ Marks use the map rules.
 - [H] The claims of 85 percent more write time and 2 times size for a facet
   layout stay untested. The probe emulated a round-robin split, not the decided
   facet layout of ticket 24.
-- [V] The no-change refresh costs 385 ms at 50,000 notes. The open and scan costs
-  dominate it. A journal cannot remove this cost.
+- [V] The no-change refresh costs 385 ms at 50,000 notes. The open and scan
+  costs dominate it. A journal cannot remove this cost.
 - [H] Journal encode costs here copy real row bytes, so they are lower bounds. A
   facts encode from the real parser adds tens of percent.
 

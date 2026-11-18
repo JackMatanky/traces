@@ -1,9 +1,9 @@
 # Alternative designs and critique for ticket 23
 
 **Superseded in part.** The ticket's `## Answer` rejects the `BodyExtras`
-wrapper in section 2. It also replaces the shared stored-span design in
-section 4 and the derived-view advice in section 1.4 (the stored duplicate stays).
-The unified `ListItem` sketch in section 1 stands, with the box decided by a
+wrapper in section 2. It also replaces the shared stored-span design in section
+4 and the derived-view advice in section 1.4 (the stored duplicate stays). The
+unified `ListItem` sketch in section 1 stands, with the box decided by a
 measurement.
 
 This document analyses alternative designs for the note document model. It
@@ -92,9 +92,8 @@ items [P].
 
 ### 1.5 Verdict
 
-Verdict: Adopt [P].
-Strongest argument against proposal:
-Boxing `TaskData` adds one extra heap allocation for each task item during the parse [H].
+Verdict: Adopt [P]. Strongest argument against proposal: Boxing `TaskData` adds
+one extra heap allocation for each task item during the parse [H].
 
 ## 2. Footnotes and callouts in the model (Q6 and extension)
 
@@ -187,9 +186,9 @@ serializes an empty `Option` as one byte [H].
 
 ### 2.4 Verdict
 
-Verdict: Adopt as option [P].
-Strongest argument against proposal:
-No production query or index feature reads footnotes or callouts today [V: `docs/digests/plans/arch-redesign-digest/research/01-verify-core-findings.md:215-216`].
+Verdict: Adopt as option [P]. Strongest argument against proposal: No production
+query or index feature reads footnotes or callouts today [V:
+`docs/digests/plans/arch-redesign-digest/research/01-verify-core-findings.md:215-216`].
 Adding them now increases parse time before the LSP exists [H].
 
 ## 3. Effective field map comparisons (Q3)
@@ -198,36 +197,36 @@ Adding them now increases parse time before the LSP exists [H].
 
 We compare three candidates for multi-value and metadata field merges:
 
-1. Candidate A: Stored effective map.
-The parser merges frontmatter and inline fields into one `IndexMap` [P].
-It discards the source distinction [P].
-Tradeoffs:
-Query reads are fast [H].
-However, schema validation in ticket 20 and ticket 36 cannot tell frontmatter from body fields [V: `20-schema-note-typing-and-validation.md:196-200`].
-Diagnostics in ticket 32 cannot pinpoint the authored source line [V: `34-error-and-diagnostic-architecture.md:30-37`].
-Storing both the effective map and the source maps would duplicate memory [H].
+1. Candidate A: Stored effective map. The parser merges frontmatter and inline
+   fields into one `IndexMap` [P]. It discards the source distinction [P].
+   Tradeoffs: Query reads are fast [H]. However, schema validation in ticket 20
+   and ticket 36 cannot tell frontmatter from body fields [V:
+   `20-schema-note-typing-and-validation.md:196-200`]. Diagnostics in ticket 32
+   cannot pinpoint the authored source line [V:
+   `34-error-and-diagnostic-architecture.md:30-37`]. Storing both the effective
+   map and the source maps would duplicate memory [H].
 
-2. Candidate B: Two maps with an accessor (Q3 leaning proposal).
-`Note` stores `frontmatter: Option<Frontmatter>` and `inline_fields` [V: `src/note/model.rs:27,31`].
-An accessor merges the maps on demand [P].
-Precedence: Frontmatter wins when a key appears in both [V: `src/note/model.rs:164-173`].
-Multi-value keys: Several values always form a list [V: round 1].
-Null keys: A frontmatter null masks an inline field of the same key [P].
-Tag-like keys: Frontmatter `tags` populates `Note.tags` and stays in frontmatter fields [P].
-Provenance remains intact for schema rules [H].
+2. Candidate B: Two maps with an accessor (Q3 leaning proposal). `Note` stores
+   `frontmatter: Option<Frontmatter>` and `inline_fields` [V:
+   `src/note/model.rs:27,31`]. An accessor merges the maps on demand [P].
+   Precedence: Frontmatter wins when a key appears in both [V:
+   `src/note/model.rs:164-173`]. Multi-value keys: Several values always form a
+   list [V: round 1]. Null keys: A frontmatter null masks an inline field of the
+   same key [P]. Tag-like keys: Frontmatter `tags` populates `Note.tags` and
+   stays in frontmatter fields [P]. Provenance remains intact for schema rules
+   [H].
 
-3. Candidate C: App-layer merge.
-`Note` exposes raw maps without an accessor [P].
-Each consumer merges fields on its own [P].
-Tradeoffs:
-The query engine, template engine, and LSP can implement different merge rules [H].
-This breaks the Frozen compatibility guarantee of ticket 16 [V: `16-compatibility-and-support-tiers.md`].
+3. Candidate C: App-layer merge. `Note` exposes raw maps without an accessor
+   [P]. Each consumer merges fields on its own [P]. Tradeoffs: The query engine,
+   template engine, and LSP can implement different merge rules [H]. This breaks
+   the Frozen compatibility guarantee of ticket 16 [V:
+   `16-compatibility-and-support-tiers.md`].
 
 ### 3.2 Verdict
 
-Verdict: Adopt candidate B (two maps with accessor) [P].
-Strongest argument against proposal:
-Iterating effective fields creates a dynamic iterator chain with hash checks on every call [H].
+Verdict: Adopt candidate B (two maps with accessor) [P]. Strongest argument
+against proposal: Iterating effective fields creates a dynamic iterator chain
+with hash checks on every call [H].
 
 ## 4. Representation split and spans (Q1)
 
@@ -235,12 +234,13 @@ Iterating effective fields creates a dynamic iterator chain with hash checks on 
 
 We compare four candidates for spans and persistence:
 
-1. Candidate 1: Shared `Note` with stored spans (Q1 leaning proposal).
-`Note` holds byte spans on headings, items, links, and extras [P].
-`redb` stores the whole `Note` in the `NOTES` table [V: `src/index/tables.rs:26-28`].
-Probe measurement: Spans add 4.3% bytes to the serialized `Note` [V: `g-probe-results.md:8-9,113`].
-Decoding takes 6.1 microseconds per note [V: `g-probe-results.md:118`].
-Startup time for 50,000 notes takes 0.31 seconds [H].
+1. Candidate 1: Shared `Note` with stored spans (Q1 leaning proposal). `Note`
+   holds byte spans on headings, items, links, and extras [P]. `redb` stores the
+   whole `Note` in the `NOTES` table [V: `src/index/tables.rs:26-28`]. Probe
+   measurement: Spans add 4.3% bytes to the serialized `Note` [V:
+   `g-probe-results.md:8-9,113`]. Decoding takes 6.1 microseconds per note [V:
+   `g-probe-results.md:118`]. Startup time for 50,000 notes takes 0.31 seconds
+   [H].
 
 2. Candidate 2: Split types (`IndexNote` and `EditorNoteDocument`).
 `IndexNote` stores no spans [P].
@@ -261,84 +261,91 @@ However, the second table adds `redb` b-tree keys and page headers [H].
 Total database size grows by about 5% [H].
 The index must update two tables on every edit [H].
 
-4. Candidate 4: Persisted facts with lazy item text.
-`Note` stores metadata and spans, but omits raw and clean item text strings from storage [P].
-Probe measurement: List item text is 93% of `ListItem` bytes and 72.2% of the entire database [V: `g-probe-results.md:10,89`].
-The stored database shrinks from 15.89 megabytes to 4.42 megabytes (-72%) [H].
-For 50,000 notes, the database shrinks from 293 megabytes to 82 megabytes [H].
-Decode time for 50,000 notes shrinks from 0.31 seconds to 0.08 seconds [H].
-Tradeoffs:
-Any query that displays task text must open the source file from disk and slice the bytes [H].
-Matching 500 tasks across 200 files needs 200 disk file reads [H].
-This destroys cold CLI query speed [H].
+4. Candidate 4: Persisted facts with lazy item text. `Note` stores metadata and
+   spans, but omits raw and clean item text strings from storage [P]. Probe
+   measurement: List item text is 93% of `ListItem` bytes and 72.2% of the
+   entire database [V: `g-probe-results.md:10,89`]. The stored database shrinks
+   from 15.89 megabytes to 4.42 megabytes (-72%) [H]. For 50,000 notes, the
+   database shrinks from 293 megabytes to 82 megabytes [H]. Decode time for
+   50,000 notes shrinks from 0.31 seconds to 0.08 seconds [H]. Tradeoffs: Any
+   query that displays task text must open the source file from disk and slice
+   the bytes [H]. Matching 500 tasks across 200 files needs 200 disk file reads
+   [H]. This destroys cold CLI query speed [H].
 
 ### 4.2 Verdict
 
-Verdict: Adopt candidate 1 (shared `Note` with stored spans) [P].
-Strongest argument against proposal:
-Persisting spans invalidates the stored row on any whitespace edit, even when semantic data does not change [H].
+Verdict: Adopt candidate 1 (shared `Note` with stored spans) [P]. Strongest
+argument against proposal: Persisting spans invalidates the stored row on any
+whitespace edit, even when semantic data does not change [H].
 
 ## 5. Five gaps in the seven round-1 decisions
 
 ### 5.1 Format version and configuration fingerprint
 
-Adding spans, callouts, or changing `TaskStatus` alters postcard serialization bytes [V: `a2a-index-persistence.md:59-62`].
-The format version `META_VERSION = b"1"` in `src/index/store.rs:38-41` must increase to `b"2"` [P].
-Without this bump, opening an existing database causes decode failures or data corruption [V: `a2a-index-persistence.md:46-58`].
-Decision Q1 to Q7 did not name this required change [H].
+Adding spans, callouts, or changing `TaskStatus` alters postcard serialization
+bytes [V: `a2a-index-persistence.md:59-62`]. The format version
+`META_VERSION = b"1"` in `src/index/store.rs:38-41` must increase to `b"2"` [P].
+Without this bump, opening an existing database causes decode failures or data
+corruption [V: `a2a-index-persistence.md:46-58`]. Decision Q1 to Q7 did not name
+this required change [H].
 
-Verdict: Adopt version bump in ticket 23 resolution [P].
-Strongest argument against proposal:
-Increasing `META_VERSION` forces a complete reindex of the vault on the first run after upgrade [H].
+Verdict: Adopt version bump in ticket 23 resolution [P]. Strongest argument
+against proposal: Increasing `META_VERSION` forces a complete reindex of the
+vault on the first run after upgrade [H].
 
 ### 5.2 Row identity for ticket 26
 
-Ticket 26 needs a stable identity for list and task rows [V: `b3-open-ticket-demands.md:17-18,50`].
-Today the row identity is `(file_index, item_idx)` [V: `src/query/results.rs:31-85`].
-When a user edits an item above another item, `item_idx` shifts [H].
-The editor cannot use `item_idx` to toggle a task status [H].
-Ticket 23 must define an anchor using `(note_path, BytePos)` or `SourceLine` [P].
+Ticket 26 needs a stable identity for list and task rows [V:
+`b3-open-ticket-demands.md:17-18,50`]. Today the row identity is
+`(file_index, item_idx)` [V: `src/query/results.rs:31-85`]. When a user edits an
+item above another item, `item_idx` shifts [H]. The editor cannot use `item_idx`
+to toggle a task status [H]. Ticket 23 must define an anchor using
+`(note_path, BytePos)` or `SourceLine` [P].
 
-Verdict: Adopt stable position anchor for row identity [P].
-Strongest argument against proposal:
-Line and byte positions also shift when text changes earlier in the document [H].
+Verdict: Adopt stable position anchor for row identity [P]. Strongest argument
+against proposal: Line and byte positions also shift when text changes earlier
+in the document [H].
 
 ### 5.3 Unsaved-buffer build for ticket 35
 
-Ticket 35 needs to build the editor note from an in-memory buffer without disk access [V: `b3-open-ticket-demands.md:30-32`].
-Today `MarkdownParserInput::for_test` takes in-memory text, but it is gated by `test-utils` [V: `src/lib.rs:559-561`].
-The production constructor takes `&Path` and reads the file [V: `src/note/parser/input.rs`].
-The model needs a public constructor `MarkdownParserInput::from_buffer(path, text)` [P].
-The LSP needs an in-memory overlay that does not write to `redb` [P].
+Ticket 35 needs to build the editor note from an in-memory buffer without disk
+access [V: `b3-open-ticket-demands.md:30-32`]. Today
+`MarkdownParserInput::for_test` takes in-memory text, but it is gated by
+`test-utils` [V: `src/lib.rs:559-561`]. The production constructor takes `&Path`
+and reads the file [V: `src/note/parser/input.rs`]. The model needs a public
+constructor `MarkdownParserInput::from_buffer(path, text)` [P]. The LSP needs an
+in-memory overlay that does not write to `redb` [P].
 
-Verdict: Adopt in-memory buffer constructor in production [P].
-Strongest argument against proposal:
-An unsaved buffer note in memory can drift from persisted index state if not tracked carefully [H].
+Verdict: Adopt in-memory buffer constructor in production [P]. Strongest
+argument against proposal: An unsaved buffer note in memory can drift from
+persisted index state if not tracked carefully [H].
 
 ### 5.4 Host memory footprint for 50,000 notes
 
-Decision Q1 assumes the LSP host loads all 50,000 notes into memory on startup [V: round 1].
-The probe measures `size_of::<Note>()` at 232 bytes [V: `g-probe-results.md:44`].
-In RAM, each note owns list items, headings, links, fields, tags, and heap strings [V: `src/note/model.rs:24-33`].
-The average note consumes about 9 kilobytes of heap memory in RAM [H].
-Holding 50,000 notes in RAM takes about 450 megabytes of memory [H].
-Decision Q1 did not budget this memory usage [H].
+Decision Q1 assumes the LSP host loads all 50,000 notes into memory on startup
+[V: round 1]. The probe measures `size_of::<Note>()` at 232 bytes [V:
+`g-probe-results.md:44`]. In RAM, each note owns list items, headings, links,
+fields, tags, and heap strings [V: `src/note/model.rs:24-33`]. The average note
+consumes about 9 kilobytes of heap memory in RAM [H]. Holding 50,000 notes in
+RAM takes about 450 megabytes of memory [H]. Decision Q1 did not budget this
+memory usage [H].
 
 Verdict: Adopt as option with a lazy eviction policy for large vaults [P].
-Strongest argument against proposal:
-A lazy eviction policy complicates the LSP memory model and reintroduces disk reads [H].
+Strongest argument against proposal: A lazy eviction policy complicates the LSP
+memory model and reintroduces disk reads [H].
 
 ### 5.5 Section extents and preambles for ticket 37
 
-Ticket 37 needs section boundaries and text slices for body schemas [V: `b3-open-ticket-demands.md:35-36,58`].
-`Heading` stores `level`, `text`, `line`, and `span` [V: `src/note/heading.rs:10-14`].
-It does not store the full section extent [V: `src/note/heading.rs:10-14`].
-Also, notes often contain preamble text before the first heading [H].
-The model must define whether `Heading` derives its section extent from the next heading, and how to address preambles [P].
+Ticket 37 needs section boundaries and text slices for body schemas [V:
+`b3-open-ticket-demands.md:35-36,58`]. `Heading` stores `level`, `text`, `line`,
+and `span` [V: `src/note/heading.rs:10-14`]. It does not store the full section
+extent [V: `src/note/heading.rs:10-14`]. Also, notes often contain preamble text
+before the first heading [H]. The model must define whether `Heading` derives
+its section extent from the next heading, and how to address preambles [P].
 
 Verdict: Adopt derived section extents and an explicit preamble span [P].
-Strongest argument against proposal:
-Storing section extents or preambles adds more fields to `Note` and `Heading` [H].
+Strongest argument against proposal: Storing section extents or preambles adds
+more fields to `Note` and `Heading` [H].
 
 ## Not checked
 

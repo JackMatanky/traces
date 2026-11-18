@@ -82,7 +82,8 @@ integrates cleanly with the existing parser.
 - Self-referencing: valid but meaningless, optional warning.
 - Definitions inside blockquotes/lists: parsed by pulldown-cmark, but some
   renderers do not support them. Flag as a diagnostic.
-- Nested footnotes: the index handles this naturally (each label is independent).
+- Nested footnotes: the index handles this naturally (each label is
+  independent).
 
 ### Callouts: in scope, limited
 
@@ -122,7 +123,8 @@ Diagnostics are skipped by design.
 **Why skip diagnostics**:
 
 - Obsidian treats unknown types as valid (fallback to note rendering).
-- Custom callout types via CSS make any "known type" list permanently incomplete.
+- Custom callout types via CSS make any "known type" list permanently
+  incomplete.
 - No LSP in the ecosystem provides callout diagnostics (Markdown Oxide, rumdl,
   VS Code markdown-ls all skip).
 - Malformed syntax (`> [!NOTE` missing bracket): Obsidian treats it as "not a

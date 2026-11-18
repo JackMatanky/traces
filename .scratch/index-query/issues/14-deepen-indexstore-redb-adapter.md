@@ -578,8 +578,9 @@ doesn't repeat it.
   `RefreshCache::load`. Its other methods (`diff_bases`, `reconcile_note`,
   `diff_links`, `into_inlinks`) and its move into a method-owning shape
   are ticket 15's scope, landing after this ticket.
-- `IndexBuilder` (`src/index/builder.rs`) — `cache: Option<Box<RefreshCache<'a>>>`
-  (was `Option<RefreshCache>`, owned, unboxed).
+- `IndexBuilder` (`src/index/builder.rs`) —
+  `cache: Option<Box<RefreshCache<'a>>>` (was `Option<RefreshCache>`, owned,
+  unboxed).
 - `IndexerService::refresh`/`persist` (`src/index/service.rs`) — `refresh`
   persists internally, best-effort; `persist` unchanged.
 - `IndexDelta` (`src/index/builder.rs`, moves to `delta.rs` under ticket
@@ -604,7 +605,8 @@ doesn't repeat it.
 Implemented on branch `deepen-indexstore-redb-adapter` in two commits:
 
 - `bad803a` — `feat(index): deepen redb adapter, persist refresh internally`
-- `c1ae73f` — `test(index): close review gaps, drop large_stack_frames suppressions`
+- `c1ae73f` —
+  `test(index): close review gaps, drop large_stack_frames suppressions`
 
 ### Delivered shape
 
@@ -636,21 +638,21 @@ Implemented on branch `deepen-indexstore-redb-adapter` in two commits:
   failing the call.
 - `benches/template_render.rs` — `prepared_root()` now builds and
   persists the index in its untimed setup step.
-- New tests: `recovers_by_rebuilding_when_the_files_table_has_the_old_str_key_schema`,
+- New tests:
+  `recovers_by_rebuilding_when_the_files_table_has_the_old_str_key_schema`,
   `refresh_after_corruption_recovery_reports_every_file_upserted_and_nothing_deleted`,
   `incremental_refresh_persist_actually_removes_a_deleted_notes_row_from_disk`
-  (the three the checklist named), plus four review-driven additions:
-  a `mod is_rebuild_trigger` unit suite covering every `TableError`
-  variant directly (the corruption-recovery test only exercises
-  `create_db`'s container-level catch, confirmed by temporary probe
-  instrumentation — the per-table `Storage(Corrupted)` arm inside
-  `should_rebuild` needed its own direct test), a `mod is_empty`
-  table-driven suite for `IncrementalDelta::is_empty`, and a CLI-level
-  `tests/e2e/dispatch.rs` test (`list_persists_the_file_index_without_an_
-  explicit_index_command`) proving the checklist's actual headline
-  requirement — that `list`/`table`/`task` persist the index without an
-  explicit `index` run — since no test previously covered this above
-  the unit level.
+  (the three the checklist named), plus four review-driven additions: a
+  `mod is_rebuild_trigger` unit suite covering every `TableError` variant
+  directly (the corruption-recovery test only exercises `create_db`'s
+  container-level catch, confirmed by temporary probe instrumentation — the
+  per-table `Storage(Corrupted)` arm inside `should_rebuild` needed its own
+  direct test), a `mod is_empty` table-driven suite for
+  `IncrementalDelta::is_empty`, and a CLI-level `tests/e2e/dispatch.rs` test
+  (`list_persists_the_file_index_without_an_ explicit_index_command`) proving
+  the checklist's actual headline requirement — that `list`/`table`/`task`
+  persist the index without an explicit `index` run — since no test previously
+  covered this above the unit level.
 
 ### Verification
 

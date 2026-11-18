@@ -323,8 +323,8 @@ quoted text equality at first.
 - **Shares, not exact:** phase shares come from sampling, not from
   instrumented timing.
 - **Floor-table percentage:** the source report gives 8% beside 29 ms and 26 ms.
-  The table now computes about 10% from those displayed rounded medians.
-  Raw timing samples are unavailable. This repairs arithmetic, not a measurement.
+  The table now computes about 10% from those displayed rounded medians. Raw
+  timing samples are unavailable. This repairs arithmetic, not a measurement.
 
 **Not measured:** sort, limit and top-K pushdown, `@Class` sources, and
 cold-cache runs.

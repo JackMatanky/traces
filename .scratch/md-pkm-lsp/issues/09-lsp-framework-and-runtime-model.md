@@ -57,8 +57,8 @@ research](../research/07-rust-lsp-framework-crates.md). That research answers
   request handler must never block on human input the way CLI template
   instantiation does. Decide whether template-related LSP features simply never
   invoke `ui.*` helpers. That is static analysis only; see ticket 22. Decide
-  whether some code path needs a non-interactive `DialogProvider` implementation.
-  This holds regardless of the sync/async choice.
+  whether some code path needs a non-interactive `DialogProvider`
+  implementation. This holds regardless of the sync/async choice.
 - Base protocol handling (Content-Length framing): confirm that the chosen crate
   covers it, or decide that it needs implementing.
 
@@ -84,26 +84,26 @@ Every Index/Query/Schema/Template/parsing call stays synchronous, invoked from
 async handlers via blocking-task dispatch. Ticket 12 owns the concrete
 mechanism: thread pool vs `spawn_blocking` vs other.
 
-This revises an initial sync-only lean. Ticket 35's research (see [Decisions so
-far](../map.md)) found zero precedent across `ty`, `ruff server`, Biome, and
-Taplo for making the *core analysis engine* itself async. That is option (c),
-whole-process-async. Every performant Rust LSP examined keeps parsing/analysis
-synchronous, regardless of transport choice. The discriminator that separates
-the two viable shapes found is whether the LSP process has non-trivial
-concurrent I/O beyond request/response. `ty`/`ruff server` do not. They stay
-fully synchronous. Biome does (file-watch events, multi-client sessions) and
-adopted `tokio`+`tower-lsp-server` at the transport boundary specifically for
-that reason. Traces will need filesystem watching (a real gap today), which
-places it in Biome's shape. **Option (c) is not foreclosed**. If a concrete,
-evidenced need to push async deeper into the core surfaces later, nothing here
-prevents revisiting it. Such a need could come from ticket 12's cancellation
-design or from real profiling. This decision locks in the transport boundary as the
-starting shape, not a permanent ceiling. (amended 2026-10-21 by iwe/fileclass
-research: iwe demonstrates a fourth shipped shape. It handles real concurrent
-I/O (file-watch events) with a synchronous crossbeam `select!` loop and no async
-runtime ([tool-iwe](../research/tool-iwe.md) Part 1). Concurrent I/O does not
-*force* tokio-at-transport; the decision stands on the ecosystem axis and
-Traces' own needs.)
+This revises an initial sync-only lean. Ticket 35's research (see
+[Decisions so far](../map.md)) found zero precedent across `ty`, `ruff server`,
+Biome, and Taplo for making the *core analysis engine* itself async. That is
+option (c), whole-process-async. Every performant Rust LSP examined keeps
+parsing/analysis synchronous, regardless of transport choice. The discriminator
+that separates the two viable shapes found is whether the LSP process has
+non-trivial concurrent I/O beyond request/response. `ty`/`ruff server` do not.
+They stay fully synchronous. Biome does (file-watch events, multi-client
+sessions) and adopted `tokio`+`tower-lsp-server` at the transport boundary
+specifically for that reason. Traces will need filesystem watching (a real gap
+today), which places it in Biome's shape. **Option (c) is not foreclosed**. If a
+concrete, evidenced need to push async deeper into the core surfaces later,
+nothing here prevents revisiting it. Such a need could come from ticket 12's
+cancellation design or from real profiling. This decision locks in the transport
+boundary as the starting shape, not a permanent ceiling. (amended 2026-10-21 by
+iwe/fileclass research: iwe demonstrates a fourth shipped shape. It handles real
+concurrent I/O (file-watch events) with a synchronous crossbeam `select!` loop
+and no async runtime ([tool-iwe](../research/tool-iwe.md) Part 1). Concurrent
+I/O does not *force* tokio-at-transport; the decision stands on the ecosystem
+axis and Traces' own needs.)
 
 **Template `DialogProvider` interaction: (a) static-analysis-only as the
 default**. Template-related LSP features (ticket 22) start by never invoking

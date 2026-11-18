@@ -28,10 +28,9 @@ Strictness-by-seam spreads across four owners
 (`.scratch/temporal-core/divergence-register.md`).
 
 Alternatives include explicit typed values with a query-level cast policy.
-Another alternative is schema-informed typing.
-A third option keeps the heuristic, but centralizes it in one lattice owned by
-the value model.
-A fourth option removes implicit promotion, which needs a compatibility decision.
+Another alternative is schema-informed typing. A third option keeps the
+heuristic, but centralizes it in one lattice owned by the value model. A fourth
+option removes implicit promotion, which needs a compatibility decision.
 
 Inputs: `survey/query.md` H6, `survey/temporal.md` H3, `survey/note.md` H7,
 `research/03`, value model decision, execution-context decision for the zone

@@ -1,10 +1,19 @@
 # WebAssebly/WASI benchmarking
 
-Criterion benchmarks can be compiled to WebAssembly/WASI. This lets you performance test your code with runtimes such as [wasmer](https://wasmer.io/) and [wasmtime](https://wasmtime.dev/), as well as JavaScript environments such as [NodeJS](https://nodejs.org/en/) or web browsers ([FireFox](https://www.mozilla.org/en-US/firefox/new/), [Chrome](https://www.google.com/chrome/), [Safari](https://www.apple.com/safari/)).
+Criterion benchmarks can be compiled to WebAssembly/WASI. This lets you
+performance test your code with runtimes such as [wasmer](https://wasmer.io/)
+and [wasmtime](https://wasmtime.dev/), as well as JavaScript environments such
+as [NodeJS](https://nodejs.org/en/) or web browsers
+([FireFox](https://www.mozilla.org/en-US/firefox/new/),
+[Chrome](https://www.google.com/chrome/),
+[Safari](https://www.apple.com/safari/)).
 
 ## Adding the `wasm32-wasi` target
 
-We're cross-compiling to WebAssembly System Interface (aka WASI) so we have to add the right target. If you forget this step then your benchmarks will not compile and you'll be shown a gentle reminder. We'll use the [rustup](https://rustup.rs/) tool:
+We're cross-compiling to WebAssembly System Interface (aka WASI) so we have to
+add the right target. If you forget this step then your benchmarks will not
+compile and you'll be shown a gentle reminder. We'll use the
+[rustup](https://rustup.rs/) tool:
 
 ```properties
 rustup target add wasm32-wasi
@@ -12,7 +21,8 @@ rustup target add wasm32-wasi
 
 ## Install cargo-wasi
 
-Next we'll install the `cargo-wasi` command. While this is not required by Criterion, it does make it a lot easier to build WASI programs.
+Next we'll install the `cargo-wasi` command. While this is not required by
+Criterion, it does make it a lot easier to build WASI programs.
 
 ```properties
 cargo install cargo-wasi
@@ -20,7 +30,9 @@ cargo install cargo-wasi
 
 ## Building
 
-With `wasm32-wasi` and `cargo-wasi` installed, we're almost set to compile our benchmarks. Just one thing left: Telling Criterion not to use default features such as rayon which are not yet available in WASI:
+With `wasm32-wasi` and `cargo-wasi` installed, we're almost set to compile our
+benchmarks. Just one thing left: Telling Criterion not to use default features
+such as rayon which are not yet available in WASI:
 
 ```diff
 [dev-dependencies]
@@ -28,7 +40,9 @@ With `wasm32-wasi` and `cargo-wasi` installed, we're almost set to compile our b
 +criterion = { version = "0.5.1", default-features = false }
 ```
 
-Compiling the benchmark with `cargo-wasi` will automatically select the right target and optimize the resulting file. Here I'm using the [hex](https://crates.io/crates/hex) crate as an example:
+Compiling the benchmark with `cargo-wasi` will automatically select the right
+target and optimize the resulting file. Here I'm using the
+[hex](https://crates.io/crates/hex) crate as an example:
 
 ```properties
 cargo wasi build --bench=hex --release
@@ -40,7 +54,10 @@ But it is also possible to compile it without `cargo-wasi`:
 cargo build --bench=hex --release --target wasm32-wasi
 ```
 
-There should now be a `.wasm` file in `target/wasm32-wasi/release/deps/`. If you used `cargo-wasi` then there'll be both an optimized and an un-optimized version. Let's copy the newest WASM file out to the top-level directory for convenience:
+There should now be a `.wasm` file in `target/wasm32-wasi/release/deps/`. If you
+used `cargo-wasi` then there'll be both an optimized and an un-optimized
+version. Let's copy the newest WASM file out to the top-level directory for
+convenience:
 
 ```console
 cp `ls -t target/wasm32-wasi/release/deps/*.wasm | head -n 1` hex.wasm
@@ -72,19 +89,25 @@ wasmer-js run --dir=. hex.wasm -- --bench
 
 ## Running in a browser with webassembly.sh
 
-Browsers do not natively support WASI but there are workarounds. The easiest solution is [webassembly.sh](https://webassembly.sh/). This website shims WASI using an in-memory filesystem.
+Browsers do not natively support WASI but there are workarounds. The easiest
+solution is [webassembly.sh](https://webassembly.sh/). This website shims WASI
+using an in-memory filesystem.
 
-To use the website, go to https://webassembly.sh/, drag-and-drop the `hex.wasm` file into the browser window, and type:
+To use the website, go to <https://webassembly.sh/>, drag-and-drop the
+`hex.wasm` file into the browser window, and type:
 
 ```properties
 hex --bench
 ```
 
-Once you start the benchmark, the browser window will freeze until the results are ready. This is an unfortunate limitation of running WebAssembly in the browser.
+Once you start the benchmark, the browser window will freeze until the results
+are ready. This is an unfortunate limitation of running WebAssembly in the
+browser.
 
 ### Exporting results
 
-Writing benchmark results to an in-memory filesystem in the browser is not very useful on its own. Luckily the results are easy to export and download as JSON:
+Writing benchmark results to an in-memory filesystem in the browser is not very
+useful on its own. Luckily the results are easy to export and download as JSON:
 
 ```properties
 hex --bench --export=base | download
@@ -92,7 +115,8 @@ hex --bench --export=base | download
 
 ## Comparing results
 
-Let's run the same benchmark with native, wasmer, wasmtime, nodejs, firefox, and chromium, and see how they compare. Step 1 is the generate the json files:
+Let's run the same benchmark with native, wasmer, wasmtime, nodejs, firefox, and
+chromium, and see how they compare. Step 1 is the generate the json files:
 
 ```properties
 wasmer run --dir=. hex.wasm -- --bench --save-baseline wasmer
@@ -210,19 +234,27 @@ chromium     2.67      82.6±2.61µs       ? ?/sec
 firefox      3.31     102.2±2.66µs       ? ?/sec
 ```
 
-# Caveats and pitfalls
+## Caveats and pitfalls
 
-## Warm-up and JIT
+### Warm-up and JIT
 
-Most WebAssembly environments don't reach peak performance until the code has been running for a little while. This means the warm-up step is essential and skipping it (by setting it to 0 seconds or using the `--quick` flag) will lead to inaccurate results.
+Most WebAssembly environments don't reach peak performance until the code has
+been running for a little while. This means the warm-up step is essential and
+skipping it (by setting it to 0 seconds or using the `--quick` flag) will lead
+to inaccurate results.
 
-## Re-running benchmarks in [webassembly.sh](https://webassembly.sh/)
+### Re-running benchmarks in [webassembly.sh](https://webassembly.sh/)
 
-The WebAssembly.sh website shims the WebAssembly System Interface (WASI) required by Criterion. But this shim is not perfect and causes criterion to fail spectacularly when run more then once. Should this happen to you, reloading your browser window should work around the problem.
+The WebAssembly.sh website shims the WebAssembly System Interface (WASI)
+required by Criterion. But this shim is not perfect and causes criterion to fail
+spectacularly when run more then once. Should this happen to you, reloading your
+browser window should work around the problem.
 
-## Wasm and default-features.
+### Wasm and default-features
 
-Criterion's default features have to be disabled when compiling to wasm. Failing to do so will trigger a compilation error. If see an error saying a feature is incompatible with wasm, open your `Cargo.toml` file and make this change:
+Criterion's default features have to be disabled when compiling to wasm. Failing
+to do so will trigger a compilation error. If see an error saying a feature is
+incompatible with wasm, open your `Cargo.toml` file and make this change:
 
 ```diff
 [dev-dependencies]

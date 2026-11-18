@@ -25,8 +25,8 @@ Read directly:
   Fantastical Shapes of Testing* (2021,
   `https://martinfowler.com/articles/2021-test-shapes.html`).
 - Google Testing Blog: *Test Sizes* (Simon Stewart, 2010,
-  `https://testing.googleblog.com/2010/12/test-sizes.html`) and *Just Say No to
-  More End-to-End Tests* (Mike Wacker, 2015,
+  `https://testing.googleblog.com/2010/12/test-sizes.html`) and
+  *Just Say No to More End-to-End Tests* (Mike Wacker, 2015,
   `https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html`).
 - Kent C. Dodds: *The Testing Trophy and Testing Classifications* (2018/2021,
   `https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications`).
@@ -156,15 +156,24 @@ snapshot testing:
 
 The evidence supports this five-tier assignment rule:
 
-1. **BDD scenarios (`rstest-bdd`):** Reserved for user-visible workflows that obey ticket 07's six-condition rule. Each rule specifies 5 to 10 key examples. Scenarios never test internal logic.
-2. **Unit tests (`src/`):** Default home for code logic, combinatorial edge cases, parser rules, and private seams. Unit tests reproduce high-level failures (Fowler, 2012).
-3. **Property tests (`proptest`):** Reserved for algebraic invariants, round-trip operations, and crash-freedom across large input spaces.
-4. **Integration tests (`tests/integration/`):** Reserved for in-process composition of modules through `traces::testing`. Spawning child processes is banned.
-5. **E2E tests (`tests/e2e/`):** Reserved for process-boundary verification in a hermetic sandbox. Access to `traces::` library symbols is banned.
+1. **BDD scenarios (`rstest-bdd`):** Reserved for user-visible workflows that
+   obey ticket 07's six-condition rule. Each rule specifies 5 to 10 key
+   examples. Scenarios never test internal logic.
+2. **Unit tests (`src/`):** Default home for code logic, combinatorial edge
+   cases, parser rules, and private seams. Unit tests reproduce high-level
+   failures (Fowler, 2012).
+3. **Property tests (`proptest`):** Reserved for algebraic invariants,
+   round-trip operations, and crash-freedom across large input spaces.
+4. **Integration tests (`tests/integration/`):** Reserved for in-process
+   composition of modules through `traces::testing`. Spawning child processes is
+   banned.
+5. **E2E tests (`tests/e2e/`):** Reserved for process-boundary verification in a
+   hermetic sandbox. Access to `traces::` library symbols is banned.
 
 ### Decision (b): Where BDD scenarios physically run
 
-- **Option 1: Fold into existing binaries.** Fold scenarios into `tests/integration/` and
+- **Option 1: Fold into existing binaries.** Fold scenarios into
+  `tests/integration/` and
   - *Evidence for:* Compiles zero extra test binaries; avoids extra link
     overhead; inherits `check:layers` gates; needs zero changes to nextest tasks
     or CI.
@@ -210,15 +219,27 @@ The evidence supports this five-tier assignment rule:
 
 The evidence identifies four layers this repo must NOT introduce:
 
-1. **No mock layer:** Ban mock frameworks (such as `mockall`). Fowler and Google evidence shows heavy mocking degrades test fidelity. Use real in-memory types and sociable tests.
-2. **No PTY or terminal emulator harness:** Testing interactive prompts (inquire) via PTYs is fragile. Keep TTY tests in unit tests with injected providers.
-3. **No custom test harness:** Do not set `harness = false`. All tests must remain native libtest tests under nextest.
-4. **No combinatorial BDD scenario suites:** Adzic (2014) identifies thousands of scenario outline rows as an anti-pattern. Keep combinatorial matrix tests in unit or property tests.
+1. **No mock layer:** Ban mock frameworks (such as `mockall`). Fowler and Google
+   evidence shows heavy mocking degrades test fidelity. Use real in-memory types
+   and sociable tests.
+2. **No PTY or terminal emulator harness:** Testing interactive prompts
+   (inquire) via PTYs is fragile. Keep TTY tests in unit tests with injected
+   providers.
+3. **No custom test harness:** Do not set `harness = false`. All tests must
+   remain native libtest tests under nextest.
+4. **No combinatorial BDD scenario suites:** Adzic (2014) identifies thousands
+   of scenario outline rows as an anti-pattern. Keep combinatorial matrix tests
+   in unit or property tests.
 5. **No contract-test framework:** Reject extra contract-test layers.
-6. **No unguarded test layer:** Every layer must have a gate or ledger to prevent silent failure.
+6. **No unguarded test layer:** Every layer must have a gate or ledger to
+   prevent silent failure.
 
 ### Open questions for the grilling session
 
-1. Will the user accept folding BDD into existing binaries (Option 1), or do they demand a dedicated BDD phase in CI?
-2. When a scenario could run against either driver, does the user prefer defaulting to E2E spawn or integration facade? (Ticket 07 decided spawned process is default).
-3. Should existing `tests/e2e/` tests migrate to Gherkin, or should Gherkin be reserved for new specs?
+1. Will the user accept folding BDD into existing binaries (Option 1), or do
+   they demand a dedicated BDD phase in CI?
+2. When a scenario could run against either driver, does the user prefer
+   defaulting to E2E spawn or integration facade? (Ticket 07 decided spawned
+   process is default).
+3. Should existing `tests/e2e/` tests migrate to Gherkin, or should Gherkin be
+   reserved for new specs?

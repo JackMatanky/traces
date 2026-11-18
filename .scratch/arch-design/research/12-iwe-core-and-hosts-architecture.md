@@ -192,9 +192,9 @@ IWE represents documents across three distinct forms:
    filesystem. Owner: `liwe::operations`. All mutations return pure `Changes`
    records [V: crates/liwe/src/operations/changes.rs:6].
 3. Editor buffer authority [V]: An open editor buffer is authoritative over
-   on-disk file content. Owner: `iwes::server::Server` with `open_documents: HashSet<Key>`
-   [V: crates/iwes/src/router/server.rs:48, 115]. External disk events are
-   ignored for open keys until closed.
+   on-disk file content. Owner: `iwes::server::Server` with
+   `open_documents: HashSet<Key>` [V: crates/iwes/src/router/server.rs:48, 115].
+   External disk events are ignored for open keys until closed.
 4. Mtime preservation invariant [V]: A document write that produces identical
    content must not touch disk or update filesystem mtime. Owner:
    `diwe::fs::write_file_if_changed` [V: crates/diwe/src/fs.rs:48].

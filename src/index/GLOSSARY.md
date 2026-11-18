@@ -69,9 +69,8 @@ type: relative path, size, timestamps, and format classification.
 
 #### File Entry
 
-One indexed file's File Metadata together with its optional parsed Note and derived
-inbound links in a Workspace Index.
-*Avoid*: file record, indexed note
+One indexed file's File Metadata together with its optional parsed Note and
+derived inbound links in a Workspace Index. *Avoid*: file record, indexed note
 
 #### Note
 

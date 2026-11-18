@@ -1,7 +1,8 @@
 # Template Module — Adversarial Review Findings (v2)
 
-Date: 2026-09-07
-Scope: `src/template/`, `src/query/` integration, `benches/template_render.rs`, minijinja usage, chrono optimization, `to_yaml` filter, NL date/time utilities
+Date: 2026-09-07 Scope: `src/template/`, `src/query/` integration,
+`benches/template_render.rs`, minijinja usage, chrono optimization, `to_yaml`
+filter, NL date/time utilities
 
 ---
 
@@ -9,7 +10,11 @@ Scope: `src/template/`, `src/query/` integration, `benches/template_render.rs`, 
 
 ### 1.1 Current state
 
-`engine/query.rs` is the minijinja Object bridge between the template engine and the query module. It imports 12 types from `src/query/` and wires them into minijinja's `Object` system. The bridge is well-structured — render-scoped index caching, `QuerySet` as a minijinja `Object`, terminal filters as pipeline operations — but it leaves significant query-module capabilities on the table.
+`engine/query.rs` is the minijinja Object bridge between the template engine and
+the query module. It imports 12 types from `src/query/` and wires them into
+minijinja's `Object` system. The bridge is well-structured — render-scoped index
+caching, `QuerySet` as a minijinja `Object`, terminal filters as pipeline
+operations — but it leaves significant query-module capabilities on the table.
 
 ### 1.2 Untapped query-module capabilities
 
@@ -26,13 +31,24 @@ Scope: `src/template/`, `src/query/` integration, `benches/template_render.rs`, 
 
 ### 1.3 Recommendations
 
-**a. Expose pre-fetch transforms.** Remove `#[cfg_attr(not(test))]` gates on `QueryBuilder::filter`/`sort`/`limit`. Wire them into `QueryOps::run` so templates can push filters into the builder before `QueryService::run` executes. This is a performance optimization — the plan engine's filter fusion and sort-limit top-k optimization (`plan.rs:94-169`) would kick in automatically.
+**a. Expose pre-fetch transforms.** Remove `#[cfg_attr(not(test))]` gates on
+`QueryBuilder::filter`/`sort`/`limit`. Wire them into `QueryOps::run` so
+templates can push filters into the builder before `QueryService::run` executes.
+This is a performance optimization — the plan engine's filter fusion and
+sort-limit top-k optimization (`plan.rs:94-169`) would kick in automatically.
 
-**b. Surface dialect-aware errors.** Replace the generic `query_error` wrapper with dialect-tagged errors. When a filter expression fails, the error should say "check your `.where()` expression" not just "query failed".
+**b. Surface dialect-aware errors.** Replace the generic `query_error` wrapper
+with dialect-tagged errors. When a filter expression fails, the error should say
+"check your `.where()` expression" not just "query failed".
 
-**c. Expose multi-field sort.** Add a `sort_multi` method or extend `sort` to accept comma-separated field specs (`"rating,-date"`). The grammar parser already handles this.
+**c. Expose multi-field sort.** Add a `sort_multi` method or extend `sort` to
+accept comma-separated field specs (`"rating,-date"`). The grammar parser
+already handles this.
 
-**d. Consider `run_from_store` for hot paths.** If template renders become frequent (daemon mode, watch mode), switching from full `WorkspaceIndex` refresh to `SourceResolver`-based store queries would skip materializing non-matching notes.
+**d. Consider `run_from_store` for hot paths.** If template renders become
+frequent (daemon mode, watch mode), switching from full `WorkspaceIndex` refresh
+to `SourceResolver`-based store queries would skip materializing non-matching
+notes.
 
 ---
 
@@ -51,6 +67,7 @@ Scope: `src/template/`, `src/query/` integration, `benches/template_render.rs`, 
 ### 2.2 Current duplication in `date.rs`
 
 `DateOps` reimplements:
+
 - `format_weekday_name` — 7-arm match on weekday number
 - `format_weekday_abbr` — 7-arm match on weekday number
 - `format_month_name` — 12-arm match on month number
@@ -86,9 +103,13 @@ fn format_month_name(value: &Value) -> Result<String, TemplateError> {
 }
 ```
 
-**Impact:** Eliminates ~60 lines. Removes maintenance burden of keeping match arms in sync with chrono. Adds locale-awareness potential (enable `unstable-locales` feature later without code changes).
+**Impact:** Eliminates ~60 lines. Removes maintenance burden of keeping match
+arms in sync with chrono. Adds locale-awareness potential (enable
+`unstable-locales` feature later without code changes).
 
-**Edge case:** chrono's `%a`/`%A`/`%b`/`%B` require a `DateTime<Local>` or `DateTime<Utc>`, not `NaiveDate`. The existing `extract_date` function in `date.rs` already handles this conversion.
+**Edge case:** chrono's `%a`/`%A`/`%b`/`%B` require a `DateTime<Local>` or
+`DateTime<Utc>`, not `NaiveDate`. The existing `extract_date` function in
+`date.rs` already handles this conversion.
 
 ---
 
@@ -96,17 +117,22 @@ fn format_month_name(value: &Value) -> Result<String, TemplateError> {
 
 ### 3.1 Why this is not YAGNI
 
-This project aims to **replace Obsidian entirely**. Obsidian's template system relies heavily on YAML frontmatter — every note has it, Dataview queries read it, templates write it. A template engine without YAML support cannot:
+This project aims to **replace Obsidian entirely**. Obsidian's template system
+relies heavily on YAML frontmatter — every note has it, Dataview queries read
+it, templates write it. A template engine without YAML support cannot:
 
-- Generate notes with frontmatter (`{{ file.write_to("output.md") }}` needs to prepend `---\ntitle: ...\n---\n`)
+- Generate notes with frontmatter (`{{ file.write_to("output.md") }}` needs to
+  prepend `---\ntitle: ...\n---\n`)
 - Serialize structured data from queries to YAML
 - Interoperate with the Obsidian ecosystem's YAML conventions
 
 ### 3.2 Design
 
-**File:** `src/template/engine/yaml.rs` (new file, separate from `string.rs`/`num.rs`)
+**File:** `src/template/engine/yaml.rs` (new file, separate from
+`string.rs`/`num.rs`)
 
-**Dependency:** `serde_yml = "0.0.12"` (actively maintained fork of deprecated `serde_yaml`)
+**Dependency:** `serde_yml = "0.0.12"` (actively maintained fork of deprecated
+`serde_yaml`)
 
 **Filters to register:**
 
@@ -185,11 +211,16 @@ Or more practically:
 
 ### 4.1 Why these matter
 
-Obsidian's Templater plugin provides structured date/time prompts. As a full replacement, Traces needs equivalent capabilities in its template engine. The JS scripts (`nl_date.js`, `nl_time.js`) show the UI flow; the Rust side needs the **data model** and **parsing logic**.
+Obsidian's Templater plugin provides structured date/time prompts. As a full
+replacement, Traces needs equivalent capabilities in its template engine. The JS
+scripts (`nl_date.js`, `nl_time.js`) show the UI flow; the Rust side needs the
+**data model** and **parsing logic**.
 
 ### 4.2 Design: `ui.date` and `ui.time` helpers
 
-These are not ports of the JS scripts — they're the **data layer** that powers structured date/time selection in templates. The `DialogProvider::select` infrastructure already handles the UI.
+These are not ports of the JS scripts — they're the **data layer** that powers
+structured date/time selection in templates. The `DialogProvider::select`
+infrastructure already handles the UI.
 
 **New helpers in `engine/date.rs`:**
 
@@ -242,7 +273,8 @@ pub fn parse_relative_date(input: &str) -> Result<NaiveDate, TemplateError> {
 
 ### 4.3 `ui.select` struct options
 
-The `ui.select_from_options` function currently takes 6 separate parameters. For structured date/time prompts, a `SelectOption` struct is warranted:
+The `ui.select_from_options` function currently takes 6 separate parameters. For
+structured date/time prompts, a `SelectOption` struct is warranted:
 
 ```rust
 pub struct SelectOption {
@@ -253,6 +285,7 @@ pub struct SelectOption {
 ```
 
 This is justified because:
+
 - The JS scripts use `{ label, value, description }` objects
 - The existing `select_from_options` already receives these as parallel arrays
 - Multiple callers will use it (date, time, and any future structured prompts)
@@ -277,30 +310,43 @@ The current structure is **already well-designed**. Key findings:
 
 ### 5.2 What NOT to do
 
-- **Don't merge `TemplateService` into `TemplateEngine`.** The service is a thin facade that keeps the public API clean. Merging leaks implementation details.
-- **Don't reorganize into lifecycle groups** (`resolution/`, `execution/`, `output/`). The current flat structure is simpler and the lifecycle is already clear from the service method order.
-- **Don't group objects vs operations.** The current modules have good internal cohesion. Splitting adds indirection without reducing coupling.
-- **Don't add path segment types to `TemplatePath`.** The thin-wrapper design is correct — callers need one method (`parse`) and one accessor (`as_ref`).
-- **Don't cache the `Environment` across renders.** The CLI is single-shot. Cross-render caching adds invalidation complexity for zero measurable gain.
-- **Don't add a loader cache.** Template directory scans are tiny. Minijinja already caches loaded sources within a render.
+- **Don't merge `TemplateService` into `TemplateEngine`.** The service is a thin
+  facade that keeps the public API clean. Merging leaks implementation details.
+- **Don't reorganize into lifecycle groups** (`resolution/`, `execution/`,
+  `output/`). The current flat structure is simpler and the lifecycle is already
+  clear from the service method order.
+- **Don't group objects vs operations.** The current modules have good internal
+  cohesion. Splitting adds indirection without reducing coupling.
+- **Don't add path segment types to `TemplatePath`.** The thin-wrapper design is
+  correct — callers need one method (`parse`) and one accessor (`as_ref`).
+- **Don't cache the `Environment` across renders.** The CLI is single-shot.
+  Cross-render caching adds invalidation complexity for zero measurable gain.
+- **Don't add a loader cache.** Template directory scans are tiny. Minijinja
+  already caches loaded sources within a render.
 
 ### 5.3 What TO do
 
-**a. Add `yaml.rs` as a new engine helper** (section 3). This is the highest-impact addition — it enables frontmatter manipulation, which is essential for Obsidian replacement.
+**a. Add `yaml.rs` as a new engine helper** (section 3). This is the
+highest-impact addition — it enables frontmatter manipulation, which is
+essential for Obsidian replacement.
 
-**b. Extend `date.rs` with NL parsing** (section 4). Structured date/time selection is a core Obsidian replacement feature.
+**b. Extend `date.rs` with NL parsing** (section 4). Structured date/time
+selection is a core Obsidian replacement feature.
 
 **c. Fix regex caching in `string.rs`**. One-line `LazyLock` fix on a hot path.
 
-**d. Replace chrono match arms in `date.rs`**. Use chrono's native formatting, eliminate ~60 lines.
+**d. Replace chrono match arms in `date.rs`**. Use chrono's native formatting,
+eliminate ~60 lines.
 
-**e. Deepen `engine/query.rs` integration with `src/query/`** (section 1). Surface pre-fetch transforms, dialect-aware errors, multi-field sort.
+**e. Deepen `engine/query.rs` integration with `src/query/`** (section 1).
+Surface pre-fetch transforms, dialect-aware errors, multi-field sort.
 
-**f. Decompose benchmarks** into loader/engine/writer groups for profiling clarity.
+**f. Decompose benchmarks** into loader/engine/writer groups for profiling
+clarity.
 
 ### 5.4 Recommended file layout (after changes)
 
-```
+```text
 template/
   mod.rs           ← unchanged
   engine.rs        ← add yaml filter registration
@@ -323,7 +369,8 @@ template/
   error.rs         ← unchanged
 ```
 
-One new file (`yaml.rs`), zero removed. The module gains depth where it matters (YAML, NL dates, query integration) without structural churn.
+One new file (`yaml.rs`), zero removed. The module gains depth where it matters
+(YAML, NL dates, query integration) without structural churn.
 
 ---
 
@@ -331,7 +378,8 @@ One new file (`yaml.rs`), zero removed. The module gains depth where it matters 
 
 ### 6.1 Current limitation
 
-`template_render.rs` measures only end-to-end `render_to_file`. Impossible to isolate loader vs engine vs writer bottlenecks.
+`template_render.rs` measures only end-to-end `render_to_file`. Impossible to
+isolate loader vs engine vs writer bottlenecks.
 
 ### 6.2 Recommended groups
 
@@ -346,7 +394,8 @@ One new file (`yaml.rs`), zero removed. The module gains depth where it matters 
 - **Variable density**: 1 vs 10 vs 100 `{{ var }}` substitutions per template
 - **Filter chains**: single filter vs multi-filter pipelines
 - **Include depth**: flat vs nested includes
-- **Query complexity**: simple `query.from()` vs chained `.where().sort().limit()`
+- **Query complexity**: simple `query.from()` vs chained
+  `.where().sort().limit()`
 - **Cache hit/miss**: cold first render vs warm repeated render
 
 ---
@@ -374,7 +423,10 @@ One new file (`yaml.rs`), zero removed. The module gains depth where it matters 
 
 ### 8.1 `engine/file.rs` — `FileBase` metadata gaps
 
-`file.rs` currently exposes `write_to` and `include`. The `FileBase` struct (defined in `src/file.rs:47`) provides richer metadata that the query engine partially surfaces via `record.file.*`, but some capabilities are missing or inconsistent:
+`file.rs` currently exposes `write_to` and `include`. The `FileBase` struct
+(defined in `src/file.rs:47`) provides richer metadata that the query engine
+partially surfaces via `record.file.*`, but some capabilities are missing or
+inconsistent:
 
 | `FileBase` method | Currently accessible from templates? | Gap |
 |---|---|---|
@@ -387,7 +439,8 @@ One new file (`yaml.rs`), zero removed. The module gains depth where it matters 
 | **`format()`** | **No** | `FileFormat::Note` vs `FileFormat::Other` — could enable `if record.file.format == "note"` branching in templates |
 | **`created_at()` (raw)** | **No** | Only the `_or_modified` fallback is exposed; raw `Option<Timestamp>` is dead code outside tests |
 
-**`Timestamp` formatting gaps** — The `Timestamp` type in `src/file.rs` provides richer formatting than what reaches templates:
+**`Timestamp` formatting gaps** — The `Timestamp` type in `src/file.rs` provides
+richer formatting than what reaches templates:
 
 | Method | Returns | Template accessible? |
 |---|---|---|
@@ -396,11 +449,16 @@ One new file (`yaml.rs`), zero removed. The module gains depth where it matters 
 | **`to_time_string()`** | **`HH:MM:SS`** | **No** — time-only component not available |
 | **`to_offset_string()`** | **`YYYY-MM-DDTHH:MM:SS+00:00`** | **No** — RFC 3339 with offset not available |
 
-**Recommendation:** Add `file.format` to the query field accessors. Add `file.time_only` and `file.rfc3339` field suffixes to `Timestamp` rendering in the query layer. These are thin additions — the underlying `Timestamp` methods already exist.
+**Recommendation:** Add `file.format` to the query field accessors. Add
+`file.time_only` and `file.rfc3339` field suffixes to `Timestamp` rendering in
+the query layer. These are thin additions — the underlying `Timestamp` methods
+already exist.
 
 ### 8.2 `engine/ui.rs` — `DialogProvider` gaps
 
-`ui.rs` exposes all four prompt methods: `confirm`, `text_input`, `select`, `multi_select`. The `DialogProvider` trait (defined in `src/dialog/mod.rs:35`) has one additional method not wired:
+`ui.rs` exposes all four prompt methods: `confirm`, `text_input`, `select`,
+`multi_select`. The `DialogProvider` trait (defined in `src/dialog/mod.rs:35`)
+has one additional method not wired:
 
 | Method | Currently accessible? | Gap |
 |---|---|---|
@@ -410,37 +468,53 @@ One new file (`yaml.rs`), zero removed. The module gains depth where it matters 
 | `multi_select()` | Yes | — |
 | **`is_interactive()`** | **No** | Could enable `if ui.interactive()` branching — skip prompts in batch/headless mode |
 
-**Recommendation:** Add `ui.interactive` as a boolean variable (not a filter — it's a property of the dialog provider, not a transformation). One line: `env.add_global("ui_interactive", Value::from(dialog.is_interactive()))`. Templates can then `{% if ui_interactive %}...{% endif %}`.
+**Recommendation:** Add `ui.interactive` as a boolean variable (not a filter —
+it's a property of the dialog provider, not a transformation). One line:
+`env.add_global("ui_interactive", Value::from(dialog.is_interactive()))`.
+Templates can then `{% if ui_interactive %}...{% endif %}`.
 
 ### 8.3 `engine/path.rs` — Root confinement is well-used
 
-`path.rs` already uses `RootConfinedPath`, `FileName`, and `BaseName` for its tests. The filters (`path_exists`, `is_file_path`, `is_dir_path`, `path_parent`, `path_stem`, `path_extension`) are correct and sufficient. No gaps identified — the confinement seam is doing its job.
+`path.rs` already uses `RootConfinedPath`, `FileName`, and `BaseName` for its
+tests. The filters (`path_exists`, `is_file_path`, `is_dir_path`, `path_parent`,
+`path_stem`, `path_extension`) are correct and sufficient. No gaps identified —
+the confinement seam is doing its job.
 
 ### 8.4 `engine/string.rs` — Regex recompilation is the only gap
 
-String filters are well-implemented. The 13 filters cover a good surface. The one gap:
+String filters are well-implemented. The 13 filters cover a good surface. The
+one gap:
 
 | Issue | Current | Fix |
 |---|---|---|
 | Regex recompilation | `Regex::new(pattern).ok()` on every call (line ~115) | `LazyLock<Regex>` cache keyed by pattern |
 
-No other underlying module capabilities are being missed — `convert_case` is used appropriately, and the string operations are self-contained.
+No other underlying module capabilities are being missed — `convert_case` is
+used appropriately, and the string operations are self-contained.
 
 ### 8.5 `engine/num.rs` — No gaps
 
-Numeric operations (`ceil`, `floor`, `sqrt`, `num_format`) are complete for the use cases templates need. No underlying module has untapped numeric capabilities.
+Numeric operations (`ceil`, `floor`, `sqrt`, `num_format`) are complete for the
+use cases templates need. No underlying module has untapped numeric
+capabilities.
 
 ### 8.6 `engine/date.rs` — See sections 2 and 4
 
-Chrono optimization and NL date parsing are covered in earlier sections. The key gap: ~60 lines of hardcoded match arms that chrono handles natively, and missing NL parsing utilities.
+Chrono optimization and NL date parsing are covered in earlier sections. The key
+gap: ~60 lines of hardcoded match arms that chrono handles natively, and missing
+NL parsing utilities.
 
 ### 8.7 `engine/schema.rs` — Already deep
 
-`Schema` is already exposed as a full minijinja `Object` with property access, iteration, and deep traversal. The `get` filter supports dot-notation paths. No gaps.
+`Schema` is already exposed as a full minijinja `Object` with property access,
+iteration, and deep traversal. The `get` filter supports dot-notation paths. No
+gaps.
 
 ### 8.8 `engine/cache.rs` — No gaps
 
-The render-scoped cache via `State` temp storage is the correct pattern. It's simple, scoped to the render, and avoids lifetime issues. No untapped capabilities.
+The render-scoped cache via `State` temp storage is the correct pattern. It's
+simple, scoped to the render, and avoids lifetime issues. No untapped
+capabilities.
 
 ---
 

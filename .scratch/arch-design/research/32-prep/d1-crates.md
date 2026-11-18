@@ -14,11 +14,11 @@ names the concept that it informs.
    (`src/path.rs:190`). A decision can keep the crate and keep the checked
    path.
 
-2. **relative-path 2.0.2.** [V] `RelativePath` is a validated, separator-normalized
-   relative path with `is_normalized`, `strip_prefix` and an explicit base for
-   filesystem use.
-   Lesson for 32: C4 — a portable UTF-8 form with fixed `/` is a mature crate.
-   It cannot carry non-UTF-8 Unix names. That is the cost research 09 records.
+2. **relative-path 2.0.2.** [V] `RelativePath` is a validated,
+   separator-normalized relative path with `is_normalized`, `strip_prefix` and
+   an explicit base for filesystem use. Lesson for 32: C4 — a portable UTF-8
+   form with fixed `/` is a mature crate. It cannot carry non-UTF-8 Unix names.
+   That is the cost research 09 records.
 
 3. **camino 1.2.6.** [V] `Utf8Path`/`Utf8PathBuf` replace `Path`/`PathBuf` with
    UTF-8 equivalents using OS separators.

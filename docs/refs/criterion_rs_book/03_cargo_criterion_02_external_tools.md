@@ -1,26 +1,28 @@
 # External Tools
 
-cargo-criterion provides a machine-readable output stream which other tools can consume to collect
-information about the Criterion.rs benchmarks.
+cargo-criterion provides a machine-readable output stream which other tools can
+consume to collect information about the Criterion.rs benchmarks.
 
-To enable this output stream, pass the `--message-format` argument when running cargo-criterion.
+To enable this output stream, pass the `--message-format` argument when running
+cargo-criterion.
 
 ## JSON messages
 
-When passing `--message-format=json` cargo-criterion will output information about:
+When passing `--message-format=json` cargo-criterion will output information
+about:
 
-* Benchmarks, including the basic statistics about the measurements
-* Benchmark groups
+- Benchmarks, including the basic statistics about the measurements
+- Benchmark groups
 
-The output goes to stdout, with one JSON object per line. The `reason` field distinguishes different
-kinds of messages.
+The output goes to stdout, with one JSON object per line. The `reason` field
+distinguishes different kinds of messages.
 
 Additional messages or fields may be added to the output in the future.
 
 ### Benchmark Complete Messages
 
-The "benchmark-complete" message includes the measurements and basic statistics from a single
-Criterion.rs benchmark. The message format is as follows:
+The "benchmark-complete" message includes the measurements and basic statistics
+from a single Criterion.rs benchmark. The message format is as follows:
 
 ```json
 {
@@ -121,8 +123,8 @@ Criterion.rs benchmark. The message format is as follows:
 
 ### Group Complete Messages
 
-When a benchmark group is completed, cargo-criterion emits a "group-complete" message containing
-some information about the group.
+When a benchmark group is completed, cargo-criterion emits a "group-complete"
+message containing some information about the group.
 
 ```json
 {
