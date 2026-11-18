@@ -9,16 +9,17 @@ Baseline revision: `971bdd5729d9d5f51a1bd6fed46bab6947df936a`.
 
 - Tags: [V] source inspection in this report, not execution or proof of every
   attached claim. [H] inference. [P] proposal for the grilling.
-- Ledger ids B, C, P and D come from [b-prior-decisions.md](./b-prior-decisions.md).
+- Ledger ids B, C, P and D come from
+  [b-prior-decisions.md](./b-prior-decisions.md).
 - Verdicts: HOLDS, WEAKENED (with a repair) or FAILS (with a better option).
 - The owner edited `synthesis.md` while I worked. I reviewed the version
   with the modification time 19:10 on 2026-11-16. This report does not assess
   later edits.
 - I read code with `read` and `grep`. I did not run builds, tests or probes.
 
-This report records an attack on that snapshot. Its verdicts are historical,
-not findings about the repaired synthesis. Later source checks correct some
-attacks: [K4](./k-citation-verification.md#k4-cldr-first-day-minimum-days-and-week-rollover)
+This report records an attack on that snapshot. Its verdicts are historical, not
+findings about the repaired synthesis. Later source checks correct some attacks:
+[K4](./k-citation-verification.md#k4-cldr-first-day-minimum-days-and-week-rollover)
 rejects the claim about `(sunday, 4)`.
 [L1-L2](./l-answer-verification.md#l1-b26-is-not-the-truncated-schema-fragment)
 correct Q4's schema-rule argument.
@@ -41,10 +42,10 @@ deny that later evidence.
 - Recommendation: the Q1 to Q3 cluster. Choose P (strftime plus a template
   Moment adapter) or Q (landed state plus a schema check). Reject R and S. [P]
 - Attack 1. Both P and Q leave the owner's tokens `Q`, `Qo`, `ww` and `DDDD`
-  failing. The table has 21 entries and none of them is `Q`, `ww` or `DDDD`
-  [V: `src/temporal/token.rs:15-37`]. The cluster never decides to add them.
-  Jiff has `%q` (format only) and `%j`, but no local-week directive
-  [V: `.rust-docs/cache/crates/jiff/0.2.38/source/src/fmt/strtime/mod.rs:171-195`].
+  failing. The table has 21 entries and none of them is `Q`, `ww` or `DDDD` [V:
+  `src/temporal/token.rs:15-37`]. The cluster never decides to add them. Jiff
+  has `%q` (format only) and `%j`, but no local-week directive [V:
+  `.rust-docs/cache/crates/jiff/0.2.38/source/src/fmt/strtime/mod.rs:171-195`].
 - Attack 2. The reject reason for S says the owner's templates break. The
   ticket says Traces does not run those Templater scripts [V: ticket 30,
   "Current code"]. Obsidian continues to run those scripts with real Moment.
@@ -613,8 +614,8 @@ deny that later evidence.
 ### Check 4: recommendations without measurements in this report
 
 - Q12 and Q14: binary size and in-repo grammar cost. Unmeasured.
-- Q19 and Q20: size estimates (32 and 16 bytes) are [H]. Sizes for `civil::DateTime`
-  and a period have no measurements in this report.
+- Q19 and Q20: size estimates (32 and 16 bytes) are [H]. Sizes for
+  `civil::DateTime` and a period have no measurements in this report.
 - Q35: this report contains no temporal key timing.
 - Q9: this review did not run the speedate and Jiff differential probe.
 - Q10: this report contains no rebuild-cost measurement for a `winnow` bump.

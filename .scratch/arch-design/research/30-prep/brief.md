@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Prepare evidence for [Where do temporal, format dialects and calendar helpers belong?](../../issues/30-temporal-boundary-and-dialects.md).
+Prepare evidence for [Where do temporal, format dialects and calendar helpers
+belong?](../../issues/30-temporal-boundary-and-dialects.md).
 Do not resolve the ticket. Do not implement the redesign.
 The ticket remains claimed for preparation and the later human discussion.
 
@@ -40,7 +41,8 @@ This list guides research. It does not replace the accepted Answers.
 - Treat target decisions and current implementation as different evidence.
 - Keep naive datetimes civil. Explicit offsets identify instants.
 - Keep period membership separate from equality, grouping and total order.
-- Use the instant's civil date for membership. Do not depend on next-day midnight.
+- Use the instant's civil date for membership. Do not depend on next-day
+  midnight.
 - Keep one pinned clock and week rule per operation.
 - Get the zone only when needed. Retain a failed lookup in that frame.
 - Do not use UTC as an implicit fallback.
@@ -49,18 +51,20 @@ This list guides research. It does not replace the accepted Answers.
 - Derive filename periods during evaluation, not in the persisted note.
 - Keep schemas out of the index fingerprint.
 - Keep unproved range mappings Unsupported. Always run the residual predicate.
-- Keep the 80-byte runtime value limit as a constraint.
-  A mirror measurement does not establish a new production type's size.
+- Keep the 80-byte runtime value limit as a constraint. A mirror measurement
+  does not establish a new production type's size.
 - Do not treat the truncated schema date-check sentence as an accepted rule.
 
 ## Parallel work and file ownership
 
-- Ten read-only scouts inspect the ten Rust-design lenses. They return findings only.
+- Ten read-only scouts inspect the ten Rust-design lenses. They return findings
+  only.
 - The prior-decision researcher owns `b-prior-decisions.md`.
 - The digest researcher owns `c-digest-lessons.md`.
 - The crate researcher owns `d-crate-evidence.md`.
 - The external-source researcher owns `e-external-designs.md`.
-- The integration owner writes the code synthesis, design comparison and grilling guide.
+- The integration owner writes the code synthesis, design comparison and
+  grilling guide.
 - Only the integration owner changes this brief or the temporal ticket.
 
 ## Evidence contract
@@ -76,8 +80,8 @@ Rules for evidence:
 - Cite the primary source for each material claim.
 - Cite source symbols and paths. Add exact locations to scout findings.
 - State the crate version and feature configuration for crate claims.
-- Read line citations against the report's recorded source snapshot.
-  Later prose edits can move those lines without changing the cited rule.
+- Read line citations against the report's recorded source snapshot. Later prose
+  edits can move those lines without changing the cited rule.
 - Use rust-docs tools only with project-local `.rust-docs/` sources.
 - Do not claim that a cached version matches a candidate without checking it.
 - Keep prototype facts separate from production behavior.
@@ -93,10 +97,12 @@ Rules for research prose:
 - Preserve caveats, numbers, identifiers and source links.
 - Use the same term for the same concept.
 - Do not change earlier Answers, current-code glossaries or production files.
-- Do not run builds, tests, benchmarks, formatters, linters or diagnostic scripts in an agent.
-- The integration owner runs the final checks.
-  Checker results do not replace a review of meaning.
-- Do not claim a design is optimal from line count, dependency count or unmeasured cost.
+- Do not run builds, tests, benchmarks, formatters, linters or diagnostic
+  scripts in an agent.
+- The integration owner runs the final checks. Checker results do not replace a
+  review of meaning.
+- Do not claim a design is optimal from line count, dependency count or
+  unmeasured cost.
 - Compare retain, consolidation, adapters and removal where each applies.
 - Give each candidate a counterexample and a condition that rejects it.
 

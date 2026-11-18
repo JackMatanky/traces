@@ -198,12 +198,13 @@ an owner-confirmed need for Moment tokens in queries or config.
   quarter; `DDD`/`DDDD` read day-of-year 1 to 366 in leap years (S7). A
   value check can classify each token, but the class of `Q` is "quarter
   selector", not "full date".
-- [V] Ticket 20 hands over a truncated sentence ("Only date, datetime
-  and") inside its [Date-shaped-text discussion](../../issues/20-schema-note-typing-and-validation.md),
-  lines 305-315. Ticket 20 already delegates the value check to the
-  date-format check, and B26's accepted rule accepts complete scalars
-  provisionally. The fragment does not gate the check in this file.
-  Ticket 36 keeps it as a recovery item (`i-leakage-review.md`, I1).
+- [V] Ticket 20 hands over a truncated sentence ("Only date, datetime and")
+  inside its
+  [Date-shaped-text discussion](../../issues/20-schema-note-typing-and-validation.md),
+  lines 305-315. Ticket 20 already delegates the value check to the date-format
+  check, and B26's accepted rule accepts complete scalars provisionally. The
+  fragment does not gate the check in this file. Ticket 36 keeps it as a
+  recovery item (`i-leakage-review.md`, I1).
 
 Counterexample against "check every `date.format` against a full date": a
 field declared `DDDD` holds `152`. That is a valid value of its declared

@@ -63,14 +63,16 @@ a token lint only.
 
 [V] Ticket 20 gives a complete provisional value rule:
 
-> `date.format` is a write-format hint: the check accepts Date/DateTime and any scalar if the format has no date component.
+> `date.format` is a write-format hint: the check accepts Date/DateTime and any
+> scalar if the format has no date component.
 
 Source: 20, Answer, lines 119-123.
 The same Answer hands the dialect and date-format check to ticket 30.
 It also says no declared option stays silently ignored.
 Sources: 20:416-417, 20:119.
 
-[V] The truncated words occur in `Date-shaped text`, after the discussion of quote styles and quoted numbers:
+[V] The truncated words occur in `Date-shaped text`, after the discussion of
+quote styles and quoted numbers:
 
 > Only date, datetime and
 
@@ -84,11 +86,12 @@ requirement. Do not complete the fragment by inference.
 
 ### L2. Partial dates and formats with no date component are different cases
 
-Affected text: B26, synthesis Q4 and the Q4 argument inherited from `h-redteam.md:74-89`.
+Affected text: B26, synthesis Q4 and the Q4 argument inherited from
+`h-redteam.md:74-89`.
 
 [V] Ticket 20 says “no date component”.
 Ticket 30 asks about “no full date”, with `YYYY`, `Q` and `DDDD` as examples.
-Sources: 20:120-123, 30:51-52.
+Sources: 20:120-123; ticket 30 Question 4.
 The accepted rule does not equate these categories.
 
 [V] Ticket 20 also says quoted numbers stay text.
@@ -96,10 +99,10 @@ Source: 20:311-315.
 Thus, “a string-shape check would never see a string” is not established.
 The written quoting and parser route matter.
 
-[P] Separate full-date, partial-date and no-date-component formats.
-Keep the provisional scalar acceptance rule only where its accepted condition applies.
-Describe numeric examples as specific input spellings, not all possible field values.
-Leave the partial-date acceptance rule for the human decision.
+[P] Separate full-date, partial-date and no-date-component formats. Keep the
+provisional scalar acceptance rule only where its accepted condition applies.
+Describe numeric examples as specific input spellings, not all possible field
+values. Leave the partial-date acceptance rule for the human decision.
 
 ### L3. Frozen parsing has explicit accepted exceptions
 
@@ -113,9 +116,9 @@ Sources: 16:76-77, 19:110-118, 19:232-246.
 Ticket 18 records that supersession directly.
 Source: 18:586-590.
 
-[V] Ticket 21 limits its new week, quarter and year forms to filename extraction.
-It does not authorize those forms in note fields.
-Source: 21:170-176.
+[V] Ticket 21 limits its new week, quarter and year forms to filename
+extraction. It does not authorize those forms in note fields. Source:
+21:170-176.
 
 [P] Preserve frozen classification except for explicitly accepted changes
 and their migration rows. Keep the new filename grammar separate. Do not use
@@ -137,15 +140,15 @@ Source: 18:458-461.
 Ticket 20 places that runtime value below both note and schema.
 Source: 20:85-87.
 
-[V] Ticket 21 forbids a second period-value type and heap allocation for the period.
-It requires normalized `CalendarPeriod` values.
-Source: 21:136-141.
+[V] Ticket 21 forbids a second period-value type and heap allocation for the
+period. It requires normalized `CalendarPeriod` values. Source: 21:136-141.
 
-[P] Do not recommend a second query runtime carrier as an unchanged application of ticket 18.
-Mark that option as an explicit change to the accepted runtime-value contract.
-Adding one runtime period case does not, by itself, permit period syntax in persisted note fields.
-Keep runtime representation and note-parser acceptance as separate decisions.
-The unresolved variant list does not reopen the one-runtime-value rule automatically.
+[P] Do not recommend a second query runtime carrier as an unchanged application
+of ticket 18. Mark that option as an explicit change to the accepted
+runtime-value contract. Adding one runtime period case does not, by itself,
+permit period syntax in persisted note fields. Keep runtime representation and
+note-parser acceptance as separate decisions. The unresolved variant list does
+not reopen the one-runtime-value rule automatically.
 
 ### L5. Membership bounds do not prove a conflicting physical key rule
 
@@ -153,7 +156,8 @@ Affected text: B66, B68, B70, synthesis Q18/Q35 and `h-redteam.md:508-510`.
 
 [V] Ticket 29 R5 explicitly states:
 
-> Point-period matching uses membership bounds. Period-period comparison uses normalized `(start, unit)` identity and order.
+> Point-period matching uses membership bounds. Period-period comparison uses
+> normalized `(start, unit)` identity and order.
 
 Source: 29:538-542.
 R1 also requires the temporal key coverage to include period-valued rows.
@@ -174,10 +178,10 @@ anticipates such bounds. It does not supply their proof or adopt a
 `member_of` probe.
 
 [P] Remove the asserted contradiction and its reject condition from Q35.
-Describe it as a terminology clarification if the human wants one.
-Keep the reserved node Unsupported in the current scope.
-For existing point-period comparisons, each operator and row kind needs the R1/R5 proof.
-Never substitute period identity order for membership.
+Describe it as a terminology clarification if the human wants one. Keep the
+reserved node Unsupported in the current scope. For existing point-period
+comparisons, each operator and row kind needs the R1/R5 proof. Never substitute
+period identity order for membership.
 
 ### L6. Temporal group class order does not settle every mixed-value sort key
 
@@ -187,15 +191,14 @@ Affected text: B65/C4, B67 and synthesis Q19/Q22.
 
 > The classes stay apart and order Civil, Instant, Period.
 
-Source: 29:721-730.
-The final review confirms that group equality is not every filter matching relation.
-Source: 29:1519-1526.
+Source: 29:721-730. The final review confirms that group equality is not every
+filter matching relation. Source: 29:1519-1526.
 
 [V] Ticket 21 separately requires a deterministic mixed temporal total sort key.
 It leaves the period unit tie-break open.
 Source: 21:149-156, 21:266-270.
 Ticket 30 Q22 asks for that total key, including its unit tie-break.
-Source: 30:97-98.
+Source: ticket 30 Question 22.
 
 [P] Keep Civil, Instant, Period as the accepted group-key order.
 Do not reduce Q22 to the unit tie-break alone.
@@ -213,17 +216,17 @@ group-class order. Its C4 owns period upper-bound wording.
 
 Affected text: B67's proposed repair “under the pinned zone”.
 
-[V] Ticket 29 group keys use civil `(date, time)`, instant epoch nanoseconds and period `(start, unit)`.
-They do not convert one class into another.
-Source: 29:721-730.
+[V] Ticket 29 group keys use civil `(date, time)`, instant epoch nanoseconds and
+period `(start, unit)`. They do not convert one class into another. Source:
+29:721-730.
 
 [V] Ticket 21 forbids acquiring a zone for work solely on stored civil values.
 Source: 21:123-127.
 
-[P] Say “project once to the canonical class key”.
-Keep the pinned frame for operations that need it.
-Do not add civil-to-instant conversion to grouping.
-Keep the reported DST comparator failure as earlier probe evidence, not a result from this task.
+[P] Say “project once to the canonical class key”. Keep the pinned frame for
+operations that need it. Do not add civil-to-instant conversion to grouping.
+Keep the reported DST comparator failure as earlier probe evidence, not a result
+from this task.
 
 ### L8. Config merge is inherited, not an undecided default
 
@@ -231,7 +234,8 @@ Affected text: B46, C17 and synthesis Q26/Q31.
 
 [V] Ticket 22 says:
 
-> Keep the merge. Apply the global config first, then the local config, field by field.
+> Keep the merge. Apply the global config first, then the local config, field by
+> field.
 
 Source: 22:223-235.
 The same section gives config ownership of `[date]` and fixes zone precedence.
@@ -250,12 +254,10 @@ Affected text: synthesis Q28/Q29/Q30/Q33.
 Q28 says the temporal policy contains a loaded zone.
 Q33 says the frame acquires the zone at first need.
 
-[V] Ticket 21 pins one clock sample and week rule per operation.
-It acquires the system-local zone only when needed and retains success or failure.
-It prohibits a zone acquisition for civil-only work.
-Source: 21:106-127.
-Ticket 22 fixes the selected source order: host, config, system.
-Source: 22:227-230.
+[V] Ticket 21 pins one clock sample and week rule per operation. It acquires the
+system-local zone only when needed and retains success or failure. It prohibits
+a zone acquisition for civil-only work. Source: 21:106-127. Ticket 22 fixes the
+selected source order: host, config, system. Source: 22:227-230.
 
 [P] Distinguish zone spelling checks, zone-source selection, and actual zone
 acquisition. Do not justify two policy types by assuming an eagerly loaded
@@ -272,10 +274,10 @@ of the inherited frame lifetime.
 
 Affected text: C5, synthesis Q8/Q31 and its global-week risk note.
 
-[V] Ticket 21 specifies validated ISO filename weeks with Monday start and four-day week one.
-It separately mentions configurable first weekdays and leaves week formats beyond ISO open.
-Sources: 21:170-179, 21:266-270.
-It does not say that a configured general week rule reinterprets an ISO prefix.
+[V] Ticket 21 specifies validated ISO filename weeks with Monday start and
+four-day week one. It separately mentions configurable first weekdays and leaves
+week formats beyond ISO open. Sources: 21:170-179, 21:266-270. It does not say
+that a configured general week rule reinterprets an ISO prefix.
 
 [P] Remove the statement that the filename prefix obeys the configured frame
 week rule. Keep ISO prefixes stable under template or query week settings
@@ -293,11 +295,10 @@ Affected text: synthesis Q13/Q14/Q16/Q18.
 
 > Natural-language dates remain a hook, not a decided grammar.
 
-Source: 19:167-170.
-Ticket 29 adopts no new DSL syntax and reserves only the `member_of` node name.
-Sources: 29:467-478, 29:1186-1199.
-Ticket 21 permits new overlap or containment functions only when a query needs them.
-Source: 21:149-152.
+Source: 19:167-170. Ticket 29 adopts no new DSL syntax and reserves only the
+`member_of` node name. Sources: 29:467-478, 29:1186-1199. Ticket 21 permits new
+overlap or containment functions only when a query needs them. Source:
+21:149-152.
 
 [P] Make grammar adoption a separate decision from grammar design and crate
 choice. Keep the hook-only alternative valid without implying a missing
@@ -309,10 +310,10 @@ relation. Do not infer a required new implementation from the reserved name.
 
 Affected text: synthesis Q5.
 
-[V] Ticket 16 makes config formats Migratable through the specification change table.
-Ticket 22 keeps `deny_unknown_fields` and calls for comment-preserving migration at the first breaking change.
-Neither Answer requires a one-release accept-and-ignore path.
-Sources: 16:60-72, 16:86, 22:223-226.
+[V] Ticket 16 makes config formats Migratable through the specification change
+table. Ticket 22 keeps `deny_unknown_fields` and calls for comment-preserving
+migration at the first breaking change. Neither Answer requires a one-release
+accept-and-ignore path. Sources: 16:60-72, 16:86, 22:223-226.
 
 [P] Remove the implied requirement for a tolerance release. Compare a direct
 documented migration with any proposed tolerance path. Label tolerance as
@@ -338,13 +339,13 @@ Treat any diagnostic setting as new scope with an identified consumer and owner.
 
 Affected text: B48, B49, B54, B55, B60 and the claimed B63/B64 coverage.
 
-[V] B48 points to ticket 23 line 477, which concerns the task payload, not inline datetime classification.
-Use 19:110-118 for inline civil datetimes.
-Use 23:334-335 for element-wise classification.
+[V] B48 points to ticket 23 line 477, which concerns the task payload, not
+inline datetime classification. Use 19:110-118 for inline civil datetimes. Use
+23:334-335 for element-wise classification.
 
-[V] B49's six task-date slots are current code, not a new rule in ticket 23's Answer.
-`TaskDateSet` confirms six civil slots (`src/task.rs:498-505`).
-Keep that code fact separate from the accepted parser-preservation rule.
+[V] B49's six task-date slots are current code, not a new rule in ticket 23's
+Answer. `TaskDateSet` confirms six civil slots (`src/task.rs:498-505`). Keep
+that code fact separate from the accepted parser-preservation rule.
 
 [V] Use 24:503-510 and 25:438-439 for zone-free cache decoding.
 B54 currently includes a mislabeled link whose target is ticket 30.
@@ -363,16 +364,17 @@ overlay keeps base `mtime` and `created`. A new file has neither.
 Source: 28:1070-1078. The frame/generation memo rule is explicit in
 29:965-978.
 
-[P] Replace proxy citations with these direct owners.
-Do not infer period dates from the buffer clock or invent metadata for new buffers.
+[P] Replace proxy citations with these direct owners. Do not infer period dates
+from the buffer clock or invent metadata for new buffers.
 
 ### L15. The default-format disagreement is now closed by source inspection
 
 Affected text: B's current-config paragraph and source-screening notes.
 
-[V] `DEFAULT_DATETIME_PATTERN` is `%Y-%m-%dT%H:%M:%S` (`src/temporal/datetime.rs:32`).
-Config defaults reference it (`src/config/model/frontmatter.rs:261,296`).
-The stale `%Y-%m-%d %H:%M` research value is not the current default.
+[V] `DEFAULT_DATETIME_PATTERN` is `%Y-%m-%dT%H:%M:%S`
+(`src/temporal/datetime.rs:32`). Config defaults reference it
+(`src/config/model/frontmatter.rs:261,296`). The stale `%Y-%m-%d %H:%M` research
+value is not the current default.
 
 [P] Replace “check at implementation time” with this source fact.
 Do not present the two earlier reports as equally current evidence.
@@ -403,9 +405,9 @@ No formatting execution ran.
    accepted merge and zone precedence. Temporal must not import config
    merely to get its policy.
    Sources: 22:223-235, 20:72-77.
-7. **Index:** persist source timestamps, not zone-derived dates or filename periods.
-   Decode civil datetimes without a machine zone.
-   Sources: 24:397-405, 24:503-510.
+7. **Index:** persist source timestamps, not zone-derived dates or filename
+   periods. Decode civil datetimes without a machine zone. Sources: 24:397-405,
+   24:503-510.
 8. **Fingerprint owner:** cover persisted producers and probe outputs.
    Add the civil case. Record the epoch change. Audit `winnow` before
    declaring the producer list complete. Query-only grammar changes do not
@@ -415,13 +417,13 @@ No formatting execution ran.
    Run residual predicates. Scan Unsupported cases in the first scope.
    Also scan merely Inexact cases in that scope.
    Sources: 29:504-542, 29:571-583.
-10. **Path owner:** read listed path text, not NUL-form database keys or folded Comparison Keys.
-    Keep link percent decoding and encoded separators as explicit decisions.
-    Sources: 32:463-470, 32:657-675, 32:872-874.
-11. **Host and memo owner:** use one pinned base or derived generation with its frame.
-    A changed plan, frame or generation needs a distinct memo identity.
-    Buffer metadata does not create a new filesystem timestamp.
-    Sources: 29:965-978, 28:1070-1078.
+10. **Path owner:** read listed path text, not NUL-form database keys or folded
+    Comparison Keys. Keep link percent decoding and encoded separators as
+    explicit decisions. Sources: 32:463-470, 32:657-675, 32:872-874.
+11. **Host and memo owner:** use one pinned base or derived generation with its
+    frame. A changed plan, frame or generation needs a distinct memo identity.
+    Buffer metadata does not create a new filesystem timestamp. Sources:
+    29:965-978, 28:1070-1078.
 
 ## Remaining human choices and evidence blockers
 
@@ -431,13 +433,15 @@ below apply to this report, not every later investigation.
 - **Schema semantics:** choose the dialect. Define partial-date value
   acceptance. Recover the unrelated truncated classification fragment
   without guessing its missing words.
-- **Civil/instant shape:** choose the field-level representation within the runtime-value and size constraints.
-  The accepted civil behavior is not open again.
+- **Civil/instant shape:** choose the field-level representation within the
+  runtime-value and size constraints. The accepted civil behavior is not open
+  again.
 - **Period carrier:** complete the one-runtime-value model. Before choosing
   another carrier, get approval for an explicit amendment to that contract.
   Do not make stored period syntax an accidental consequence.
-- **Ordinary Date versus instant:** choose the gap/fold comparison rule separately from period membership.
-  Ticket 21 does not settle that ordinary field comparison.
+- **Ordinary Date versus instant:** choose the gap/fold comparison rule
+  separately from period membership. Ticket 21 does not settle that ordinary
+  field comparison.
 - **Total sort key:** specify the mixed-value key. Specify the period unit
   rank. Preserve the accepted group classes and transitivity requirements.
 - **Configured weeks:** choose the supported operations and week-one rule.
@@ -453,10 +457,11 @@ below apply to this report, not every later investigation.
   handling. Decide extension normalization. Decide `[[b]]` versus
   `[b](b.md)` equality separately from `date(link)` extraction.
   Sources: 19:299-313, 32:872-874.
-- **Pushdown evidence:** no direct Answer supplies a temporal physical encoding or operator proof table.
-  Key eligibility needs the full temporal bracket, including period rows, and the pinned frame.
-  Quoted literals remain Unsupported in the accepted first scope.
-  A timing for numeric or folder keys supplies no temporal proof.
+- **Pushdown evidence:** no direct Answer supplies a temporal physical encoding
+  or operator proof table. Key eligibility needs the full temporal bracket,
+  including period rows, and the pinned frame. Quoted literals remain
+  Unsupported in the accepted first scope. A timing for numeric or folder keys
+  supplies no temporal proof.
 - **Implementation evidence:** this report does not measure enum size,
   parser parity, key cost, grammar cost, or shipped-profile behavior. Those
   are evidence gates, not permission to choose the human's semantics.

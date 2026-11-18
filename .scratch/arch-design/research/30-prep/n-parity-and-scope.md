@@ -83,12 +83,12 @@ category. It does not compare this outer enum or its retained input.
 
 ## Prefix behavior and shared consumers
 
-[V] The date prefix scanner asks Logos for one token. It validates that
-complete token once (`src/temporal/lexer.rs:93-111`). An invalid full-date
-token does not make the scanner try a second, shorter token. If Logos
-recognizes only a seven-byte month followed by `-`, the scanner rejects it at lines
-105-106. Thus `2026-02-30` cannot become `2026-02`, and `2026-02-x` cannot
-become `2026-02`. This is source-backed behavior, not a new runtime result.
+[V] The date prefix scanner asks Logos for one token. It validates that complete
+token once (`src/temporal/lexer.rs:93-111`). An invalid full-date token does not
+make the scanner try a second, shorter token. If Logos recognizes only a
+seven-byte month followed by `-`, the scanner rejects it at lines 105-106. Thus
+`2026-02-30` cannot become `2026-02`, and `2026-02-x` cannot become `2026-02`.
+This is source-backed behavior, not a new runtime result.
 
 [V] Do not generalize this rule into a ban on intentional prefix parsing.
 `DatePoint::parse_prefix` returns a spanned date prefix

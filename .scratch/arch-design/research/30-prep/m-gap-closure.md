@@ -237,13 +237,13 @@ returns `8dea411bc9325027ce7de20650d6392d6893f268`, dated 2026-04-05.
 Its message is `bump version to 0.4.1 (#30)`. These facts establish a
 repository snapshot, not a maintenance-quality guarantee.
 
-The [open-issues API](https://api.github.com/repos/DevinVS/fuzzydate/issues?state=open&per_page=10)
+The
+[open-issues API](https://api.github.com/repos/DevinVS/fuzzydate/issues?state=open&per_page=10)
 returns three entries, including a pull request. Issue 32 requests
-multi-language support; pull request 31 remains open and unmerged.
-Reopened issue 17 reports that `next monday` selects January 19 from
-Saturday January 10, not January 12. That report is not a new reproduction
-against the cached release. The fixed-anchor weekday results above are
-the measured cases.
+multi-language support; pull request 31 remains open and unmerged. Reopened
+issue 17 reports that `next monday` selects January 19 from Saturday January 10,
+not January 12. That report is not a new reproduction against the cached
+release. The fixed-anchor weekday results above are the measured cases.
 
 ### Reproduce the candidate checks
 
