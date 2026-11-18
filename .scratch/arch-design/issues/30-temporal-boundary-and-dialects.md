@@ -1,7 +1,7 @@
 # Where do temporal, format dialects and calendar helpers belong?
 
 Type: grilling
-Status: claimed
+Status: resolved
 Blocked by: 7, 14, 16, 18, 19, 20, 21, 22, 23, 24, 25, 29, 32
 
 ## Question
@@ -694,3 +694,460 @@ Supersession list for ticket 36:
 - The temporal survey and `reverification.md` predate the translator move.
 
 These are recorded discrepancies, not changes to the earlier Answers.
+
+## Answer
+
+*Language note: This section uses ASD-STE100 Simplified Technical English (STE)
+for rules, contracts, and gates.*
+
+### Summary of the architecture
+
+The temporal architecture splits responsibilities across four boundaries:
+
+- The `temporal` module owns all temporal value types, calendar arithmetic, week
+  rules, zone resolution, and date parsing.
+- The `config` module owns the flat `[date]` TOML table and parses it into
+  `DateConfig`.
+- The `temporal` module receives `TemporalPolicy`, which holds validated
+  spellings and never imports `config`.
+- Each query, render, or request pins one `TemporalFrame` that holds a clock
+  sample, a `TemporalPolicy`, and a thread-safe `OnceLock` zone cell.
+- All five date-precision levels (`Year`, `Quarter`, `Month`, `Week`, `Day`)
+  live on `DatePoint::Calendar` and travel through `NoteFieldValue::Date`.
+- `CalendarPeriod` is a span helper that code derives from `DatePoint` when
+  membership or boundary math needs a half-open interval.
+
+---
+
+### Question dispositions (Q1 to Q36)
+
+#### Moment compatibility and format dialects (Q1 to Q5)
+
+1. **Q1 — Moment compatibility as a domain concept**: **Decided** (Choice: not a
+   domain concept; compatibility adapter only).
+   - **Reason**: Ticket 16 makes Templater parity free. Domain values hold no
+     dialect tokens.
+   - **Evidence**: `research/07-template-bridge-precedent.md`;
+     `src/temporal/token.rs`.
+   - **Invariant owner**: `template` (compatibility) and `temporal`
+     (dialect-free values).
+
+2. **Q2 — Location of the Moment dialect translator**: **Decided** (Choice: move
+   the Moment render-only translator to `src/template/`).
+   - **Reason**: `pattern_to_strftime` is a render-only helper, and all callers
+     sit in `src/template/engine/date.rs`. This move keeps `temporal`
+     dialect-free.
+   - **Evidence**: `src/temporal/token.rs:15-61,186-189`; CodeGraph caller
+     check.
+   - **Invariant owner**: `template`.
+   - **Downstream**: Ticket 31 receives the translator move and the
+     `UnsupportedToken` error shape.
+   - **Supersession**: This decision supersedes the landed move in commit
+     `6104d0ae`.
+
+3. **Q3 — Dialect per format surface**: **Decided** (Choice: `strftime` is
+   native for query and schema; Moment is a render-only adapter in `template`;
+   `[date]` periodic formats use `%`-sniff).
+   - **Reason**: Query `date(text, pattern)` already uses `strftime`, and schema
+     `date.format` shares one native dialect with query.
+   - **Rule**: `[date]` periodic formats (`YYYY`, `YYYY-Qq`, `YYYY-MM`,
+     `YYYY-Www`, `YYYY-MM-DD`) use `%`-sniff in a dedicated filename-pattern
+     compiler in `temporal`. The compiler selects `strftime` when `%` is
+     present, and it selects the Moment subset otherwise.
+   - **Evidence**: `src/temporal/token.rs:55-61`;
+     `docs/vault/05_metadata/cal.md`.
+   - **Invariant owner**: `temporal` (`strftime` and filename-pattern compiler)
+     and `template` (Moment render adapter).
+
+4. **Q4 — `date.format` check for formats without a full date**: **Decided**
+   (Choice: check format syntax at schema load, and check frontmatter values by
+   format class).
+   - **Reason**: Schema load checks only that `date.format` is a valid format
+     string. At note validation, full-date formats accept `Date` or `DateTime`.
+     Partial formats (`%Y`, `%j`, quarter) accept `Int`, a matching `String`, or
+     `Date` because YAML parses unquoted `2026` as `Int`.
+   - **Evidence**: `src/schema/fields/date.rs`; `docs/vault/05_metadata/cal.md`;
+     `research/14`.
+   - **Invariant owner**: `schema` (load lint and value check).
+   - **Downstream**: Ticket 34 receives the schema format lint diagnostic code.
+     Ticket 36 records that this rule completes Ticket 20's truncated date-check
+     sentence.
+
+5. **Q5 — `format` under `[frontmatter.date_created]` and
+   `[frontmatter.date_modified]`**: **Decided** (Choice: keep both frontmatter
+   tables reserved; place default date and datetime formats under `[date]`).
+   - **Reason**: Both reserved tables hold config slots for future
+     `file.date_created` and `file.date_modified` functions. Putting general
+     default date and datetime formats in `[date]` gives one home for vault date
+     settings.
+   - **Evidence**: `src/config/raw.rs`; Ticket 22.
+   - **Invariant owner**: `config`.
+   - **Rule**: Exclude both reserved frontmatter tables from `IndexPolicy` until
+     an index reader consumes them.
+
+#### Calendar helpers and filenames (Q6 to Q8)
+
+6. **Q6 — Calendar helpers in `src/template/engine/date.rs`**: **Decided**
+   (Choice: keep minimal filter adapters in `engine/date.rs`; move `Anchor`
+   resolution, offset arithmetic, and week-rule logic to `temporal` behind
+   `TemporalFrame`).
+   - **Reason**: Minimal argument parsing and filter registration in `template`
+     removes duplicate calendar logic and ambient clock reads.
+   - **Evidence**: `src/template/engine/date.rs:183-294`;
+     `src/temporal/calendar.rs:35-64`.
+   - **Invariant owner**: `temporal` (arithmetic and week rules) and `template`
+     (filter registration).
+   - **Downstream**: Ticket 31 receives the thin-adapter boundary.
+
+7. **Q7 — Location of the filename-period parser**: **Decided** (Choice: a
+   general string date/period extractor in `src/temporal/` with its own token
+   enum, separate from the frozen note-content lexer).
+   - **Reason**: `FileMeta::derive_day` in `src/file.rs` already calls
+     `temporal`. Placing the new extractor in `src/temporal/` with its own token
+     enum keeps one date grammar and protects frozen note parsing (Ticket 16).
+   - **Evidence**: `src/temporal/lexer.rs:17-54`; `src/file.rs`; Ticket 16.
+   - **Invariant owner**: `temporal`.
+   - **Contract**: Use longest-match-first with boundary checks. Return `Null`
+     plus one notice for a malformed longer prefix (for example `2026-13-40`).
+     Never fall back to a shorter prefix (`2026`).
+
+8. **Q8 — Week-one rule for a custom week start**: **Decided** (Choice: pair
+   `[date].week_start` with optional `[date].week_min_days` in `1..=7`; default
+   `4` for Monday and `1` for Sunday; no rollover from invalid weeks).
+   - **Reason**: `week_start` alone does not define week 1 (`2009-01-01` shifts
+     between `2009-W01` and `2008-W53` across `min_days` 4 and 5). Jiff lacks
+     custom week-year math, so `temporal` implements this arithmetic. Filename
+     `Www` labels stay ISO-fixed (Monday, 4 days) under Ticket 21.
+   - **Evidence**: `e-external-designs.md` q8 (`java.time.WeekFields`, CLDR);
+     `src/temporal/calendar.rs:41-48`.
+   - **Invariant owner**: `temporal`.
+
+#### Parsing stack (Q9 to Q12)
+
+9. **Q9 — `speedate`**: **Deferred / Prototype-gated** (Choice: keep `speedate`
+   now; measure removal cost versus gain in a prototype before removal).
+   - **Reason**: `speedate` has one call site (`src/temporal/date.rs:369-386`)
+     and matches guarded `jiff::civil::Date::new` across 4,635,370 generated
+     inputs.
+   - **Rule**: Keep `speedate` in the codebase and in Ticket 25's fingerprint
+     crate list until a prototype benchmark measures binary size and throughput.
+   - **Evidence**: `m-gap-closure.md`; `n-parity-and-scope.md`;
+     `src/temporal/date.rs:369-396`.
+   - **Downstream**: Ticket 35 receives this prototype gate before it prunes
+     `speedate`, `lexical-parse-float`, and `strum`.
+
+10. **Q10 — `winnow`**: **Decided** (Choice: keep `winnow`).
+    - **Reason**: `duration_part` in `src/temporal/lexer.rs:139-148` uses
+      `winnow` to report the consumed prefix length, which Jiff's friendly
+      parser cannot report. `winnow` already stays in `Cargo.lock` through
+      `toml`.
+    - **Evidence**: `src/temporal/lexer.rs:139-148`; `d-crate-evidence.md`.
+    - **Downstream**: Ticket 25 must add `winnow` to the extractor fingerprint
+      crate list.
+
+11. **Q11 — `logos`**: **Inherited** (Choice: keep `logos`).
+    - **Reason**: `logos` drives four lexers across `temporal`, `note`, and
+      `query` with no reported defect.
+    - **Evidence**: `src/temporal/lexer.rs`; `src/note/parser/lexer.rs`;
+      `src/query/grammar/filter.rs`.
+
+12. **Q12 — `jiff`**: **Ratified** (Choice: keep `jiff = "=0.2.38"` with `std`,
+    `tz-system`, `tzdb-bundle-always`).
+    - **Reason**: `jiff` is the core temporal engine for civil types, instants,
+      `tzdb`, and `strtime`.
+    - **Evidence**: `Cargo.toml:128`.
+
+#### Natural-language dates and keywords (Q13 to Q18)
+
+13. **Q13 — Natural-language date grammar**: **Decided** (Choice: closed,
+    deterministic English grammar resolved against the frame's `today`).
+    - **Reason**: Query plans need deterministic parsing for keywords
+      (`today()`, `now()`, `tomorrow`, `yesterday`), weekdays, offsets, and
+      period phrases. Offsets use `in <n> <unit>` and `<n> <unit> ago`. Period
+      phrases use `this/next/last week/month/quarter/year` and
+      `start of/end of <period>`.
+    - **Evidence**: Ticket 19; `synthesis.md` Q13 table.
+    - **Invariant owner**: `temporal`.
+
+14. **Q14 — Build in-repo or use a crate**: **Decided** (Choice: build the
+    closed grammar in the repository).
+    - **Reason**: Four-candidate evaluation at Rust 1.96.0 found panics in
+      `jiff-english`, `fuzzydate`, and `chrono-english`. The fourth candidate,
+      `parse_datetime`, has an overbroad grammar and point-only output with no
+      error spans.
+    - **Evidence**: `m-gap-closure.md` (298 JSON records across 64 shared cases
+      and 36 host variations); `d-crate-evidence.md`.
+    - **Invariant owner**: `temporal`.
+
+15. **Q15 — Bare weekday and phrase time policy**: **Decided** (Choice:
+    forward-only bare weekdays; midnight `00:00` for phrase datetimes).
+    - **Rules**:
+      - A bare weekday means the next occurrence strictly after `today`.
+      - `this <day>` means the day in the current week.
+      - `next <day>` means the next occurrence after `today`.
+      - `last <day>` means the previous occurrence before `today`.
+      - Phrase datetimes use midnight `00:00`.
+    - **Reason**: Forward-only bare weekdays keep `due > friday` and
+      `due == friday` predictable when `today` is Friday.
+    - **Evidence**: `synthesis.md` Q15; `m-gap-closure.md` same-day weekday
+      probe.
+    - **Invariant owner**: `temporal`.
+
+16. **Q16 — Interval precision of `next week` and offset phrases**: **Decided**
+    (Choice: all natural-language date functions and phrases return `DatePoint`
+    with 5-level `DatePrecision` (`Year | Quarter | Month | Week | Day`)).
+    - **Rules**:
+      - `next week` returns
+        `DatePoint::Calendar { date: <week_start>, date_precision: Week }`.
+      - Offset phrases (`in 1 month`, `3 months ago`) return
+        `DatePoint::Calendar` at `Day` precision, clamped under accepted
+        calendar arithmetic.
+      - `==` checks exact `(date, precision)` equality.
+      - `in`, `not in`, and `member_of` derive the `CalendarPeriod` span
+        `[start, end)` on demand to check membership.
+      - `<`, `<=`, `>`, and `>=` across different precisions compare span bounds
+        (`d < p` means `d < p.start`, and `d <= p` means `d < p.end`).
+    - **Evidence**: `src/temporal/point.rs:28-53`.
+    - **Invariant owner**: `temporal` (types and span math) and `query`
+      (operator semantics).
+    - **Supersession**: This decision unifies `DatePoint::DatePrecision` and
+      `CalendarPeriod`, revising Ticket 21's separation.
+
+17. **Q17 — Filter spelling of relative keywords**: **Decided** (Choice: nullary
+    `today()` and `now()` only; compose period edges as `eom(today())` and
+    `sow(today())`).
+    - **Reason**: Bare `today` parses as a field path. Adding only `today()` and
+      `now()` avoids giving every edge function a second arity.
+    - **Evidence**: `src/query/grammar/filter.rs:591-597`.
+    - **Invariant owner**: `query`.
+    - **Supersession**: Ticket 29 prose using bare `eom` as a keyword yields to
+      function `eom(today())`.
+
+18. **Q18 — Frontend spelling of `member_of`**: **Decided** (Choice: support
+    both `in` / `not in` infix overload and named `member_of(point, period)`).
+    - **Reason**: The infix form matches existing `in` list syntax for
+      readability. The named function `member_of(point, period)` gives an
+      explicit form for unambiguous queries.
+    - **Evidence**: Ticket 29 section 10.
+    - **Invariant owner**: `query`.
+
+#### Value shapes (Q19 to Q25)
+
+19. **Q19 — Civil and instant type shape**: **Decided** (Choice: inner
+    `Civil | Instant` enum inside `DateTimeValue`, keeping `NoteFieldValue` <=
+    80 bytes; remove cross-class `Ord`; bump format epoch).
+    - **Reason**: This shape keeps `NoteFieldValue`'s variant count and 80-byte
+      slot budget (24-byte temporal payload versus 72-byte `DurationValue` or
+      `Object`). Naive datetimes stay civil without a zone lookup at parse or
+      cache load.
+    - **Evidence**: `m-gap-closure.md` (`probes/parity/tests/layout.rs` 80-byte
+      mirror); `src/note/field.rs:579-580`.
+    - **Invariant owner**: `temporal` (`DateTimeValue`) and `note`
+      (`NoteFieldValue` size assertion).
+    - **Downstream**: Ticket 25 bumps the format epoch and adds civil datetime
+      to the fingerprint corpus. Ticket 36 records the frozen-parse semantic
+      change for naive datetimes (authorized by B16).
+
+20. **Q20 — Placement of `CalendarPeriod` in the value model**: **Decided**
+    (Choice: expand `DatePoint::DatePrecision` to
+    `Year | Quarter | Month | Week | Day` on `NoteFieldValue::Date`; derive
+    `CalendarPeriod` as a span helper).
+    - **Reason**: `file.date` and all temporal expressions stay inside
+      `NoteFieldValue` with no `QueryValue` wrapper and no
+      `NoteFieldValue::Period` variant. `DatePoint::Calendar` normalizes `date`
+      to the unit start on construction.
+    - **Evidence**: `src/temporal/point.rs:28-53`; `src/note/field.rs:579-580`.
+    - **Invariant owner**: `temporal` and `note`.
+    - **Supersession**: This decision revises Ticket 18 and Ticket 21 by storing
+      5-level `DatePrecision` on `NoteFieldValue::Date` and treating
+      `CalendarPeriod` as a derived span helper.
+
+21. **Q21 — Date versus instant at an ambiguous or skipped local midnight**:
+    **Decided** (Choice: Option D — project the instant to a civil value in the
+    pinned zone, then compare civil values).
+    - **Reason**: Instant-to-civil projection is total once the zone is
+      available and stays monotone across DST gaps. Civil-to-instant mapping
+      across `America/New_York` 2026-03-08 02:30 versus 03:00 breaks
+      transitivity. Zone failure stays a typed error (B30).
+    - **Evidence**: `d-crate-evidence.md` (`Compatible` row);
+      `m-gap-closure.md`; `src/note/field.rs:297-300`.
+    - **Invariant owner**: `temporal` (projection) and `query` (error
+      propagation).
+
+22. **Q22 — Total sort key for mixed temporal values**: **Decided** (Choice:
+    `Civil < Instant < Period`, with `Week < Month < Quarter < Year` tie-break
+    inside `Period` for equal start dates).
+    - **Reason**: `Civil` covers `Date` (`Day` precision) and civil `DateTime`,
+      while `Period` covers `Week`, `Month`, `Quarter`, and `Year` precisions.
+      This order reuses Ticket 29's group-class order (B65), aligns with
+      PostgreSQL `daterange` `(lower, upper)` ordering, and needs no zone
+      lookup.
+    - **Evidence**: Ticket 29 (B65); PostgreSQL `daterange` convention.
+    - **Invariant owner**: `temporal` (sort key) and `query` (`ORDER BY` /
+      `GROUP BY`).
+
+23. **Q23 — Nominal duration equality and order**: **Ratified** (Choice: keep
+    nominal rules: 1 month = 30 days, 1 year = 365 days).
+    - **Reason**: This rule preserves existing behavior in
+      `src/temporal/duration.rs:11-13` and `unit.rs:210` with no observed user
+      defect.
+    - **Evidence**: `src/temporal/duration.rs:11-13`;
+      `src/temporal/unit.rs:210`.
+
+24. **Q24 — Calendar arithmetic documentation**: **Decided** (Choice: update
+    `src/temporal/GLOSSARY.md` at cutover with three lists: exact rules, rules
+    with a caveat, and undefined cases, tied to Q23).
+    - **Reason**: Current-code glossaries stay accurate until implementation
+      lands (Ticket 19 / Ticket 36 rule).
+    - **Invariant owner**: `temporal`.
+
+25. **Q25 — `date(link)` on Markdown targets**: **Decided** (Choice: take the
+    last raw `/` segment, remove `#anchor` and the extension, percent-decode
+    once, then parse the prefix or pattern; external URLs yield `Null`).
+    - **Reason**: Component separation before decoding (RFC 3986 section 2.4)
+      makes sure `%2F` never creates a path boundary and double-decoding never
+      occurs.
+    - **Evidence**: Ticket 19; `k-citation-verification.md` K22.
+    - **Invariant owner**: `query` and `temporal`.
+
+#### Configuration and zone (Q26 to Q32)
+
+26. **Q26 — `[date]` table syntax**: **Decided** (Choice: one flat `[date]`
+    table with `deny_unknown_fields`, using global-then-local field merge after
+    the trust gate).
+    - **Reason**: One flat table avoids nested TOML subtables and obeys Ticket
+      22's merge and trust rules.
+    - **Invariant owner**: `config`.
+
+27. **Q27 — Fields of `DateConfig`**: **Decided** (Choice: `zone`, `week_start`,
+    `week_min_days`, `filename_date`, periodic format strings `year`, `quarter`,
+    `month`, `week`, `day`, plus default `date` and `datetime` formats).
+    - **Reason**: One flat struct holds all temporal configuration consumed by
+      `TemporalPolicy` and `TemporalFrame`.
+    - **Invariant owner**: `config`.
+
+28. **Q28 — Temporal-owned policy**: **Decided** (Choice: new
+    `temporal::TemporalPolicy` receiving validated spellings and settings from
+    `config::DateConfig`).
+    - **Reason**: `TemporalPolicy` keeps `temporal` free of `config` imports and
+      carries zone spellings rather than a loaded `TimeZone` so acquisition
+      stays lazy.
+    - **Invariant owner**: `temporal`.
+
+29. **Q29 — Configured zone syntax and validation**: **Decided** (Choice: accept
+    an IANA zone name or explicit `±HH:MM` offset; check spelling against
+    bundled `tzdb` at config load without acquiring a zone).
+    - **Reason**: `±HH:MM` avoids the `Etc/GMT-2` reversed-sign trap. A
+      load-time spelling check catches typos early without triggering zone
+      acquisition for civil-only commands.
+    - **Evidence**: `src/note/field.rs:1041`; `e-external-designs.md` q29.
+    - **Invariant owner**: `config` (load check) and `temporal` (syntax
+      validator).
+
+30. **Q30 — System zone acquisition**: **Inherited** (Choice: lazy per-operation
+    acquisition in `TemporalFrame`, memoized for success or typed failure; UTC
+    is never an implicit fallback).
+    - **Reason**: Ticket 21 (B28) and Ticket 22 (host override, then config,
+      then system) fix this rule.
+    - **Evidence**: `owner-evidence.md` (jiff 5-minute cache).
+
+31. **Q31 — Configurable week start**: **Decided** (Choice: configurable
+    `[date].week_start` and `[date].week_min_days` with `iso` and `us` presets,
+    merging global-then-local).
+    - **Reason**: Presets and explicit fields support Sunday-first or custom
+      calendar weeks for `sow()`/`eow()` and templates while filename `Www`
+      labels stay ISO-fixed.
+    - **Invariant owner**: `config` and `temporal`.
+
+32. **Q32 — Opt-in key for filename date extraction**: **Decided** (Choice:
+    replace `filename_year_prefix` bool with
+    `filename_date = "off" | "basename" | "prefix"` across all `[date]` periodic
+    formats).
+    - **Reason**: The three-state enum avoids prefix-versus-basename naming
+      contradictions and protects non-date stems like `2019 budgets.md` when set
+      to `"basename"`.
+    - **Invariant owner**: `config` and `temporal`.
+
+#### Boundary after the execution-context decision (Q33 to Q34)
+
+33. **Q33 — Temporal exports to the execution frame**: **Decided** (Choice:
+    `TemporalFrame` exports `clock_sample`, `TemporalPolicy`, and
+    `OnceLock<Result<TimeZone, ZoneError>>`).
+    - **Reason**: `OnceLock` makes the frame `Sync` for LSP requests and lazy
+      `QuerySet` execution while keeping zone acquisition lazy.
+    - **Invariant owner**: `temporal` (frame type) and `query`/`template`
+      (callers).
+
+34. **Q34 — Replacements for ambient reads**: **Inherited** (Choice: pass
+    `&TemporalFrame` to all filter arithmetic, template helpers, `Anchor::base`,
+    `is_past`/`is_future`, and civil/instant conversions; remove `local_zone()`,
+    `now_instant()`, and `ZoneGuard`).
+    - **Reason**: Ticket 21 (B38) fixes this rule.
+
+#### Query pushdown and notices (Q35 to Q36)
+
+35. **Q35 — Temporal probe bounds per operator and value kind**: **Decided**
+    (Choice: prove `Exact` bounds in first scope for zone-free civil and period
+    kinds only; keep zone-dependent and instant mappings `Unsupported` to scan).
+    - **Reason**: This boundary matches PostgreSQL's `IMMUTABLE` versus `STABLE`
+      sargability rule. Timezone-dependent projections cannot drive index bounds
+      without explicit pinned-zone bound proofs.
+    - **Evidence**: Ticket 29 R1–R7; PostgreSQL `date` versus `timestamptz`
+      sargability convention.
+    - **Invariant owner**: `query` and `index`.
+
+36. **Q36 — Notices for `Null` dates**: **Decided** (Choice: emit no notice for
+    an absent field; emit one notice for a malformed date-shaped value; return a
+    typed error for a zone failure).
+    - **Reason**: This rule matches SQL and Dataview conventions so queries do
+      not flood users with notices when notes omit optional date fields.
+    - **Invariant owner**: `query` and `temporal` (conditions) and Ticket 34
+      (notice delivery and deduplication).
+
+---
+
+### Removable or replaceable code
+
+- `pattern_to_strftime` in `src/temporal/token.rs`: move to `src/template/`.
+- `local_zone()`, `now_instant()`, and `ZoneGuard`: remove after
+  `&TemporalFrame` migration.
+- Cross-class `Ord` on `DateTimeValue`: remove in favor of Option D projection
+  and mixed sort key.
+- `filename_year_prefix` config key: replace with
+  `filename_date = "off" | "basename" | "prefix"`.
+- `speedate` (plus `lexical-parse-float` and `strum` if unused): keep until the
+  prototype benchmark in Gate 4 decides removal.
+
+---
+
+### Downstream contracts
+
+| Receiving ticket | Contract delivered by this decision |
+| --- | --- |
+| **31 — Template** | Moment render-only adapter moves to `src/template/`; `UnsupportedToken` error shape; thin filter adapters in `engine/date.rs`; `TemporalFrame` and typed `ZoneError`; `today()`/`now()` and closed NL grammar; `DatePoint` (5-level `DatePrecision`) and `DateTimeValue::{Civil, Instant}` relation/sort semantics. |
+| **34 — Diagnostics** | Typed `ZoneError` (never coerced to `Null`); notice conditions (absent = none, malformed date-shaped = 1 notice); schema `date.format` load-lint diagnostic code; NL error spans. |
+| **35 — Topology** | `temporal` -> `config` edge stays forbidden (`TemporalPolicy` carries spellings); `winnow`, `logos`, `jiff` stay; `speedate` stays pending prototype benchmark. |
+| **36 — Reconciliation** | Unification of `DatePrecision` (5 levels) and derived `CalendarPeriod`; naive-datetime civil change (epoch bump); `file.day` -> `file.date` migration; `filename_date` enum; `eom(today())` over bare `eom`; `winnow` added to Ticket 25 crate list; Ticket 20 truncated date-check sentence completed by Q4. |
+
+---
+
+### Implementation gates (unrun; needed at cutover)
+
+1. Implement `DateTimeValue::{Civil, Instant}` and 5-level
+   `DatePoint::DatePrecision`.
+2. Add a compile-time `size_of::<NoteFieldValue>() <= 80` assertion and a
+   compile-fail `Ord` check.
+3. Bump the index format epoch and update the fingerprint corpus.
+4. Implement `TemporalFrame` with `OnceLock<Result<TimeZone, ZoneError>>`.
+5. Replace all `local_zone()`, `now_instant()`, and `ZoneGuard` calls from a
+   fresh call-site scan.
+6. Implement the closed NL grammar, custom `(week_start, week_min_days)`
+   arithmetic, and the filename-pattern compiler.
+7. Add tests for malformed longer prefixes (`2026-13-40`) and frozen note-parser
+   isolation.
+8. Measure `speedate` removal (`cargo bench` and binary size) before pruning
+   `speedate`, `lexical-parse-float`, and `strum`.
+9. Prove residual equivalence for each `(operator, value_kind)` before marking a
+   zone-free temporal pushdown mapping as `Exact`.
+10. Update `src/temporal/GLOSSARY.md` at cutover with exact, caveat, and
+    undefined arithmetic lists.
