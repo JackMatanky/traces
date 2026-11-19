@@ -44,6 +44,8 @@ commits the LSP. Part B is not optional.
 - A12. Decide how to reconcile the accepted ADR-0003 with ticket 21.
 - A13. Decide which core use case the CLI calls for `traces check` and `traces
   index --verify`. Ticket 34 owns their exit codes.
+- A14. Decide where the host builds the temporal frame and supplies
+  `DateConfig` to a render. Ticket 30 hands this item to the host.
 
 ### Part B: the long-lived host
 
@@ -93,6 +95,12 @@ Open buffers and the LSP:
   Do not mix schema generations inside one request.
 - B27. Decide how changed parser settings invalidate buffer work and derived
   generations. Keep admitted requests on their pinned inputs.
+- B28. Decide the resolver state rule for the host. Ticket 28 bans a
+  host-global resolver cache.
+- B29. Decide the host requirements for `ProjectRoot`. Ticket 35 shares the
+  decision about its crate and module home.
+- B30. Decide whether MCP edit ranges and `expect` guards wait for a specified
+  MCP host. Record any deferral in the Answer.
 
 ### Part C: the closed-pipe contract
 
@@ -119,7 +127,8 @@ Re-verified (main @ `cf6d79bd`, earlier `207cc3fb`):
 `IndexerService::from(&Config)` with an `IndexPolicy` argument.
 
 Inputs: `research/04`, `research/08` (Cargo/jj/Ruff composition roots),
-execution context, config ownership, read model, freshness.
+execution context, config ownership, read model, freshness and temporal
+boundary.
 
 User steer (after the compatibility-envelope ruling): a workspace split
 **starting with the CLI crate** is under review (see the crate-topology ticket).
@@ -161,6 +170,14 @@ them before it records an Answer.
   query". Round two replaced this rule with the staleness bound. Use the bound.
 - Dialog claims. The old text of this ticket said `NotInteractive` is
   unreachable. It is reachable. See "Code facts".
+- Store handle. Research 11 measures a 25 ms commit floor that comes from
+  opening and dropping the store on each call. It says a retained open handle
+  cuts a commit to 18 µs. This ticket follows ticket 25 and opens the store only
+  to refresh and to persist. redb rejects a second writer while a handle is
+  open. Settle the tension in Part B.
+- Stale ticket numbers. research 13 and ticket 13 label ticket 33 "Write Use
+  Cases". research 14 labels live buffers "Ticket 27". The renumber passes
+  changed these numbers. Do not read scope from the old labels.
 
 ## Inputs from the config decision
 
@@ -548,7 +565,8 @@ Exact handoffs, so that the grilling loses none of them:
 ## Inputs from the open tickets
 
 - [Ticket 31](./31-template-engine-boundary.md) is open. It decides engine-side
-  render inputs and the render/check/write sequence. This ticket decides their
+  render inputs, the path-check sequence and the render/check/write sequence.
+  This ticket decides their
   composition and lifetime in the host. Work against those contracts without a
   reverse dependency on module placement.
 - [Ticket 34](./34-error-and-diagnostic-architecture.md) is open. It owns notice
@@ -629,6 +647,8 @@ Checked on `cf6d79bd`. Cite symbols, not lines.
 - The cost of a drift heal on a cold query. The A-B-A control did not time it
   (`reverification.md`).
 - The cost of the overlay lifecycle under `opt-level = "z"` (ticket 28).
+- The complete read-only query figure that research 26 prep P11 hands over. The
+  prep records only the handle probe (-12 ms and -5 syncs).
 
 ## Checks before resolution
 

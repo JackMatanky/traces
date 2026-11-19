@@ -318,7 +318,9 @@ relation contract. Check each operator that the adapter exposes.
 
 ## Inputs from the schema typing decision
 
-See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). The
+See [ticket 20's Answer](./20-schema-note-typing-and-validation.md). Ticket 20's
+standing layering principle binds this ticket. cli, lsp and mcp are thin hosts
+of core, and use cases take explicit inputs with no context object. The
 template service stays free of `note`. An app-layer use case runs an advisory
 check between `render()` and `write()`. The check parses rendered frontmatter,
 resolves the class, and calls the schema check. The check skips execution

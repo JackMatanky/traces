@@ -1,6 +1,6 @@
 # How does Traces version and release the codebase?
 
-Type: decision
+Type: grilling
 Status: open
 Blocked by: 16, 22, 25, 32
 

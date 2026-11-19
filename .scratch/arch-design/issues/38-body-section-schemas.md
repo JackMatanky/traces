@@ -335,6 +335,9 @@ See [research 14](../research/14-fileclass-model-binding-and-validation.md).
 
 - Fileclass has no body validation. It validates frontmatter only. It writes
   through `processFrontMatter`.
+- research 14 says Fileclass has no live-buffer synchronization and no body
+  validation. It gives no precedent for tickets 28 and 38. research 14 prints
+  28 as `Ticket 27`.
 - Research 14 says "Traces requires body section schemas (ticket 38) for
   structured notes" [H]. This is a hypothesis, not evidence. Decision 1 stays
   open.
