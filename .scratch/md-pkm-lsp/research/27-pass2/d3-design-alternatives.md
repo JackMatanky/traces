@@ -325,21 +325,16 @@ The single visibility change this whole plan needs is the already-budgeted
 **Wave 1 (walk wave; ships BEFORE 11, 14-overlay, and 26):**
 
 4. `DocStructure` walk module with `(uri, version)` cache (D1).
-
 5. documentSymbol: headings + tasks-as-children, line-granular ranges (D2, D6
    machinery).
 
 6. foldingRange E-lite (D6).
-
 7. selectionRange S1 trimmed (D10.2).
-
 8. documentLink: wikilinks, embeds, standard links; exact spans; drop
    unresolved; `resolveProvider:false` (D3).
 
 9. documentHighlight: same-target matcher over walk spans (D10.1).
-
 10. CodeLens Option C: note-level count from `FileEntry::inlinks()` (D4).
-
 11. Semantic tokens: T1 legend, two-valued unresolved modifier, `full`-only,
     refresh via D9 lane (D5 v1).
 

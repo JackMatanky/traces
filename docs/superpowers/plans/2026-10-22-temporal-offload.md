@@ -361,7 +361,6 @@ engine's doc line (:1039-1042) already claims `i32` while the code uses
     remap.
   - Date-string arm unchanged in effect (both end in `from_ymd`/`Date::new`).
   - The two leap formulas agree on the whole `i32` range (proleptic Gregorian).
-
 - [ ] **Step 6: Run the existing engine tests**
 
   Run: `mise run test:unit leap_year` Expected: PASS; every case in

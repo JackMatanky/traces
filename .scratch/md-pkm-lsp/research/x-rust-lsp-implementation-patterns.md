@@ -581,7 +581,6 @@ Based on the patterns above:
    should not retry (positions become stale), notifications should.
 
 5. **Debounce diagnostics** with 250ms delay + at-most-one-running-per-file.
-
 6. **Don't implement `$/cancelRequest`** — instead, detect staleness and return
    `ContentModified`.
 

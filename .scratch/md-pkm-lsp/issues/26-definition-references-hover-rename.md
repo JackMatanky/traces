@@ -89,7 +89,6 @@ the inlink graph keeps nearest-picked edges (backlink counts, 25's
 change-summary soundness, 27's counts, 28's rewrite targeting all consume them);
 navigation reports ties. Q9(ii) (revoking distance-picking) is rejected as a
 26-local switch.
-
 3. **Ambiguity choke point and refusal taxonomy (Q6).** The ambiguity check
 lives in the spine's position-level entry points
 (`rename_at`/`prepare_rename_at`), never in handlers. It is structurally not in
@@ -111,7 +110,6 @@ ties, M3) can be Ambiguous; tags, fields, schema, and footnotes resolve
 Unique/Unresolved only (a negative pin is written into 16). Use distinct message
 text for heading ambiguity ("3 headings match in this note"). prepare checks the
 capability gate before ambiguity (gopls ordering).
-
 4. **Comparison keys (Q10 + Q12): tiered `match_key`, byte-exact-first,
 fold-fallback.** One `match_key(s) -> Cow<str>` helper (quick-check borrow
 fast-path) in `src/path.rs`: NFC, then `char::to_lowercase`, then trailing NFC
@@ -137,7 +135,6 @@ never sort order, never I/O paths, never slug generation. New direct dep:
 intake boundary (ecosystem pattern: normalize-once-at-build, retain originals
 for output). Cost sold as correctness (12 to 300ns per key, ~10ms one-time index
 build, zero budget impact).
-
 5. **References and the response cap (Q7 + Q11).** The union is computed at
 `references_at` orchestration as a union of **resolved occurrences**. Per
 candidate, scan its inlink-implicated files for occurrences whose own
@@ -158,7 +155,6 @@ and a `partialResultToken` streaming upgrade path recorded for 29 (deliberate
 non-advertisement until then). Rationale is client-side (Neovim bufloads every
 referenced file: the measured 2.93s stall class), anchored honestly between
 clangd's 1,000 and VS Code's 20,000.
-
 6. **WorkspaceEdit construction (Q2).** Core computes a protocol-free `EditSet`
 (per-doc `(DocPath, Vec<Replacement { span, text }>)`, sorted and
 overlap-checked). The edge alone owns Uri/TextEdit conversion, capability
@@ -186,7 +182,6 @@ v1. iwe's rename (prepareRename -> WorkspaceEdit with create+delete file ops,
 link text preserved) is cited as the PKM-native precedent for this serializer
 shape. (amended 2026-10-21 by iwe/fileclass research,
 [tool-iwe](../research/tool-iwe.md) Part 6).
-
 7. **Position encodings (Q5).** Negotiate utf-8-if-offered-else-utf-16 (the
 first encoding in the client's ordered preference that Traces implements; never
 utf-32; default utf-16), and echo it via `capabilities.positionEncoding`. One
@@ -202,7 +197,6 @@ String, version: i32 }`, no rope; one LineIndex-backed helper serves disk and
 overlay via `ContentResolver::text_of`). Strip BOM once at ContentResolver.
 Encoding is an explicit parameter threaded from the session, never a global.
 This closes 11's open negotiation question and the 11/14 ropey inconsistency.
-
 8. **Hover (Q3).** Kind: negotiated Markdown iff `contentFormat` contains
 Markdown (absent -> PlainText); PlainText = stripped rendering of the same
 composed body, one composer two formatters, never raw markdown in a plaintext
@@ -227,7 +221,6 @@ first (markdown-oxide's known wart). Non-resolvable states still hover,
 informational, never a prompt or code action (creation belongs to diagnostics).
 Budget: tightened to **<2ms target / <1ms stretch** (SOTA warm markdown hover is
 <1ms; 33's <10ms/<5ms row is superseded here).
-
 9. **prepareRename and per-entity rename (Q4).** Advertise `RenameOptions {
 prepare_provider: true }` iff the client announced prepareSupport
 (spec-mandated, Marksman pattern), else plain `true`; handlers are registered
@@ -261,7 +254,6 @@ self-described-wrong -32602). Staleness: `Some(v)` for open docs keeps VS Code's
 `validateWorkspaceEdit` guard live; under sequential dispatch the
 prepare->rename pair is atomic server-side. Out-of-root: `Ok(null)` when the
 resolved target fails the confinement predicate (seam to 30).
-
 10. **Concurrency and performance (A2, round-1).** Keep `concurrency_level(1)`;
 rename is the **sole handler permitted to exceed 100ms**; implement workDone
 `$/progress` for rename (this sides with 33's allowance and amends 12's
@@ -275,7 +267,6 @@ client-side apply ~0.5s; markdown notes are KB-scale, so precomputed-span
 renames beat code LSPs. Zed rename smoke-test (prepare + rename error path) is
 owed at implementation time; markdown-oxide documents "(not zed)" next to its
 rename features as the hazard evidence.
-
 11. **NFKC rejected, slugger locked (Q8).** NFKC is rejected everywhere: slug
 generation would produce rumdl MD051 false positives on Traces' own output and
 GitHub-rendered anchor mismatches; path matching would resolve links the
@@ -287,7 +278,6 @@ The Unicode fixture set is owed to 25. NFD heading vs NFC anchor, fullwidth,
 circled, ligature, emoji-in-title, NFC-equal duplicate filenames, CJK width
 tags, non-UTF-8 path, sigma, case-only rename. Home = 15's slugger acceptance
 tests.
-
 12. **Process ledger.** Amended-by-26 blocks are written into 11, 12, 14, 15,
 16, 18, 19, 21, 22, 25. Inputs-from-26 blocks are written into 27, 28, 29, 30,
 32, 33, 34, 41. Glossary terms: Occurrence, NavTarget, Resolution, Comparison

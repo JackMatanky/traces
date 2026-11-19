@@ -548,7 +548,6 @@ fire.) **[corrected in §8 review: these are not all `maximum`]**
    > the pinned tag, or bump to `tag:v0.1.15` — see §8.1.
 
 2. **Repo policy file:** `messrust.xml` at repo root (§7.2).
-
 3. **Task** — a TOML task in the "Formatting & Linting" section, matching the
    repo's `arg "[args]" var=#true` passthrough idiom (no USAGE flags worth
    exposing beyond passthrough; flags like `--only`/`--strict` change per triage

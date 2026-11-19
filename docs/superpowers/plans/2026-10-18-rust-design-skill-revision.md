@@ -311,7 +311,6 @@ reach ≤1250 by Task 10.
 **Files:**
 
 - Modify: `.agents/skills/rust-design/SKILL.md`
-
 - [ ] **Step 1: Remove the checklist section**
 
 Edit `SKILL.md`: delete this entire block (it duplicates the Step-by-Step
@@ -540,7 +539,6 @@ with a `REQUIRED` pointer. No rule becomes homeless.
 **Files:**
 
 - Modify: `DISCOVERY.md`, `SKILL.md`
-
 - [ ] **Step 1: Add the enum to DISCOVERY.md §5**
 
 Append to the end of `DISCOVERY.md` §5 (after the "Store candidate
@@ -578,7 +576,6 @@ new:
 **Files:**
 
 - Modify: `SKILL.md`
-
 - [ ] **Step 1: Compress Step 2 EAV block**
 
 old:
@@ -715,7 +712,6 @@ Expected: `8` (all eight sections retained).
 **Files:**
 
 - Modify: `DISCOVERY.md`
-
 - [ ] **Step 1: Replace the ten subsections**
 
 Delete the ten `### Lens N: ...` subsections (each with Target/Inspect/Objective
@@ -752,7 +748,6 @@ count >=2).
 **Files:**
 
 - Modify: `SKILL.md`
-
 - [ ] **Step 1: Insert a new section after the Operational Modes block**
 
 Insert this section between the Steady/Breakthrough bullet list and the `---`

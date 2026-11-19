@@ -135,7 +135,6 @@ direct Markdown file paths.
     - Columns:
       `["list.text", "list.status", "list.due", "list.priority", "file.path"]`
   - Custom `--column <path>` specifies custom columns; headers match columns.
-
 - **Count Flag:**
   `--count` prints only `{count}\n` to stdout and returns early, omitting
   table/list formatting and omitting the stderr summary line. In

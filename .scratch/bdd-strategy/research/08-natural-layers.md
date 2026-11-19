@@ -107,7 +107,6 @@ instances in `tests/`, and four blocks in `src/temporal/`:
   - Schema DAG topological sorting: acyclic rank stability under Kahn's
     algorithm (`04:S3`, `04:S12`).
   - Tag containment algebra: prefix containment transitivity (`05:tag`).
-
 - **Example-shaped classes (belong to scenarios or unit tests):**
   - Specific numeric exit codes (0 on success, 1 on failure, 2 on usage, 130 on
     cancel).

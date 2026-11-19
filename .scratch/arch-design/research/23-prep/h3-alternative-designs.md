@@ -250,7 +250,6 @@ Tradeoffs:
 However, a workspace query for all references must reparse unopened files [H].
 Reparsing 1,000 files takes 0.22 seconds (1,000 times 217 microseconds) [H].
 Also, the codebase must maintain two distinct note types [H].
-
 3. Candidate 3: Stored spans in a compact side table.
 `NOTES` stores span-free notes [P].
 A second table `NOTE_SPANS` stores byte spans by path [P].
@@ -260,7 +259,6 @@ It saves 0.7 milliseconds across 2,711 notes [H].
 However, the second table adds `redb` b-tree keys and page headers [H].
 Total database size grows by about 5% [H].
 The index must update two tables on every edit [H].
-
 4. Candidate 4: Persisted facts with lazy item text. `Note` stores metadata and
    spans, but omits raw and clean item text strings from storage [P]. Probe
    measurement: List item text is 93% of `ListItem` bytes and 72.2% of the

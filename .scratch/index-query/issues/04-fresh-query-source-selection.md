@@ -20,7 +20,6 @@ codebase.
     `/` boundary containment (`#projects` matches `#projects/active` and
     `#projects/active/urgent`, but `#project` does not match `#projects`).
   - Added unit test cases under `mod is_nested_under` using `rstest`.
-
 - **Page-Level Query Sources & Outcome Data Models (`src/index/query.rs`)**:
   - Defined `Source` enum (`All`, `Tag(String)`, `Folder(PathBuf)`).
   - Defined `IndexRecord` combining `FileRecord` and `Note` to expose `file.*`

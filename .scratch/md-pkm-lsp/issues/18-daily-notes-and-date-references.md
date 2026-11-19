@@ -39,42 +39,34 @@ which does not exist yet). Cost: ~0.5ms for 20K files. **Redb caveat (reconciled
 fields changes its encoding and triggers the existing `check_rebuild_needed`
 wipe-and-rebuild once (one-time user-visible index rebuild, accepted under
 ticket 13; flag it in the eventual implementation spec).
-
 2. **Configurable matching per granularity.** Four modes: `file` (stem matches
 format pattern, default), `folder` (file lives in configured folder). `both`
 (stem + folder), `path` (full vault-relative path matches
 `folder/<date-stem>.md`). This covers flat vaults and split-folder setups.
-
 3. **All periodic granularities.** Config supports
 `day`/`week`/`month`/`quarter`/`year`. LSP features (completion, hover,
 definition) start with daily and extend incrementally. Config is
 forward-compatible.
-
 4. **Hybrid completion with cap.** Generate dates algorithmically (today ± 7
 days with relative labels: today/tomorrow/yesterday/next weekday/last weekday)
 and match them against on-disk files. Cap algorithmic candidates to avoid 400+
 item lists.
-
 5. **Natural language dates in v1.** A custom ~150-line parser (zero
 dependencies) handles: today/tomorrow/yesterday, next/last weekday, ±Nd/Nw/Nm.
 Full NL parsing (chrono-node equivalent) defers to v2. No viable Rust crate
 exists for full NL; the custom parser matches Markdown Oxide's proven approach.
-
 6. **Diagnostic-driven creation.** Definition returns `null` for nonexistent
 date notes (no precedent for Location-on-nonexistent in major LSPs). Hover shows
 "Note not found" (informational, no creation prompt). A code action on the
 diagnostic offers "Create from template {X}"; that is the action surface.
-
 7. **Past-date-only diagnostics.** Diagnose date-shaped links where `date <
 today` and no matching file exists (likely forgotten/deleted). Future dates are
 intentional forward references, so they get no diagnostic.
-
 8. **`[periodic]` config designed from scratch.** Use short granularity names
 and flat independent-per-granularity sub-tables. `format` is optional with
 per-granularity defaults (`%Y-%m-%d`, `%G-W%V`, `%Y-%m`, `%Y-Q%q`, `%Y`).
 `folder` and `template` are optional. `match` defaults to `"file"`. No `enabled`
 field: a granularity is enabled when its table exists.
-
 9. **Explicit reuse.** Builds on `DateValue` (existing),
 `FileEntry`/`WorkspaceIndex` (existing), `LinkResolver` (ticket 15), inverted
 index (ticket 33), `RefreshPlan` (ticket 13). Completion dispatch defers to

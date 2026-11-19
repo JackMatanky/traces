@@ -443,7 +443,6 @@ startup). Then in a scratch session, verify:
 **Files:**
 
 - Commit: `docs/superpowers/plans/2026-10-12-opencode-guards.md` (this file)
-
 - [ ] **Step 1: Commit the plan document**
 
 ```bash
