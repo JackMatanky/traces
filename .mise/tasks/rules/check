@@ -1,0 +1,6 @@
+#!/bin/bash
+#MISE description="Fail when .pi/pi-warden.json differs from the agent rule folders"
+
+set -euo pipefail
+
+exec uv run --script "${MISE_PROJECT_ROOT:?}/.mise/scripts/rules_sync.py" check

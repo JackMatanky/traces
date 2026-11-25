@@ -1,0 +1,6 @@
+#!/bin/bash
+#MISE description="Generate .pi/pi-warden.json from the global and project agent rules"
+
+set -euo pipefail
+
+exec uv run --script "${MISE_PROJECT_ROOT:?}/.mise/scripts/rules_sync.py" write
