@@ -13,34 +13,25 @@ Multi-context — `GLOSSARY-MAP.md` + per-module `GLOSSARY.md` under `src/`. See
 
 ## Agent workflow
 
-Use **MUST**, **MUST NOT**, **SHOULD**, and **MAY** as in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
-
 ### Worktree hygiene
-
 - Temporary files from the current task **MAY** stay in the worktree while needed.
-- Temporary files **MUST** be removed when no longer needed and before merging.
-  This cleanup includes temporary files in `.scratch/`.
+- Temporary files **MUST** be removed when no longer needed and before merging. This cleanup includes temporary files in `.scratch/`.
 - User files and `.scratch/` issue records **MUST** remain intact.
 
 ### Clarification
-
-- Clarification **MUST** start with a check of project context.
-  Use an index or the relevant file. For code navigation, see the CodeGraph section.
-- Each round **MUST** limit clarification to five focused questions.
-  Grilling, Wayfinder, and explicitly open-ended discovery have no such limit.
+- Clarification **MUST** start with a check of project context. Use an index or the relevant file. For code navigation, see the CodeGraph section.
+- Each round **MUST** limit clarification to five focused questions. Grilling, Wayfinder, and explicitly open-ended discovery have no such limit.
 - Independent questions **SHOULD** go in one batch.
 - Dependent questions **MUST** wait for prerequisite answers.
 - Low-risk, reversible decisions **MAY** use a stated assumption.
 
 ### Subagents
-
 - Tasks **SHOULD** use subagents when delegation saves time or improves quality.
 - Delegation **MUST** use the harness subagent tool and obey subagent tool rules.
 - Independent tasks **SHOULD** run in parallel when supported.
 - Dependent tasks **MUST** run in order.
 - Subagent results **MUST** be reviewed before use.
-- Only per-call timeouts **MAY** be set, and only when needed and allowed by
-  the harness.
+- Only per-call timeouts **MAY** be set, and only when needed and allowed by the harness.
 
 <!-- mise:start -->
 ## Mise — Environment & Task Orchestration
@@ -52,8 +43,7 @@ Prerequisite: Set `MISE_EXPERIMENTAL=1` for tool/task discovery.
     - **MAY** use raw shell commands only for operations that have no task.
 - **MUST** inspect `mise://tasks` before builds or tests.
 - **MUST** inspect `mise://tools`, `mise://env`, and `mise://config` for environment failures.
-- Check effects on downstream dependencies and tools before changing
-  `.tool-versions` or `mise.toml`.
+- Check effects on downstream dependencies and tools before changing `.tool-versions` or `mise.toml`.
 
 ### Tasks & Completion Gates
 | Task | Alias | Scope / Arguments | Gate & Purpose |
@@ -76,10 +66,8 @@ Prerequisite: Set `MISE_EXPERIMENTAL=1` for tool/task discovery.
 2. Limit checks to touched files.
    - For exact paths, pass a NUL-delimited list with `--files0-from <path>`.
    - Use `--cd <dir>` to target a subdirectory without changing directories.
-3. Checks and fixes **MUST** use `--safe`. Destructive or unknown commands
-   **MUST NOT** run without explicit user approval.
-4. Read the JSON or JSONL diagnostics. Keep the raw output for triage.
-   Check the diff after fixes.
+3. Checks and fixes **MUST** use `--safe`. Destructive or unknown commands **MUST NOT** run without explicit user approval.
+4. Read the JSON or JSONL diagnostics. Keep the raw output for triage. Check the diff after fixes.
 
 ### Commands
 | Command | Action |
@@ -91,28 +79,20 @@ Prerequisite: Set `MISE_EXPERIMENTAL=1` for tool/task discovery.
 <!-- codegraph:start -->
 ## CodeGraph — Semantic Code Navigation
 
-Code navigation **MUST** start with CodeGraph. Use file or shell tools for
-literal or regex searches, Markdown docs, non-code assets, and edits.
+Code navigation **MUST** start with CodeGraph. Use file or shell tools for literal or regex searches, Markdown docs, non-code assets, and edits.
 
-- **Index:** Use only the active worktree’s `.codegraph/` index. In a new
-  worktree without an index, run `codegraph init -i`. In a primary repository
-  without an index, use standard file search tools.
-- **Query:** Use `codegraph_explore` for broad questions. For targeted queries,
-  use `codegraph_search`, `codegraph_node`, or `codegraph_callers`.
-  Query `deferred` symbols by name.
-- **Fallback:** If MCP is unavailable, run `codegraph explore "<symbols or question>"`.
-  Use standard file tools if CodeGraph is unavailable or the results are insufficient.
+- **Index:** Use only the active worktree’s `.codegraph/` index. In a new worktree without an index, run `codegraph init -i`. In a primary repository without an index, use standard file search tools.
+- **Query:** Use `codegraph_explore` for broad questions. For targeted queries, use `codegraph_search`, `codegraph_node`, or `codegraph_callers`. Query `deferred` symbols by name.
+- **Fallback:** If MCP is unavailable, run `codegraph explore "<symbols or question>"`. Use standard file tools if CodeGraph is unavailable or the results are insufficient.
 <!-- codegraph:end -->
 
 <!-- rust-docs:start -->
 ## rust-docs-mcp — Rust Documentation Engine
 
-Crate API, source, and dependency queries **MUST** use `rust-docs_*` tools
-and only the local `.rust-docs/` index.
+Crate API, source, and dependency queries **MUST** use `rust-docs_*` tools and only the local `.rust-docs/` index.
 
 ### Caching & Storage Scope
-- Load indexes only from `.rust-docs/`. Use `cache_crate` with
-  `source_type: "local"` and the crate directory in `.rust-docs/`.
+- Load indexes only from `.rust-docs/`. Use `cache_crate` with `source_type: "local"` and the crate directory in `.rust-docs/`.
 - Workspace crates: pass `member: "<path>"` (e.g., `member: "crates/rmcp"`).
 - Local external crates: pass `source_type: "local"` pointing to `.rust-docs/<crate_name>`.
 

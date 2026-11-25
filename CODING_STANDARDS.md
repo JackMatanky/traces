@@ -1,225 +1,184 @@
-# Agent Guidelines for Rust Code Quality
+# Rust Coding Standards
 
-This document provides guidelines for maintaining high-quality Rust code. These rules MUST be followed by all AI coding agents and contributors.
+## Core Principles
+- **SHOULD** prioritize clarity and maintainability over cleverness.
+- **MUST** write clear, maintainable, idiomatic Rust (DRY).
+- All code **MUST** be fully optimized.
 
-## Your Core Principles
-All code you write MUST be fully optimized.
+## Code Style
+- **MUST** follow the Single Responsibility Principle (SRP): keep each type and function focused on one responsibility.
+- **MUST** use meaningful, descriptive variable and function names.
+- **MUST** obey the Rust API Guidelines.
+- Naming conventions:
+  - `snake_case` for functions, variables, and modules.
+  - `PascalCase` for types and traits.
+  - `SCREAMING_SNAKE_CASE` for constants.
+- **MUST NOT** use emoji or Unicode that emulates emoji (for example, `✓`, `✗`), except in tests that specifically test multibyte character handling.
 
-"Fully optimized" includes:
+### Rust Idioms
+- **MUST** call `.clone()` explicitly on non-`Copy` types. Avoid hidden clones in closures and iterators.
+- **MUST** use exhaustive pattern matching. Avoid catch-all `_` patterns when possible. Prefer `if let` and `while let` for single-pattern matching.
+- **MUST** use `format!` for string formatting, and `enumerate()` instead of manual counter variables.
 
-- maximizing algorithmic big-O efficiency for memory and runtime
-- using parallelization and SIMD where appropriate
-- following proper style conventions for Rust (e.g. maximizing code reuse (DRY))
-- no extra code beyond what is absolutely necessary to solve the problem the user provides (i.e. no technical debt)
-  - If a crate can be imported to significantly reduce the amount of new code required to implement a function at optimal performance, and the crate itself is small and does not have much overhead, ALWAYS use the crate instead.
+### Type System
+- **MUST** use Rust's type system to prevent bugs at compile time.
+- Use newtypes to distinguish values with different meanings that share an underlying type.
+  - Parse external input into validated newtypes at system boundaries.
+  - **MUST** enforce the same invariants in every construction path, including deserialization.
+- Prefer `Option<T>` over sentinel values.
 
-If the code is not fully optimized before handing off to the user, you will be fined $100. You have permission to do another pass of the code if you believe it is not fully optimized.
+### Numeric Operations
+- Use `From` for lossless conversions and `TryFrom` for fallible conversions when the types provide those traits. Clippy warns on `as` conversions.
+- Choose integer overflow behavior explicitly:
+  - Use checked arithmetic when overflow is an error.
+  - Use saturating arithmetic when the result must stop at a bound.
+  - Use wrapping arithmetic only when modular arithmetic is intentional.
 
-## Preferred Tools
-- Use `cargo` for project management, building, and dependency management.
-- Use `indicatif` to track long-running operations with progress bars. The message should be contextually sensitive.
-- Use `serde` with `serde_json` for JSON serialization/deserialization.
-- Use `ratatui` and `crossterm` for terminal applications/TUIs.
-  - Include logical and intuitive mouse controls for all TUIs.
-  - **ALWAYS** account for interface scrolling offsets when calculating click locations
-- Use `axum` for creating any web servers or HTTP APIs.
-  - Keep request handlers async, returning `Result<Response, AppError>` to centralize error handling.
-  - Use layered extractors and shared state structs instead of global mutable data.
-  - Add `tower` middleware (timeouts, tracing, compression) for observability and resilience.
-  - Offload CPU-bound work to `tokio::task::spawn_blocking` or background services to avoid blocking the reactor.
-- When reporting errors to the console, use `tracing::error!` or `log::error!` instead of `println!`.
-- If the project involves the creation of images (e.g. PNG/WEBP), you have permission to use the Read tool to verify the rendered images fit the user and application requirements.
-- If designing applications with a web-based front end interface, e.g. compiling to WASM or using `dioxus`:
-  - All deep computation **MUST** occur within Rust processes (i.e. the WASM binary or the `dioxus` app Rust process). **NEVER** use JavaScript for deep computation.
-  - The front-end **MUST** use Pico CSS and vanilla JavaScript. **NEVER** use jQuery or any component-based frameworks such as React.
-  - The front-end should prioritize speed and common HID guidelines.
-  - The app should use adaptive light/dark themes by default, with a toggle to switch the themes.
-  - The typography/theming of the application **MUST** be modern and unique, similar to that of popular single-page web/mobile. **ALWAYS** add an appropriate font for headers and body text. You may reference fonts from Google Fonts.
-  - **NEVER** use the Pico CSS defaults as-is: a separate CSS/SCSS file is encouraged. The design **MUST** logically complement the semantics of the application use case.
-  - **ALWAYS** rebuild the WASM binary if any underlying Rust code that affects it is touched.
-- For data processing:
-  - **ALWAYS** use `polars` instead of other data frame libraries for tabular data manipulation.
-  - If a `polars` dataframe will be printed, **NEVER** simultaneously print the number of entries in the dataframe nor the schema as it is redundant.
-  - **NEVER** ingest more than 10 rows of a data frame at a time. Only analyze subsets of data to avoid overloading your memory context.
-- If using Python to implement Rust code using PyO3/`maturin`:
-  - Rebuild the Python package with `maturin` after finishing all Rust code changes.
-  - **ALWAYS** use `uv` for Python package management and to create a `.venv` if it is not present. **NEVER** use the base system Python installation.
-  - **ALWAYS** use `maturin` within `uv`; **NEVER** use the system-installed `maturin` as it is likely incorrect.
-  - Ensure `.venv` is added to `.gitignore`.
-  - Ensure `ipykernel` and `ipywidgets` is installed in `.venv` for Jupyter Notebook compatability. This should not be in package requirements.
-  - **MUST** keep functions focused on a single responsibility
-  - **NEVER** use mutable objects (lists, dicts) as default argument values
-  - Limit function parameters to 5 or fewer
-  - Return early to reduce nesting
-  - **MUST** use type hints for all function signatures (parameters and return values)
-  - **NEVER** use `Any` type unless absolutely necessary
-  - **MUST** run mypy and resolve all type errors
-  - Use `Optional[T]` or `T | None` for nullable types
+### Type Design
+- **MUST** derive common traits (`Debug`, `Clone`, `PartialEq`, `Default`) when the type supports them.
+- **SHOULD** prefer composition over inheritance-like patterns.
+- **SHOULD** use the builder pattern for complex construction.
+- **MUST** keep fields private by default. Provide accessors when callers need them.
+- Types, functions, and modules **MUST** use the narrowest visibility that callers need.
 
-## Code Style and Formatting
-- **MUST** use meaningful, descriptive variable and function names
-- **MUST** follow Rust API Guidelines and idiomatic Rust conventions
-- **MUST** use 4 spaces for indentation (never tabs)
-- **NEVER** use emoji, or unicode that emulates emoji (e.g. ✓, ✗). The only exception is when writing tests and testing the impact of multibyte characters.
-- Use snake_case for functions/variables/modules, PascalCase for types/traits, SCREAMING_SNAKE_CASE for constants
-- Limit line length to 100 characters (rustfmt default)
-- Assume the user is a Python expert, but a Rust novice. Include additional code comments around Rust-specific nuances that a Python developer may not recognize.
-- **MUST** avoid including redundant comments which are tautological or self-demonstating (e.g. cases where it is easily parsable what the code does at a glance or its function name giving sufficient information as to what the code does, so the comment does nothing other than waste user time)
-- **MUST** avoid including comments which leak what this CLAUDE.md file contains, or leak the original user prompt, ESPECIALLY if it's irrelevant to the output code.
+### Function Design
+- **MUST** prefer borrowing (`&T`, `&mut T`) over ownership when possible.
+- **SHOULD** group more than 5 related parameters into a config struct.
+- **SHOULD** return early to reduce nesting.
+- **SHOULD** use iterators and combinators over explicit loops when clearer.
 
-## Documentation
-- **MUST** include doc comments for all public functions, structs, enums, and methods
-- **MUST** document function parameters, return values, and errors
-- Keep comments up-to-date with code changes
-- Include examples in doc comments for complex functions
+### Error Handling
+- **MUST** use `Result<T, E>` for fallible operations and propagate recoverable
+  errors with `?`.
+- **MUST NOT** use `.unwrap()` in production code paths. Use `.expect()` only for
+  invariants, with a message explaining why the invariant holds. Tests may use
+  `.unwrap()` when it makes failures clear.
+- **MUST** use `thiserror` for typed library/domain errors and `anyhow` (with `.context()`) for application-level errors at binary or CLI boundaries.
+- **MUST** preserve the source error when wrapping an error or adding context.
+- Start error messages with lowercase text and omit trailing punctuation. Preserve the case of identifiers and names.
 
-Example doc comment:
+## Optimization
+- **MUST** maximize algorithmic time and space efficiency (Big-O).
+- **SHOULD** use parallelization and SIMD for CPU-bound hot paths when benchmarks show a gain.
+- **MUST** write only the code needed to solve the task, with no technical debt.
+- **MUST** use a small, low-overhead crate when it replaces significant custom code with the best performance.
+- **SHOULD** do a second pass over the code before handoff when clear performance or simplicity gains remain.
+
+### Memory Use
+- **MUST** avoid unnecessary allocations: prefer `&str` over `String`, use `Cow<'_, str>` when ownership is conditionally needed, and use `Vec::with_capacity()` when size is known.
+- **SHOULD** keep iterators lazy and avoid intermediate `.collect()` calls.
+- **SHOULD** reuse collection capacity with `clear()` and `extend()`, or `drain()` when removed items are needed.
+- **SHOULD** use the `entry` API for map insert-or-update when the key is already owned.
+- **SHOULD** wrap unbuffered streams in `BufReader` or `BufWriter` for repeated small I/O operations.
+- Use `Arc` and `Rc` judiciously. Prefer borrowing.
+
+### Concurrency
+- **MUST** use `Send` and `Sync` bounds appropriately.
+- **SHOULD** prefer `tokio` for async I/O and `rayon` for CPU-bound parallelism when parallelism is warranted.
+- Choose synchronization (`RwLock`, lock-free alternatives, `mpsc`/`crossbeam` channels) to fit the workload.
+- **MUST NOT** hold a `std::sync::Mutex` or `std::sync::RwLock` guard across `.await`.
+- **MUST** use bounded channels when producers can outpace consumers.
+- **MUST** check cancellation safety for futures in `tokio::select!` branches.
+- Blocking work **MUST NOT** run on async worker threads.
+
+## Testing
+- Test new behavior at the right boundary:
+  - **Unit tests** (`#[cfg(test)]`, `#[test]`) for local logic.
+  - **Integration tests** (`tests/integration`) for public APIs and cross-module flows.
+  - **E2E tests** for shipped CLI binary behavior.
+  - **Cucumber-style BDD tests** (Gherkin `.feature` files with `rstest-bdd`) for user-facing scenarios.
+  - **Doctests** for public API examples.
+  - **Property tests** for invariants across broad input ranges. Keep example tests for specific cases.
+  - **Mutation tests** (`mise run test:mutants`) when verifying test suite strength.
+- Use real temporary files/directories when filesystem behavior matters, and test doubles when a test does not need an external dependency (APIs, databases).
+- Use Arrange–Act–Assert for unit and integration tests. Make the expected behavior clear in the assertion.
+- Use Given–When–Then for Gherkin scenarios. Given sets the context. When names the action. Then states the observable result.
+- **MUST NOT** commit commented-out tests.
+
+### Benchmarking
+- **MUST** use the Mise `bench` task (see `AGENTS.md`) instead of invoking Criterion directly.
+- **MUST** run benchmark measurements in `release` mode.
+- **MUST NOT** run benchmark measurements in `debug` mode.
+- **MUST** distinguish smoke checks from measurement runs.
+- Use `std::hint::black_box` where needed to prevent the compiler from eliminating benchmark work.
+- **MUST NOT** run benchmarks in parallel.
+- **MUST NOT** pass `target-cpu=native` or custom `RUSTFLAGS` to measurement runs.
+- **MUST** keep comparisons fair, apples-to-apples, and independent (disable caching features if they skew results).
+- **MUST NOT** game benchmarks or alter them just to meet a target.
+- **MUST** report measured results for all tested benchmarks in a Markdown table at handoff.
+- **MUST NOT** save separate benchmark writeups unless the user asks.
+
+## Imports & Dependencies
+- **MUST** avoid wildcard imports (`use module::*`) except for preludes, test modules (`use super::*`), and prelude re-exports.
+- **SHOULD** group imports in order: standard library, external crates, then local.
+- **MUST** declare dependencies with version constraints in `Cargo.toml`.
+- Cargo features **MUST** add capabilities without removing existing behavior.
+
+### Preferred Tools
+Check `Cargo.toml` before assuming a crate is a project default.
+
+- **CLI progress:** Use `indicatif` for long-running progress bars with messages that describe the current operation.
+- **TUI input:** Use `ratatui` and `crossterm`. Provide intuitive mouse controls. Account for scrolling offsets when mapping clicks to items.
+- **JSON:** Use `serde` with `serde_json`.
+- **Logging:** Use `tracing::error!` for error diagnostics. Do not use `println!` for error diagnostics. Use structured `tracing` fields for diagnostic values. Exclude sensitive data.
+
+## API Documentation
+- **MUST** document all public functions, structs, enums, traits, and methods.
+- **SHOULD** explain parameters and return values when the signature does not make them clear.
+- Include `# Errors`, `# Panics`, and `# Safety` sections when they apply, and `# Examples` for non-trivial functions.
+- **MUST** keep doc comments up to date with code changes.
+
+This example illustrates doc comment structure. It does not use the Traces API.
 
 ````rust
-/// Calculate the total cost of items including tax.
-///
-/// # Arguments
-///
-/// * `items` - Slice of item structs with price fields
-/// * `tax_rate` - Tax rate as decimal (e.g., 0.08 for 8%)
-///
-/// # Returns
-///
-/// Total cost including tax
+/// Calculates the total cost of `items` including `tax_rate` (for example, `0.08` for 8%).
 ///
 /// # Errors
 ///
-/// - `CalculationError::EmptyItems` if items is empty
-/// - `CalculationError::InvalidTaxRate` if tax_rate is negative
+/// Returns `CalculationError::EmptyItems` if `items` is empty, or
+/// `CalculationError::InvalidTaxRate` if `tax_rate` is negative.
 ///
 /// # Examples
 ///
 /// ```
+/// # use traces::{calculate_total, Item};
 /// let items = vec![Item { price: 10.0 }, Item { price: 20.0 }];
 /// let total = calculate_total(&items, 0.08)?;
-/// assert_eq!(total, 32.40);
+/// assert!((total - 32.40).abs() < f64::EPSILON);
+/// # Ok::<(), traces::CalculationError>(())
 /// ```
 pub fn calculate_total(items: &[Item], tax_rate: f64) -> Result<f64, CalculationError> {
+    // ...
+    # Ok(0.0)
+}
 ````
 
-## Type System
-- **MUST** leverage Rust's type system to prevent bugs at compile time
-- **NEVER** use `.unwrap()` in library code; use `.expect()` only for invariant violations with a descriptive message
-- **MUST** use meaningful custom error types with `thiserror`
-- Use newtypes to distinguish semantically different values of the same underlying type
-- Prefer `Option<T>` over sentinel values
-
-## Error Handling
-- **NEVER** use `.unwrap()` in production code paths
-- **MUST** use `Result<T, E>` for fallible operations
-- **MUST** use `thiserror` for defining error types and `anyhow` for application-level errors
-- **MUST** propagate errors with `?` operator where appropriate
-- Provide meaningful error messages with context using `.context()` from `anyhow`
-
-## Function Design
-- **MUST** keep functions focused on a single responsibility
-- **MUST** prefer borrowing (`&T`, `&mut T`) over ownership when possible
-- Limit function parameters to 5 or fewer; use a config struct for more
-- Return early to reduce nesting
-- Use iterators and combinators over explicit loops where clearer
-
-## Struct and Enum Design
-- **MUST** keep types focused on a single responsibility
-- **MUST** derive common traits: `Debug`, `Clone`, `PartialEq` where appropriate
-- Use `#[derive(Default)]` when a sensible default exists
-- Prefer composition over inheritance-like patterns
-- Use builder pattern for complex struct construction
-- Make fields private by default; provide accessor methods when needed
-
-## Testing
-- **MUST** write unit tests for all new functions and types
-- **MUST** mock external dependencies (APIs, databases, file systems)
-- **MUST** use the built-in `#[test]` attribute and `cargo test`
-- Follow the Arrange-Act-Assert pattern
-- Do not commit commented-out tests
-- Use `#[cfg(test)]` modules for test code
-
-## Imports and Dependencies
-- **MUST** avoid wildcard imports (`use module::*`) except for preludes, test modules (`use super::*`), and prelude re-exports
-- **MUST** document dependencies in `Cargo.toml` with version constraints
-- Use `cargo` for dependency management
-- Organize imports: standard library, external crates, local modules
-- Use `rustfmt` to automate import formatting
-
-## Rust Best Practices
-- **NEVER** use `unsafe` unless absolutely necessary; document safety invariants when used
-- **MUST** call `.clone()` explicitly on non-`Copy` types; avoid hidden clones in closures and iterators
-- **MUST** use pattern matching exhaustively; avoid catch-all `_` patterns when possible
-- **MUST** use `format!` macro for string formatting
-- Use iterators and iterator adapters over manual loops
-- Use `enumerate()` instead of manual counter variables
-- Prefer `if let` and `while let` for single-pattern matching
-
-## Memory and Performance
-- **MUST** avoid unnecessary allocations; prefer `&str` over `String` when possible
-- **MUST** use `Cow<'_, str>` when ownership is conditionally needed
-- Use `Vec::with_capacity()` when the size is known
-- Prefer stack allocation over heap when appropriate
-- Use `Arc` and `Rc` judiciously; prefer borrowing
-
-## Benchmarking and Optimization
-- **NEVER** run benchmarks in parallel, as the benchmarks will compete for resources and the results will be invalid
-- **NEVER** game the benchmarks. Do not manipulate the benchmarks themselves to satisfy any required performance constraints
-- **NEVER** run benchmarks with `target-cpu=native` or any other `RUSTFLAGS`
-- **ALWAYS** run benchmarks in `release` mode to get accurate measurements for speed; **NEVER** run them in `debug`
-- If benchmarking against another crate or library, ensure the benchmarks are apples-to-apples comparisons that are fair and do not disproportionately favor one library over the other
-- Ensure benchmark tests are independent. If the tests are dependent due to a feature (e.g. caching), ensure the feature is disabled
-- **ALWAYS** use `criterion` directly for running benchmarks if available
-- **NEVER** save benchmark results or other writeups to a separate file unless the user **explicitly** asks you to do so. Print the benchmark results in console
-- You may continue implementing beyond specified metric requirements if there are still high-impact/low-lift ways to improve performance
-- Before handing off to the user, report the improvements results for **all benchmarks tested** in a Markdown table
-
-## Concurrency
-- **MUST** use `Send` and `Sync` bounds appropriately
-- **MUST** prefer `tokio` for async runtime in async applications
-- **MUST** use `rayon` for CPU-bound parallelism
-- Avoid `Mutex` when `RwLock` or lock-free alternatives are appropriate
-- Use channels (`mpsc`, `crossbeam`) for message passing
+### Code Comments
+- **SHOULD** avoid comments by designing and writing code that is clear on its own.
+- When writing a comment, **SHOULD** write it as if all readers are Rust novices and explain Rust-specific nuances.
+- **MUST** avoid redundant comments that merely restate what the code or function name already makes clear.
+- **MUST NOT** use a comment to justify a missing check or claim a guarantee that the code does not enforce. Enforce guarantees with types, validation, or control flow. Comments **MAY** explain how the code enforces them.
+- **MUST NOT** copy user prompts or agent instructions into code comments. Explain the relevant technical reason in clear technical prose.
 
 ## Security
-- **NEVER** store secrets, API keys, or passwords in code. Only store them in `.env`
-  - Ensure `.env` is declared in `.gitignore`
-- **MUST** use environment variables for sensitive configuration via `dotenvy` or `std::env`
-- **NEVER** log sensitive information (passwords, tokens, PII)
-- Use `secrecy` crate for sensitive data types
+- **MUST NOT** hardcode secrets, API keys, or passwords in code, and **NEVER** log sensitive information (tokens, passwords, PII).
+- Keep local secret files (such as `.env`) out of Git, and allow CI/deployment secret stores where appropriate. Use `secrecy` for sensitive data types.
+- **MUST** read sensitive runtime configuration from environment variables when the deployment uses them, via `std::env` or `dotenvy`.
 
 ## Version Control
-- **MUST** write clear, descriptive commit messages
-- **NEVER** commit commented-out code; delete it
-- **NEVER** commit debug `println!` statements or `dbg!` macros
-- **NEVER** commit credentials or sensitive data
+- **MUST** write clear, descriptive commit messages.
+- **MUST NOT** commit commented-out code, debug `println!` statements, `dbg!` macros, or credentials.
 
-## Agent-to-User Behavior
-- **NEVER** write excessive unnecessary script artifacts that needlessly pollute the worktree
-- When creating a batch of multiple subagents, **ALWAYS** launch each subagent in a separate parallel tool call: **NEVER** batch-create them with Python subprocesses. These subagents should have a minimum duration of 10 minutes and should only return their response: do not run other code to process the response
-- Do not ask for further clarification of functional requirements before implementation unless it is impossible to implement without doing so (e.g. if the user asks to optimize Python code and the repo does not have Python code, you may skip it without confirmation)
+## Unsafe Code
+**MUST NOT** use `unsafe` unless it is completely unavoidable. Use safe Rust whenever it can meet the requirement. When `unsafe` is necessary, obey all seven rules below:
 
-## Tools
-- **MUST** use `rustfmt` for code formatting
-- **MUST** use `clippy` for linting and follow its suggestions
-- **MUST** ensure code compiles with no warnings (use `-D warnings` flag in CI, not `#![deny(warnings)]` in source)
-- Use `cargo` for building, testing, and dependency management
-- Use `cargo test` for running tests
-- Use `cargo doc` for generating documentation
-- For projects which build a Python package, **NEVER** build with `cargo build --features python`: this will always fail. Instead, **ALWAYS** use `maturin`.
-- **NEVER** uses the `Explore` tool for `Cargo.lock`: it is large and irrelevant. Read `Cargo.lock` **ONLY** if it's extremely relevant.
+1. **Scope (`unsafe-minimize-scope`):** Keep each `unsafe` block as small as possible. Put unsafe operations in explicit `unsafe {}` blocks, even inside an `unsafe fn`.
+2. **Safety documentation (`unsafe-safety-comment`):** Write a `// SAFETY:` comment above every `unsafe` block explaining why the operation is sound, and a `# Safety` doc section on every `unsafe fn` stating caller obligations.
+3. **Initialization (`unsafe-maybeuninit`):** Use `MaybeUninit<T>` for uninitialized memory. Never call `assume_init` before initialization is complete. Never use `mem::uninitialized()`, and never use `mem::zeroed()` for types where zero is not a valid bit pattern.
+4. **Thread safety (`unsafe-send-sync-manual`):** Prefer compiler-derived `Send` and `Sync`. For any manual `unsafe impl Send` or `unsafe impl Sync`, document the invariant that makes it sound.
+5. **FFI declarations (`unsafe-extern-block`):** In Rust 2024, wrap `extern` blocks in `unsafe extern { }` and mark items `safe` only when callers have no safety obligations.
+6. **Linker attributes (`unsafe-no-mangle-unsafe`):** In Rust 2024, use `#[unsafe(no_mangle)]`, `#[unsafe(export_name = "...")]`, and `#[unsafe(link_section = "...")]`, and document how symbol/section constraints are met.
+7. **Miri (`unsafe-miri-ci`):** Run `cargo miri test` in CI for every crate that contains `unsafe` code (using the project task policy).
 
-## Before Committing
-- [ ] All tests pass (`cargo test`)
-- [ ] No compiler warnings (`cargo build`)
-- [ ] Clippy passes (`cargo clippy -- -D warnings`)
-- [ ] Code is formatted (`cargo fmt --check`)
-- [ ] If the project creates a Python package and Rust code is touched, rebuild the Python package (`source .venv/bin/activate && maturin develop --release --features python`)
-- [ ] If the project creates a WASM package and Rust code is touched, rebuild the WASM package (`wasm-pack build --target web --out-dir web/pkg`)
-- [ ] All public items have doc comments
-- [ ] No commented-out code or debug statements
-- [ ] No hardcoded credentials
-
----
-
-**Remember:** Prioritize clarity and maintainability over cleverness. This is your core directive.
+## Verification
+See `AGENTS.md` for the Mise task policy and the mandatory `verify` completion gate. Use Rustfmt for formatting and Clippy for lint checks through those tasks. Resolve compiler and Clippy warnings before handoff. Use `-D warnings` in CI and lint tasks rather than `#![deny(warnings)]` in source.
